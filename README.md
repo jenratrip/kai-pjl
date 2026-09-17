@@ -1,58 +1,376 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# KAI-PJL
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistem Pencatatan Dinasan PJL berbasis web yang dikembangkan menggunakan Laravel.
 
-## About Laravel
+Project ini digunakan untuk membantu proses pencatatan dinasan, jadwal KA, realisasi perjalanan KA, dan proses serah terima dinasan.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Teknologi
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Laravel 13
+- PHP 8.3+
+- MySQL
+- Laragon
+- Blade
+- Tailwind CSS
+- Vite
+- Git & GitHub
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Persyaratan
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Sebelum menjalankan project, pastikan sudah terinstall:
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+- PHP 8.3 atau lebih baru
+- Composer
+- Node.js dan npm
+- Git
+- Laragon
+- MySQL
 
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+Cek instalasi dengan:
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+php --version
+composer --version
+node --version
+npm --version
+git --version
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+---
 
-## Contributing
+## Instalasi Project
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### 1. Clone Repository
 
-## Code of Conduct
+Clone repository ke komputer masing-masing:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+git clone https://github.com/jenratrip/kai-pjl.git
+```
 
-## Security Vulnerabilities
+Masuk ke folder project:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+cd kai-pjl
+```
 
-## License
+---
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### 2. Install Dependency PHP
+
+Jalankan:
+
+```bash
+composer install
+```
+
+---
+
+### 3. Install Dependency Frontend
+
+Jalankan:
+
+```bash
+npm install
+```
+
+---
+
+### 4. Konfigurasi Environment
+
+Salin file `.env.example` menjadi `.env`.
+
+Untuk Git Bash:
+
+```bash
+cp .env.example .env
+```
+
+Untuk PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Kemudian generate application key:
+
+```bash
+php artisan key:generate
+```
+
+---
+
+## Konfigurasi Database
+
+### 1. Jalankan MySQL
+
+Buka Laragon kemudian klik:
+
+```text
+Start All
+```
+
+Pastikan MySQL dalam keadaan running.
+
+### 2. Buat Database
+
+Buat database MySQL dengan nama:
+
+```text
+kai_pjl
+```
+
+Database dapat dibuat melalui phpMyAdmin atau database manager lainnya.
+
+### 3. Konfigurasi `.env`
+
+Sesuaikan bagian database pada file `.env`:
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=kai_pjl
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+> Sesuaikan `DB_USERNAME` dan `DB_PASSWORD` apabila konfigurasi MySQL pada komputer berbeda.
+
+---
+
+## Migration Database
+
+Setelah database `kai_pjl` dibuat dan `.env` dikonfigurasi, jalankan:
+
+```bash
+php artisan migrate
+```
+
+Migration akan membuat tabel database sesuai struktur yang terdapat pada project.
+
+> Jangan membuat tabel secara manual apabila tabel tersebut sudah disediakan melalui migration Laravel.
+
+---
+
+## Menjalankan Project
+
+Jalankan:
+
+```bash
+composer run dev
+```
+
+Kemudian buka browser:
+
+```text
+http://localhost:8000
+```
+
+Untuk menghentikan server, tekan:
+
+```text
+Ctrl + C
+```
+
+---
+
+## Git Workflow
+
+Untuk menjaga agar pekerjaan antar anggota tim tidak saling bertabrakan, **jangan melakukan coding langsung pada branch `main`**.
+
+### 1. Sebelum mulai bekerja
+
+Pastikan berada pada branch `main`:
+
+```bash
+git checkout main
+```
+
+Ambil perubahan terbaru:
+
+```bash
+git pull origin main
+```
+
+---
+
+### 2. Buat Branch untuk Fitur
+
+Buat branch baru sesuai fitur yang dikerjakan:
+
+```bash
+git checkout -b feature/nama-fitur
+```
+
+Contoh:
+
+```bash
+git checkout -b feature/jadwal-ka
+```
+
+atau:
+
+```bash
+git checkout -b feature/realisasi-ka
+```
+
+---
+
+### 3. Setelah Selesai Coding
+
+Periksa perubahan:
+
+```bash
+git status
+```
+
+Tambahkan perubahan:
+
+```bash
+git add .
+```
+
+Buat commit:
+
+```bash
+git commit -m "Add fitur jadwal KA"
+```
+
+---
+
+### 4. Push Branch
+
+Push branch ke GitHub:
+
+```bash
+git push -u origin feature/nama-fitur
+```
+
+Contoh:
+
+```bash
+git push -u origin feature/jadwal-ka
+```
+
+---
+
+### 5. Pull Request
+
+Setelah branch berhasil di-push:
+
+1. Buka repository GitHub.
+2. Pilih **Pull requests**.
+3. Klik **New pull request**.
+4. Pilih branch fitur sebagai source.
+5. Pilih `main` sebagai target.
+6. Jelaskan perubahan yang dibuat.
+7. Buat Pull Request.
+8. Review perubahan bersama sebelum di-merge ke `main`.
+
+---
+
+## Aturan Penting
+
+### Jangan commit file `.env`
+
+File `.env` berisi konfigurasi lokal dan tidak boleh di-upload ke GitHub.
+
+Gunakan:
+
+```text
+.env.example
+```
+
+sebagai template konfigurasi.
+
+### Jangan commit dependency
+
+Folder berikut tidak perlu di-upload:
+
+```text
+/vendor
+/node_modules
+```
+
+Keduanya akan dibuat melalui:
+
+```bash
+composer install
+npm install
+```
+
+### Jangan coding langsung di `main`
+
+Gunakan branch fitur:
+
+```text
+main
+│
+├── feature/authentication
+├── feature/jadwal-ka
+├── feature/dinasan
+├── feature/realisasi-ka
+└── feature/serah-terima
+```
+
+---
+
+## Struktur Branch
+
+Branch utama:
+
+```text
+main
+```
+
+Branch pengembangan fitur:
+
+```text
+feature/nama-fitur
+```
+
+Contoh:
+
+```text
+feature/authentication
+feature/jadwal-ka
+feature/dinasan
+feature/realisasi-ka
+feature/serah-terima
+```
+
+Setiap fitur dikembangkan pada branch masing-masing dan digabungkan ke `main` melalui Pull Request.
+
+---
+
+## Catatan
+
+Setiap anggota tim menggunakan database MySQL lokal masing-masing dengan nama:
+
+```text
+kai_pjl
+```
+
+Struktur database dibagikan melalui Laravel Migration, sehingga tidak perlu membagikan database MySQL secara langsung.
+
+Apabila terdapat perubahan struktur database, buat atau ubah migration kemudian commit perubahan tersebut agar anggota tim lain dapat menjalankan:
+
+```bash
+git pull origin main
+php artisan migrate
+```
+
+---
+
+## Project Team
+
+Project: **KAI-PJL**
+
+Repository:
+
+https://github.com/jenratrip/kai-pjl
