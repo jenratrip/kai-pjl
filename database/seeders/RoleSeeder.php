@@ -9,9 +9,25 @@ class RoleSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::table('roles')->insert([
-            ['name' => 'pjl', 'label' => 'PJL', 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'admin', 'label' => 'Admin/Atasan', 'created_at' => now(), 'updated_at' => now()],
-        ]);
+        DB::table('roles')->upsert([
+            [
+                'name' => 'pjl',
+                'label' => 'PJL',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'name' => 'admin',
+                'label' => 'Admin/Atasan',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'name' => 'superadmin',
+                'label' => 'Superadmin',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ], ['name'], ['label', 'updated_at']);
     }
 }
