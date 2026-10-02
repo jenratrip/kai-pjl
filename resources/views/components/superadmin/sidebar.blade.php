@@ -3,7 +3,10 @@
     {{-- Logo --}}
     <div class="flex h-20 items-center border-b border-white/10 px-6">
         <div class="flex items-center gap-3">
-            <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-white font-bold text-[#0b1f3a]">
+
+            <div
+                class="flex h-11 w-11 items-center justify-center rounded-lg bg-white font-bold text-[#0b1f3a]"
+            >
                 KAI
             </div>
 
@@ -16,17 +19,30 @@
                     Sistem Operasional PJL
                 </p>
             </div>
+
         </div>
     </div>
+
 
     {{-- Navigation --}}
     <nav class="flex-1 space-y-1 px-4 py-6">
 
-        {{-- Dashboard --}}
+        {{-- =========================================================
+        | Dashboard
+        ========================================================== --}}
+
         <a
             href="{{ route('superadmin.dashboard') }}"
-            class="flex items-center gap-3 rounded-lg bg-white/10 px-4 py-3 text-sm font-medium transition hover:bg-white/15"
+            class="
+                flex items-center gap-3 rounded-lg px-4 py-3
+                text-sm font-medium transition
+                {{ request()->routeIs('superadmin.dashboard')
+                    ? 'bg-white/10 text-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }}
+            "
         >
+
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-5 w-5"
@@ -42,14 +58,29 @@
                 />
             </svg>
 
-            <span>Dashboard</span>
+            <span>
+                Dashboard
+            </span>
+
         </a>
 
-        {{-- Manajemen User --}}
+
+        {{-- =========================================================
+        | Manajemen User
+        ========================================================== --}}
+
         <a
-            href="#"
-            class="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
+            href="{{ route('superadmin.users.index') }}"
+            class="
+                flex items-center gap-3 rounded-lg px-4 py-3
+                text-sm font-medium transition
+                {{ request()->routeIs('superadmin.users.*')
+                    ? 'bg-white/10 text-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }}
+            "
         >
+
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-5 w-5"
@@ -63,7 +94,13 @@
                     stroke-linejoin="round"
                     d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"
                 />
-                <circle cx="9" cy="7" r="4" />
+
+                <circle
+                    cx="9"
+                    cy="7"
+                    r="4"
+                />
+
                 <path
                     stroke-linecap="round"
                     stroke-linejoin="round"
@@ -71,14 +108,26 @@
                 />
             </svg>
 
-            <span>Manajemen User</span>
+            <span>
+                Manajemen User
+            </span>
+
         </a>
 
-        {{-- Activity Log --}}
+
+        {{-- =========================================================
+        | Activity Log
+        ========================================================== --}}
+
         <a
             href="#"
-            class="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
+            class="
+                flex items-center gap-3 rounded-lg px-4 py-3
+                text-sm font-medium text-white/70
+                transition hover:bg-white/10 hover:text-white
+            "
         >
+
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-5 w-5"
@@ -92,17 +141,34 @@
                     stroke-linejoin="round"
                     d="M12 8v4l3 2"
                 />
-                <circle cx="12" cy="12" r="9" />
+
+                <circle
+                    cx="12"
+                    cy="12"
+                    r="9"
+                />
             </svg>
 
-            <span>Activity Log</span>
+            <span>
+                Activity Log
+            </span>
+
         </a>
 
-        {{-- Pengaturan --}}
+
+        {{-- =========================================================
+        | Pengaturan
+        ========================================================== --}}
+
         <a
             href="#"
-            class="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
+            class="
+                flex items-center gap-3 rounded-lg px-4 py-3
+                text-sm font-medium text-white/70
+                transition hover:bg-white/10 hover:text-white
+            "
         >
+
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-5 w-5"
@@ -116,6 +182,7 @@
                     stroke-linejoin="round"
                     d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"
                 />
+
                 <path
                     stroke-linecap="round"
                     stroke-linejoin="round"
@@ -123,10 +190,14 @@
                 />
             </svg>
 
-            <span>Pengaturan</span>
+            <span>
+                Pengaturan
+            </span>
+
         </a>
 
     </nav>
+
 
     {{-- User Profile --}}
     <x-superadmin.user-profile />

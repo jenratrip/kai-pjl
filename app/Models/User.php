@@ -52,6 +52,11 @@ class User extends Authenticatable
         return $this->hasMany(ActivityLog::class);
     }
 
+    public function catatanDinas(): HasMany
+    {
+        return $this->hasMany(CatatanDinas::class);
+    }
+
     public function hasRole(string $role): bool
     {
         return $this->role?->name === $role;
