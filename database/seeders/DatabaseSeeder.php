@@ -17,11 +17,24 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
         ]);
 
-        User::factory()->create([
-            'nip' => '0000000001',
-            'name' => 'Test Admin',
-            'email' => 'admin@example.com',
-            'role_id' => Role::where('name', 'admin')->value('id'),
-        ]);
+        User::updateOrCreate(
+            ['nip' => '0000000001'],
+            [
+                'name' => 'Test Admin',
+                'email' => 'admin@example.com',
+                'password' => 'password',
+                'role_id' => Role::where('name', 'admin')->value('id'),
+            ]
+        );
+
+        User::updateOrCreate(
+            ['nip' => '0000000000'],
+            [
+                'name' => 'Test Superadmin',
+                'email' => 'superadmin@example.com',
+                'password' => 'password',
+                'role_id' => Role::where('name', 'superadmin')->value('id'),
+            ]
+        );
     }
 }
