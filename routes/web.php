@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Support\Facades\Route;
@@ -6,6 +7,8 @@ use App\Http\Controllers\Auth\LoginController;
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\JplController;
+use App\Http\Controllers\Admin\JplImportController;
+use App\Http\Controllers\Admin\ResortController;
 use App\Http\Controllers\Admin\WilayahController;
 use App\Http\Controllers\Admin\WilayahImportController;
 
@@ -35,7 +38,6 @@ Route::get('/', function () {
         return redirect()->route('admin.dashboard');
     }
 
-    // Dashboard PJL
     return redirect()->route('user.dashboard');
 });
 
@@ -47,17 +49,15 @@ Route::get('/', function () {
 */
 
 Route::middleware('guest')->group(function () {
-
     Route::get('/login', [
         LoginController::class,
-        'showLoginForm'
+        'showLoginForm',
     ])->name('login');
 
     Route::post('/login', [
         LoginController::class,
-        'login'
+        'login',
     ])->name('login.store');
-
 });
 
 
@@ -69,7 +69,7 @@ Route::middleware('guest')->group(function () {
 
 Route::post('/logout', [
     LoginController::class,
-    'logout'
+    'logout',
 ])->middleware('auth')->name('logout');
 
 
@@ -99,7 +99,6 @@ Route::middleware('auth')
         Route::get('/serah-terima-dinas', function () {
             return view('user.serah-terima-dinas');
         })->name('serah-terima-dinas');
-
     });
 
 
@@ -108,8 +107,8 @@ Route::middleware('auth')
 | Admin - Operational Management
 |--------------------------------------------------------------------------
 |
-| Superadmin juga memiliki akses ke bagian Admin
-| sesuai middleware role yang digunakan backend.
+| Admin mengelola data operasional.
+| Superadmin juga dapat mengakses bagian Admin.
 |
 */
 
@@ -118,52 +117,119 @@ Route::middleware(['auth', 'role:admin,superadmin'])
     ->name('admin.')
     ->group(function () {
 
-        // Dashboard Admin
+        /*
+        |--------------------------------------------------------------------------
+        | Dashboard Admin
+        |--------------------------------------------------------------------------
+        */
+
         Route::get('/dashboard', [
             DashboardController::class,
-            'index'
+            'index',
         ])->name('dashboard');
 
-        // Master Data JPL
+
+        /*
+        |--------------------------------------------------------------------------
+        | Import JPL
+        |--------------------------------------------------------------------------
+        |
+        | Route import harus diletakkan sebelum Route::resource('jpl', ...).
+        |
+        */
+
+        // Halaman upload import JPL
+        Route::get('/jpl/import', [
+            JplImportController::class,
+            'create',
+        ])->name('jpl.import');
+
+        // Upload file dan menampilkan preview
+        Route::post('/jpl/import/preview', [
+            JplImportController::class,
+            'preview',
+        ])->name('jpl.import.preview.store');
+
+        // Halaman preview import
+        Route::get('/jpl/import/preview', [
+            JplImportController::class,
+            'showPreview',
+        ])->name('jpl.import.preview');
+
+        // Konfirmasi dan simpan hasil import
+        Route::post('/jpl/import/confirm', [
+            JplImportController::class,
+            'confirm',
+        ])->name('jpl.import.confirm');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Master Data JPL
+        |--------------------------------------------------------------------------
+        */
+
         Route::resource('jpl', JplController::class);
 
-        // Download Template Import Wilayah
+
+        /*
+        |--------------------------------------------------------------------------
+        | Master Data Resort
+        |--------------------------------------------------------------------------
+        */
+
+        Route::resource('resort', ResortController::class)
+            ->except(['destroy']);
+
+        // Aktifkan/nonaktifkan resort
+        Route::patch('/resort/{resort}/toggle-status', [
+            ResortController::class,
+            'toggleStatus',
+        ])->name('resort.toggle-status');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Master Data Wilayah
+        |--------------------------------------------------------------------------
+        |
+        | Route import diletakkan sebelum resource wilayah.
+        |
+        */
+
+        // Download template Excel wilayah
         Route::get('/wilayah/import/template', [
             WilayahController::class,
-            'downloadTemplate'
+            'downloadTemplate',
         ])->name('wilayah.import.template');
 
-        // Preview dan validasi file Excel
+        // Upload file dan validasi/preview
         Route::post('/wilayah/import/preview', [
             WilayahImportController::class,
-            'preview'
+            'preview',
         ])->name('wilayah.import.preview.store');
 
-        // Halaman Preview Import
+        // Halaman preview import wilayah
         Route::get('/wilayah/import/preview', [
             WilayahImportController::class,
-            'showPreview'
+            'showPreview',
         ])->name('wilayah.import.preview');
 
-        // Konfirmasi dan simpan import
+        // Konfirmasi dan simpan hasil import
         Route::post('/wilayah/import/confirm', [
             WilayahImportController::class,
-            'confirm'
+            'confirm',
         ])->name('wilayah.import.confirm');
 
-        // Resource Wilayah
+        // Resource master data wilayah
         Route::resource('wilayah', WilayahController::class)
-            ->except([
-                'show',
-                'destroy'
-            ]);
+            ->except(['show', 'destroy']);
 
         // Aktifkan/nonaktifkan wilayah
         Route::patch('/wilayah/{wilayah}/toggle-status', [
             WilayahController::class,
-            'toggleStatus'
+            'toggleStatus',
         ])->name('wilayah.toggle-status');
-
     });
 
 
@@ -178,70 +244,81 @@ Route::middleware('superadmin')
     ->name('superadmin.')
     ->group(function () {
 
-        // Dashboard Superadmin
+        /*
+        |--------------------------------------------------------------------------
+        | Dashboard Superadmin
+        |--------------------------------------------------------------------------
+        */
+
         Route::get('/dashboard', [
             SuperadminDashboardController::class,
-            'index'
+            'index',
         ])->name('dashboard');
 
-        // Daftar User
+
+        /*
+        |--------------------------------------------------------------------------
+        | Manajemen User
+        |--------------------------------------------------------------------------
+        */
+
+        // Daftar user
         Route::get('/users', [
             UserController::class,
-            'index'
+            'index',
         ])->name('users.index');
 
-        // Form Tambah User
+        // Form tambah user
         Route::get('/users/create', [
             UserController::class,
-            'create'
+            'create',
         ])->name('users.create');
 
-        // Simpan User Baru
+        // Simpan user baru
         Route::post('/users', [
             UserController::class,
-            'store'
+            'store',
         ])->name('users.store');
 
-        // Download Template Excel
+        // Download template Excel user
         Route::get('/users/import/template', [
             UserImportController::class,
-            'downloadTemplate'
+            'downloadTemplate',
         ])->name('users.import.template');
 
-        // Preview dan validasi import
+        // Upload dan preview import user
         Route::post('/users/import/preview', [
             UserImportController::class,
-            'preview'
+            'preview',
         ])->name('users.import.preview');
 
-        // Konfirmasi import
+        // Konfirmasi import user
         Route::post('/users/import/confirm', [
             UserImportController::class,
-            'confirm'
+            'confirm',
         ])->name('users.import.confirm');
 
-        // Detail User
+        // Detail user
         Route::get('/users/{user}', [
             UserController::class,
-            'show'
+            'show',
         ])->name('users.show');
 
-        // Form Edit User
+        // Form edit user
         Route::get('/users/{user}/edit', [
             UserController::class,
-            'edit'
+            'edit',
         ])->name('users.edit');
 
-        // Update User
+        // Update user
         Route::put('/users/{user}', [
             UserController::class,
-            'update'
+            'update',
         ])->name('users.update');
 
-        // Aktifkan/nonaktifkan User
+        // Aktifkan/nonaktifkan user
         Route::patch('/users/{user}/toggle-status', [
             UserController::class,
-            'toggleStatus'
+            'toggleStatus',
         ])->name('users.toggle-status');
-
     });

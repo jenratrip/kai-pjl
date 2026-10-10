@@ -3,7 +3,6 @@
 @section('title', 'Master Data JPL')
 
 @section('content')
-
 <div class="p-6">
 
     {{-- =========================================================
@@ -21,13 +20,23 @@
             </p>
         </div>
 
-        <a
-            href="{{ route('admin.jpl.create') }}"
-            class="inline-flex items-center justify-center gap-2 rounded-lg bg-[#08b878] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#079f69]"
-        >
-            <span class="text-lg leading-none">+</span>
-            <span>Tambah JPL</span>
-        </a>
+        <div class="flex items-center gap-2">
+
+            {{-- Import Excel --}}
+            <a
+                href="{{ route('admin.jpl.import') }}"
+                class="inline-flex items-center gap-2 rounded-lg bg-[#1d2d50] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#16233f]"
+            >
+                <span class="text-base leading-none">
+                    ↑
+                </span>
+
+                <span>
+                    Import Excel
+                </span>
+            </a>
+
+        </div>
 
     </div>
 
@@ -102,7 +111,7 @@
 
 
         {{-- =====================================================
-            FILTER & ACTION
+            FILTER
         ====================================================== --}}
         <div class="border-b border-gray-200 p-5">
 
@@ -113,7 +122,7 @@
 
                 <div class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
 
-                    {{-- Filters --}}
+                    {{-- Filter Fields --}}
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
 
                         {{-- Search --}}
@@ -139,7 +148,7 @@
 
 
                         {{-- Resort --}}
-                        <div class="min-w-[200px]">
+                        <div class="min-w-[220px]">
 
                             <label
                                 for="resort_id"
@@ -219,7 +228,7 @@
                     </div>
 
 
-                    {{-- Filter Buttons --}}
+                    {{-- Filter Actions --}}
                     <div class="flex items-center gap-2">
 
                         <button
@@ -267,13 +276,23 @@
                 @if ($jpls->total() > 0)
 
                     Menampilkan
+
                     <span class="font-semibold text-gray-700">
-                        {{ $jpls->firstItem() }}–{{ $jpls->lastItem() }}
+                        {{ $jpls->firstItem() }}
                     </span>
+
+                    -
+
+                    <span class="font-semibold text-gray-700">
+                        {{ $jpls->lastItem() }}
+                    </span>
+
                     dari
+
                     <span class="font-semibold text-gray-700">
                         {{ $jpls->total() }}
                     </span>
+
                     data
 
                 @else
@@ -322,10 +341,6 @@
                             Status
                         </th>
 
-                        <th class="whitespace-nowrap px-5 py-3 text-center text-xs font-bold uppercase tracking-wide text-gray-600">
-                            Aksi
-                        </th>
-
                     </tr>
 
                 </thead>
@@ -337,7 +352,6 @@
 
                         <tr class="transition hover:bg-gray-50">
 
-
                             {{-- Nomor --}}
                             <td class="whitespace-nowrap px-5 py-4 text-sm text-gray-500">
                                 {{ $jpls->firstItem() + $index }}
@@ -347,14 +361,30 @@
                             {{-- Kode JPL --}}
                             <td class="whitespace-nowrap px-5 py-4">
 
-                                <span class="font-bold text-[#1d2d50]">
-                                    {{ $jpl->kode_jpl }}
-                                </span>
+                                @if ($jpl->kode_jpl === 'Liar')
+
+                                    <span class="font-bold text-amber-600">
+                                        Liar
+                                    </span>
+
+                                @elseif ($jpl->kode_jpl)
+
+                                    <span class="font-bold text-[#1d2d50]">
+                                        {{ $jpl->kode_jpl }}
+                                    </span>
+
+                                @else
+
+                                    <span class="text-gray-400">
+                                        -
+                                    </span>
+
+                                @endif
 
                             </td>
 
 
-                            {{-- Nama --}}
+                            {{-- Nama JPL --}}
                             <td class="px-5 py-4">
 
                                 <div class="font-semibold text-gray-800">
@@ -407,52 +437,6 @@
 
                             </td>
 
-
-                            {{-- Aksi --}}
-                            <td class="whitespace-nowrap px-5 py-4">
-
-                                <div class="flex items-center justify-center gap-2">
-
-
-                                    {{-- Edit --}}
-                                    <a
-                                        href="{{ route('admin.jpl.edit', $jpl) }}"
-                                        title="Edit JPL"
-                                        class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-[#1d2d50] transition hover:bg-gray-200"
-                                    >
-                                        <span class="text-sm">
-                                            ✎
-                                        </span>
-                                    </a>
-
-
-                                    {{-- Hapus --}}
-                                    <form
-                                        action="{{ route('admin.jpl.destroy', $jpl) }}"
-                                        method="POST"
-                                        onsubmit="return confirm('Yakin ingin menghapus JPL {{ $jpl->kode_jpl }}?')"
-                                    >
-
-                                        @csrf
-
-                                        @method('DELETE')
-
-                                        <button
-                                            type="submit"
-                                            title="Hapus JPL"
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-500 transition hover:bg-red-100"
-                                        >
-                                            <span class="text-sm">
-                                                🗑
-                                            </span>
-                                        </button>
-
-                                    </form>
-
-                                </div>
-
-                            </td>
-
                         </tr>
 
                     @empty
@@ -460,14 +444,14 @@
                         <tr>
 
                             <td
-                                colspan="7"
+                                colspan="6"
                                 class="px-5 py-16 text-center"
                             >
 
                                 <div class="flex flex-col items-center">
 
                                     <div class="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-                                        <span class="text-xl text-gray-400">
+                                        <span class="text-xl font-bold text-gray-400">
                                             J
                                         </span>
                                     </div>
@@ -476,16 +460,26 @@
                                         Belum ada data JPL
                                     </p>
 
-                                    <p class="mt-1 text-xs text-gray-400">
-                                        Silakan tambahkan data JPL untuk mulai menggunakan modul ini.
+                                    <p class="mt-1 max-w-md text-xs text-gray-400">
+                                        Data JPL berasal dari master
+                                        <span class="font-semibold">
+                                            Data JPL.xlsx
+                                        </span>.
+                                        Silakan gunakan fitur Import Excel
+                                        untuk memasukkan data.
                                     </p>
 
                                     <a
-                                        href="{{ route('admin.jpl.create') }}"
-                                        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#08b878] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#079f69]"
+                                        href="{{ route('admin.jpl.import') }}"
+                                        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#1d2d50] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#16233f]"
                                     >
-                                        <span class="text-lg leading-none">+</span>
-                                        Tambah JPL
+
+                                        <span class="text-base leading-none">
+                                            ↑
+                                        </span>
+
+                                        Import Data JPL
+
                                     </a>
 
                                 </div>
@@ -519,5 +513,4 @@
     </div>
 
 </div>
-
 @endsection
