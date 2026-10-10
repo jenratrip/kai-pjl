@@ -993,20 +993,17 @@
 
 
             <!-- LOGOUT -->
+            <form action="{{ route('logout') }}" method="POST">
+                @csrf
 
-            <button
-                type="button"
-                class="logout-btn"
-                onclick="window.location.href='{{ url('/login') }}'"
-            >
-
-                <span>↪</span>
-
-                <span>
-                    Keluar
-                </span>
-
-            </button>
+                <button
+                    type="submit"
+                    class="logout-btn"
+                >
+                    <span>↪</span>
+                    <span>Keluar</span>
+                </button>
+            </form>
 
         </div>
 
