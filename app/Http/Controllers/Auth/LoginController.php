@@ -132,7 +132,7 @@ class LoginController extends Controller
 
         // PJL
         if ($user->hasRole('pjl')) {
-            return redirect()->route('pjl.dashboard');
+            return redirect()->route('user.dashboard');
         }
 
 

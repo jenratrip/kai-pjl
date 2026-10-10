@@ -21,47 +21,22 @@ use App\Http\Controllers\Superadmin\UserImportController;
 */
 
 Route::get('/', function () {
-
-    if (! auth()->check()) {
+    if (!auth()->check()) {
         return redirect()->route('login');
     }
 
     $user = auth()->user();
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | Superadmin
-    |--------------------------------------------------------------------------
-    */
-
     if ($user->isSuperadmin()) {
         return redirect()->route('superadmin.dashboard');
     }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Admin
-    |--------------------------------------------------------------------------
-    */
 
     if ($user->hasRole('admin')) {
         return redirect()->route('admin.dashboard');
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | PJL
-    |--------------------------------------------------------------------------
-    |
-    | Dashboard PJL belum dibuat.
-    | Untuk sementara kembali ke login.
-    |
-    */
-
-    return redirect()->route('login');
+    // Dashboard PJL
+    return redirect()->route('user.dashboard');
 });
 
 
@@ -73,23 +48,10 @@ Route::get('/', function () {
 
 Route::middleware('guest')->group(function () {
 
-    /*
-    |--------------------------------------------------------------------------
-    | Login Page
-    |--------------------------------------------------------------------------
-    */
-
     Route::get('/login', [
         LoginController::class,
         'showLoginForm'
     ])->name('login');
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Login Process
-    |--------------------------------------------------------------------------
-    */
 
     Route::post('/login', [
         LoginController::class,
@@ -108,17 +70,46 @@ Route::middleware('guest')->group(function () {
 Route::post('/logout', [
     LoginController::class,
     'logout'
-])
-    ->middleware('auth')
-    ->name('logout');
+])->middleware('auth')->name('logout');
 
 
 /*
 |--------------------------------------------------------------------------
-| Admin & Superadmin - Operational Management
+| User / PJL
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('auth')
+    ->prefix('user')
+    ->name('user.')
+    ->group(function () {
+
+        Route::get('/dashboard', function () {
+            return view('user.dashboard');
+        })->name('dashboard');
+
+        Route::get('/realisasi-ka', function () {
+            return view('user.realisasi-ka');
+        })->name('realisasi-ka');
+
+        Route::get('/catatan-dinas', function () {
+            return view('user.catatan-dinas');
+        })->name('catatan-dinas');
+
+        Route::get('/serah-terima-dinas', function () {
+            return view('user.serah-terima-dinas');
+        })->name('serah-terima-dinas');
+
+    });
+
+
+/*
+|--------------------------------------------------------------------------
+| Admin - Operational Management
 |--------------------------------------------------------------------------
 |
-| Superadmin memiliki seluruh akses Admin.
+| Superadmin juga memiliki akses ke bagian Admin
+| sesuai middleware role yang digunakan backend.
 |
 */
 
@@ -127,123 +118,47 @@ Route::middleware(['auth', 'role:admin,superadmin'])
     ->name('admin.')
     ->group(function () {
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Dashboard Admin
-        |--------------------------------------------------------------------------
-        */
-
+        // Dashboard Admin
         Route::get('/dashboard', [
             DashboardController::class,
             'index'
         ])->name('dashboard');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Master Data JPL
-        |--------------------------------------------------------------------------
-        */
-
+        // Master Data JPL
         Route::resource('jpl', JplController::class);
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Master Data Wilayah
-        |--------------------------------------------------------------------------
-        |
-        | Digunakan untuk mengelola data wilayah/resort hierarchy.
-        |
-        */
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Download Template Import Wilayah
-        |--------------------------------------------------------------------------
-        */
-
+        // Download Template Import Wilayah
         Route::get('/wilayah/import/template', [
             WilayahController::class,
             'downloadTemplate'
         ])->name('wilayah.import.template');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Upload & Preview Import Wilayah
-        |--------------------------------------------------------------------------
-        |
-        | POST digunakan untuk membaca file Excel,
-        | melakukan parsing, kemudian melakukan validasi
-        | sebelum data disimpan ke database.
-        |
-        */
-
+        // Preview dan validasi file Excel
         Route::post('/wilayah/import/preview', [
             WilayahImportController::class,
             'preview'
         ])->name('wilayah.import.preview.store');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Halaman Preview Import Wilayah
-        |--------------------------------------------------------------------------
-        |
-        | Menampilkan hasil validasi file Excel.
-        |
-        */
-
+        // Halaman Preview Import
         Route::get('/wilayah/import/preview', [
             WilayahImportController::class,
             'showPreview'
         ])->name('wilayah.import.preview');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Confirm Import Wilayah
-        |--------------------------------------------------------------------------
-        |
-        | Data baru akan disimpan ke database setelah Admin
-        | menekan tombol "Konfirmasi & Simpan".
-        |
-        */
-
+        // Konfirmasi dan simpan import
         Route::post('/wilayah/import/confirm', [
             WilayahImportController::class,
             'confirm'
         ])->name('wilayah.import.confirm');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Resource Wilayah
-        |--------------------------------------------------------------------------
-        |
-        | show dan destroy tidak digunakan.
-        |
-        */
-
+        // Resource Wilayah
         Route::resource('wilayah', WilayahController::class)
             ->except([
                 'show',
                 'destroy'
             ]);
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Toggle Status Wilayah
-        |--------------------------------------------------------------------------
-        |
-        | Mengaktifkan / menonaktifkan wilayah tanpa menghapus data.
-        |
-        */
-
+        // Aktifkan/nonaktifkan wilayah
         Route::patch('/wilayah/{wilayah}/toggle-status', [
             WilayahController::class,
             'toggleStatus'
@@ -263,151 +178,67 @@ Route::middleware('superadmin')
     ->name('superadmin.')
     ->group(function () {
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Dashboard
-        |--------------------------------------------------------------------------
-        */
-
+        // Dashboard Superadmin
         Route::get('/dashboard', [
             SuperadminDashboardController::class,
             'index'
         ])->name('dashboard');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Manajemen User
-        |--------------------------------------------------------------------------
-        */
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | List User
-        |--------------------------------------------------------------------------
-        */
-
+        // Daftar User
         Route::get('/users', [
             UserController::class,
             'index'
         ])->name('users.index');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Form Tambah User
-        |--------------------------------------------------------------------------
-        */
-
+        // Form Tambah User
         Route::get('/users/create', [
             UserController::class,
             'create'
         ])->name('users.create');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Simpan User Baru
-        |--------------------------------------------------------------------------
-        */
-
+        // Simpan User Baru
         Route::post('/users', [
             UserController::class,
             'store'
         ])->name('users.store');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Import User via Excel
-        |--------------------------------------------------------------------------
-        |
-        | Semua route import diletakkan sebelum
-        | route /users/{user}.
-        |
-        */
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Download Template Excel
-        |--------------------------------------------------------------------------
-        */
-
+        // Download Template Excel
         Route::get('/users/import/template', [
             UserImportController::class,
             'downloadTemplate'
         ])->name('users.import.template');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Preview dan Validasi File Excel
-        |--------------------------------------------------------------------------
-        */
-
+        // Preview dan validasi import
         Route::post('/users/import/preview', [
             UserImportController::class,
             'preview'
         ])->name('users.import.preview');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Confirm dan Proses Import Excel
-        |--------------------------------------------------------------------------
-        */
-
+        // Konfirmasi import
         Route::post('/users/import/confirm', [
             UserImportController::class,
             'confirm'
         ])->name('users.import.confirm');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Detail User
-        |--------------------------------------------------------------------------
-        */
-
+        // Detail User
         Route::get('/users/{user}', [
             UserController::class,
             'show'
         ])->name('users.show');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Form Edit User
-        |--------------------------------------------------------------------------
-        */
-
+        // Form Edit User
         Route::get('/users/{user}/edit', [
             UserController::class,
             'edit'
         ])->name('users.edit');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Update User
-        |--------------------------------------------------------------------------
-        */
-
+        // Update User
         Route::put('/users/{user}', [
             UserController::class,
             'update'
         ])->name('users.update');
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Toggle Status User
-        |--------------------------------------------------------------------------
-        */
-
+        // Aktifkan/nonaktifkan User
         Route::patch('/users/{user}/toggle-status', [
             UserController::class,
             'toggleStatus'
