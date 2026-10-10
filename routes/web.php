@@ -15,6 +15,8 @@ use App\Http\Controllers\Admin\WilayahImportController;
 use App\Http\Controllers\Superadmin\DashboardController as SuperadminDashboardController;
 use App\Http\Controllers\Superadmin\UserController;
 use App\Http\Controllers\Superadmin\UserImportController;
+use App\Http\Controllers\Superadmin\ActivityLogController;
+use App\Http\Controllers\Superadmin\SystemMonitoringController;
 
 
 /*
@@ -321,4 +323,58 @@ Route::middleware('superadmin')
             UserController::class,
             'toggleStatus',
         ])->name('users.toggle-status');
+
+        // Monitoring Activity Log
+        Route::get('/activities', [
+            ActivityLogController::class,
+            'index',
+        ])->name('activities.index');
+
+        Route::get('/activities/{activity}', [
+            ActivityLogController::class,
+            'show',
+        ])->name('activities.show');
+
+        Route::get('/monitoring', [
+            SystemMonitoringController::class,
+            'index',
+        ])->name('monitoring.index');
+
+        // Master Data JPL
+        
+        // Import JPL untuk Superadmin
+        Route::get('/jpl/import', [
+            JplImportController::class,
+            'create',
+        ])->name('jpl.import');
+
+        Route::post('/jpl/import/preview', [
+            JplImportController::class,
+            'preview',
+        ])->name('jpl.import.preview.store');
+
+        Route::get('/jpl/import/preview', [
+            JplImportController::class,
+            'showPreview',
+        ])->name('jpl.import.preview');
+
+        Route::post('/jpl/import/confirm', [
+            JplImportController::class,
+            'confirm',
+        ])->name('jpl.import.confirm');
+
+        Route::get('/jpl', [
+            \App\Http\Controllers\Superadmin\JplController::class,
+            'index',
+        ])->name('jpl.index');
+
+        Route::get('/jpl/{jpl}/edit', [
+            \App\Http\Controllers\Superadmin\JplController::class,
+            'edit',
+        ])->name('jpl.edit');
+
+        Route::put('/jpl/{jpl}', [
+            \App\Http\Controllers\Superadmin\JplController::class,
+            'update',
+        ])->name('jpl.update');
     });

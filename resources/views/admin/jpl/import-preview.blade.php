@@ -442,6 +442,11 @@
                                     <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
                                         Resort Baru
                                     </span>
+                                    
+                                @elseif (($row['status'] ?? '') === 'duplikat')
+                                    <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                                        Duplikat
+                                    </span>
 
                                 @else
 
