@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Auth\LoginController;
 
+use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\UserImportController as AdminUserImportController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\JplController;
 use App\Http\Controllers\Admin\JplImportController;
@@ -129,6 +131,52 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             DashboardController::class,
             'index',
         ])->name('dashboard');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Manajemen User
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/users', [
+            AdminUserController::class,
+            'index',
+        ])->name('users.index');
+
+        Route::get('/users/import/template', [
+            AdminUserImportController::class,
+            'downloadTemplate',
+        ])->name('users.import.template');
+
+        Route::post('/users/import/preview', [
+            AdminUserImportController::class,
+            'preview',
+        ])->name('users.import.preview');
+
+        Route::post('/users/import/confirm', [
+            AdminUserImportController::class,
+            'confirm',
+        ])->name('users.import.confirm');
+        
+        Route::get('/users/{id}', [
+            AdminUserController::class, 
+            'show'
+        ])->name('users.show');
+
+        Route::get('/users/{id}/edit', [
+            AdminUserController::class, 
+            'edit'
+        ])->name('users.edit');
+
+        Route::put('/users/{id}', [
+            AdminUserController::class, 
+            'update'
+        ])->name('users.update');
+
+        Route::patch('/users/{id}/status', [
+            AdminUserController::class, 
+            'toggleStatus'
+        ])->name('users.toggle-status');
 
 
         /*

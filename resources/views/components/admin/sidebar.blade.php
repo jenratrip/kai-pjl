@@ -255,6 +255,13 @@
                 </a>
 
                 <a
+                    href="{{ route('admin.users.index') }}"
+                    class="block rounded-lg px-3 py-2 text-sm text-blue-200 transition hover:bg-white/5 hover:text-white"
+                >
+                    Manajemen User
+                </a>
+
+                <a
                     href="#"
                     class="block rounded-lg px-3 py-2 text-sm text-blue-200 transition hover:bg-white/5 hover:text-white"
                 >
