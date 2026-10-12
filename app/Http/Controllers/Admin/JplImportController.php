@@ -157,62 +157,67 @@ class JplImportController extends Controller
             ->filter()
             ->flip();
 
+        /*
+        * Validasi setiap baris dan deteksi duplikat.
+        */
+        $seenKodeJpl = [];
 
-/*
- * Validasi setiap baris dan deteksi duplikat.
- */
-$seenKodeJpl = [];
+        $previewRows = $rows
+            ->map(function ($row) use (
+                $existingResorts,
+                $existingKodeJpl,
+                &$seenKodeJpl,
+                $normalize
+            ) {
+                $row['status'] = 'valid';
+                $row['errors'] = [];
+                $row['notes'] = [];
 
-$previewRows = $rows
-    ->map(function ($row) use (
-        $existingResorts,
-        $existingKodeJpl,
-        &$seenKodeJpl,
-        $normalize
-    ) {
-        $row['status'] = 'valid';
-        $row['errors'] = [];
-        $row['notes'] = [];
+                $kodeJpl = strtoupper(
+                    trim((string) ($row['kode_jpl'] ?? ''))
+                );
 
-        $kodeJpl = strtoupper(trim((string) ($row['kode_jpl'] ?? '')));
-        $resortName = $normalize($row['resort'] ?? '');
+                $resortName = $normalize(
+                    $row['resort'] ?? ''
+                );
 
-        // Resort wajib diisi.
-        if ($resortName === '') {
-            $row['status'] = 'error';
-            $row['errors'][] = 'RESORT kosong.';
-        } elseif (! $existingResorts->has($resortName)) {
-            $row['notes'][] = 'Resort belum tersedia dan akan dibuat otomatis.';
-        }
+                // Validasi Resort.
+                if ($resortName === '') {
+                    $row['status'] = 'error';
+                    $row['errors'][] = 'RESORT kosong.';
+                } elseif (! $existingResorts->has($resortName)) {
+                    $row['status'] = 'baru';
+                    $row['notes'][] =
+                        'Resort belum tersedia dan akan dibuat otomatis.';
+                }
 
-        // Nama JPL wajib diisi.
-        if (trim((string) ($row['nama_jpl'] ?? '')) === '') {
-            $row['status'] = 'error';
-            $row['errors'][] = 'NAMA JLN / DAERAH kosong.';
-        }
+                // Validasi nama JPL.
+                if (trim((string) ($row['nama_jpl'] ?? '')) === '') {
+                    $row['status'] = 'error';
+                    $row['errors'][] = 'NAMA JLN / DAERAH kosong.';
+                }
 
-        // Kode JPL wajib diisi.
-        if ($kodeJpl === '') {
-            $row['status'] = 'error';
-            $row['errors'][] = 'NO JPL kosong.';
-        } elseif ($row['status'] !== 'error') {
-            // Sudah ada di database?
-            if ($existingKodeJpl->has($kodeJpl)) {
-                $row['status'] = 'duplikat';
-                $row['notes'][] = 'Kode JPL sudah ada di database dan tidak akan diimpor.';
-            // Duplikat dalam file Excel yang sama?
-            } elseif (isset($seenKodeJpl[$kodeJpl])) {
-                $row['status'] = 'duplikat';
-                $row['notes'][] = 'Kode JPL muncul lebih dari sekali dalam file Excel.';
-            } else {
-                $seenKodeJpl[$kodeJpl] = true;
-            }
-        }
+                // Validasi dan deteksi duplikat kode JPL.
+                if ($kodeJpl === '') {
+                    $row['status'] = 'error';
+                    $row['errors'][] = 'NO JPL kosong.';
+                } elseif ($row['status'] !== 'error') {
+                    if ($existingKodeJpl->has($kodeJpl)) {
+                        $row['status'] = 'duplikat';
+                        $row['notes'][] =
+                            'Kode JPL sudah ada di database dan tidak akan diimpor.';
+                    } elseif (isset($seenKodeJpl[$kodeJpl])) {
+                        $row['status'] = 'duplikat';
+                        $row['notes'][] =
+                            'Kode JPL muncul lebih dari sekali dalam file Excel.';
+                    } else {
+                        $seenKodeJpl[$kodeJpl] = true;
+                    }
+                }
 
-        return $row;
-    })
-    ->values();
-
+                return $row;
+            })
+            ->values();
 
         /*
          * Hitung statistik preview.
