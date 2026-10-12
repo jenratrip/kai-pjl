@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>Serah Terima Dinas PJL</title>
 
@@ -393,40 +394,57 @@
         /* =====================================================
            LOGOUT
         ===================================================== */
-
-        .logout-link {
+        .logout-form {
+            display: block;
             width: 100%;
-            min-height: 44px;
-            margin-top: 8px;
-            padding: 0 14px;
+            margin: 0;
+        }
+
+        .logout-btn {
+            width: 100%;
+            min-height: 40px;
+            padding: 0 12px;
 
             display: flex;
             align-items: center;
-
+            justify-content: flex-start;
             gap: 10px;
 
-            text-decoration: none;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
 
-            color: white;
+            color: #e2e8f0;
+            background: transparent;
 
-            border: 1px solid rgba(255, 255, 255, .25);
-            border-radius: 7px;
+            font-family: inherit;
+            font-size: 10px;
+            font-weight: 600;
+            text-align: left;
 
-            font-size: 14px;
-            font-weight: 500;
-
-            transition:
-                background .2s ease,
-                transform .2s ease;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease;
         }
 
-        .logout-link:hover {
-            background: rgba(255, 255, 255, .08);
+        .logout-btn span:first-child {
+            width: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            line-height: 1;
         }
 
-        .logout-link:active {
-            transform: scale(.99);
+        .logout-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.25);
         }
+
+        .logout-btn:focus-visible {
+            outline: 2px solid #fff;
+            outline-offset: 2px;
+        }
+
 
         /* =====================================================
            MAIN
@@ -2918,13 +2936,20 @@
             </div>
 
 
-            <a
-                href="/login"
-                class="logout-link"
-            >
-                <span class="menu-icon">↪</span>
-                <span>Keluar</span>
-            </a>
+            <!-- LOGOUT -->
+            <form action="{{ route('logout') }}" method="POST" class="logout-form">
+                @csrf
+
+                <button type="submit" class="logout-btn">
+                    <span>↪</span>
+                    <span>Keluar</span>
+                </button>
+            </form>
+
+
+                    </div>
+
+                </header>
 
         </div>
 
@@ -2963,65 +2988,38 @@
 
 
             <!-- INFORMASI DINAS -->
+            <div>
+                <div class="field-label">HARI</div>
+                <select class="select" id="hari">
+                    <option value="Senin">Senin</option>
+                    <option value="Selasa">Selasa</option>
+                    <option value="Rabu">Rabu</option>
+                    <option value="Kamis">Kamis</option>
+                    <option value="Jumat">Jumat</option>
+                    <option value="Sabtu">Sabtu</option>
+                    <option value="Minggu">Minggu</option>
+                </select>
+            </div>
 
-            <div class="info-card">
+            <div>
+                <div class="field-label">TANGGAL</div>
+                <input
+                    type="date"
+                    class="input"
+                    id="tanggal"
+                    value="{{ now('Asia/Jakarta')->format('Y-m-d') }}"
+                >
+            </div>
 
-                <div class="info-grid">
-
-                    <div>
-
-                        <div class="field-label">
-                            HARI
-                        </div>
-
-                        <select
-                            class="select"
-                            id="hari"
-                        >
-                            <option>Senin</option>
-                            <option>Selasa</option>
-                            <option>Rabu</option>
-                            <option>Kamis</option>
-                            <option>Jumat</option>
-                            <option>Sabtu</option>
-                            <option>Minggu</option>
-                        </select>
-
-                    </div>
-
-
-                    <div>
-
-                        <div class="field-label">
-                            TANGGAL
-                        </div>
-
-                        <input
-                            type="date"
-                            class="input"
-                            id="tanggal"
-                            value="2024-09-30"
-                        >
-
-                    </div>
-
-
-                    <div>
-
-                        <div class="field-label">
-                            JAM SERAH TERIMA
-                        </div>
-
-                        <input
-                            type="time"
-                            class="input"
-                            id="jamSerahTerima"
-                            value="16:00"
-                        >
-
-                    </div>
-
-                </div>
+            <div>
+                <div class="field-label">JAM SERAH TERIMA</div>
+                <input
+                    type="time"
+                    class="input"
+                    id="jamSerahTerima"
+                    value="{{ now('Asia/Jakarta')->format('H:i') }}"
+                >
+            </div>
 
 
                 <div class="info-grid-bottom">
@@ -3083,6 +3081,7 @@
                 <div
                     class="auto-ka-result"
                     id="kaBatal"
+                    data-ka='@json($ringkasanKA["batal"] ?? [])'
                     aria-label="Daftar KA yang batal"
                 ></div>
 
@@ -3104,7 +3103,7 @@
                         2
                     </span>
 
-                    KA-KA yang berjalan / informasi perjalanan
+                    KA-KA Fak/PLB/KLB yang jalan
 
                 </div>
 
@@ -3115,6 +3114,7 @@
                 <div
                     class="auto-ka-result"
                     id="kaBerjalan"
+                    data-ka='@json($ringkasanKA["berjalan"] ?? [])'
                     aria-label="Daftar KA yang berjalan"
                 ></div>
 
@@ -3147,6 +3147,7 @@
                 <div
                     class="auto-ka-result"
                     id="kaBelumLewat"
+                    data-ka='@json($ringkasanKA["belum"] ?? [])'
                     aria-label="Daftar KA yang belum lewat"
                 ></div>
 
@@ -3833,66 +3834,30 @@
     <script>
 
         /* =====================================================
-           STORAGE REALISASI KA
-        ===================================================== */
-
-        const REALISASI_KA_STORAGE_KEY = "realisasi_ka_pjl";
-
-
-        /* =====================================================
-           AMBIL DATA REALISASI KA
-        ===================================================== */
-
-        function getDataRealisasiKA() {
-
-            try {
-
-                const savedData =
-                    localStorage.getItem(
-                        REALISASI_KA_STORAGE_KEY
-                    );
-
-                if (!savedData) {
-                    return [];
-                }
-
-                const data =
-                    JSON.parse(savedData);
-
-                if (!Array.isArray(data)) {
-                    return [];
-                }
-
-                return data;
-
-            } catch (error) {
-
-                console.error(
-                    "Gagal membaca data Realisasi KA:",
-                    error
-                );
-
-                return [];
-            }
-        }
-
-
-        /* =====================================================
-           AMBIL KA BERDASARKAN STATUS
+           DATA KA DARI DATABASE LARAVEL
         ===================================================== */
 
         function getKAByStatus(status) {
 
-            const dataKA =
-                getDataRealisasiKA();
+            const idElemen = {
+                BATAL: "kaBatal",
+                JALAN: "kaBerjalan",
+                BELUM: "kaBelumLewat"
+            };
 
-            return dataKA.filter(function(ka) {
+            const element = document.getElementById(idElemen[status]);
 
-                return String(
-                    ka.status || ""
-                ).toUpperCase() === status;
+            if (!element) {
+                return [];
+            }
 
-            });
+            try {
+                const data = JSON.parse(element.dataset.ka || "[]");
+                return Array.isArray(data) ? data : [];
+            } catch (error) {
+                console.error("Gagal membaca data KA dari Laravel:", error);
+                return [];
+            }
         }
 
 
@@ -3902,28 +3867,13 @@
 
         function formatNomorKA(ka) {
 
-            let nomor =
-                String(
-                    ka?.nomor ?? ""
-                ).trim();
+            const nomor = String(ka?.nomor ?? "").trim();
 
-
-            if (
-                nomor === "" ||
-                nomor === "-"
-            ) {
+            if (!nomor || nomor === "-") {
                 return "";
             }
 
-
-            if (
-                /^KA\s*/i.test(nomor)
-            ) {
-                return nomor;
-            }
-
-
-            return "KA " + nomor;
+            return /^KA\s*/i.test(nomor) ? nomor : "KA " + nomor;
         }
 
 
@@ -3933,45 +3883,40 @@
 
         function renderDataKA() {
 
-            const kaBatal = getKAByStatus("BATAL");
-            const kaBerjalan = getKAByStatus("JALAN");
-            const kaBelumLewat = getKAByStatus("BELUM");
+            const daftar = [
+                {
+                    id: "kaBatal",
+                    status: "BATAL",
+                    kosong: "Tidak ada KA yang batal."
+                },
+                {
+                    id: "kaBerjalan",
+                    status: "JALAN",
+                    kosong: "Tidak ada KA yang sedang berjalan."
+                },
+                {
+                    id: "kaBelumLewat",
+                    status: "BELUM",
+                    kosong: "Tidak ada KA yang belum lewat."
+                }
+            ];
 
-            const resultBatal = document.getElementById("kaBatal");
-            const resultBerjalan = document.getElementById("kaBerjalan");
-            const resultBelumLewat = document.getElementById("kaBelumLewat");
+            daftar.forEach(function(item) {
+                const element = document.getElementById(item.id);
 
-            const renderResult = (element, data, emptyText) => {
-                if (!element) return;
+                if (!element) {
+                    return;
+                }
 
+                const data = getKAByStatus(item.status);
                 const nomorKA = data.map(formatNomorKA).filter(Boolean);
 
-                if (nomorKA.length > 0) {
-                    element.textContent = nomorKA.join(", ");
-                    element.classList.remove("auto-ka-empty");
-                } else {
-                    element.textContent = emptyText;
-                    element.classList.add("auto-ka-empty");
-                }
-            };
+                element.textContent = nomorKA.length
+                    ? nomorKA.join(", ")
+                    : item.kosong;
 
-            renderResult(
-                resultBatal,
-                kaBatal,
-                "Tidak ada KA yang batal."
-            );
-
-            renderResult(
-                resultBerjalan,
-                kaBerjalan,
-                "Tidak ada KA yang sedang berjalan."
-            );
-
-            renderResult(
-                resultBelumLewat,
-                kaBelumLewat,
-                "Tidak ada KA yang belum lewat."
-            );
+                element.classList.toggle("auto-ka-empty", nomorKA.length === 0);
+            });
         }
 
 
@@ -4097,6 +4042,47 @@
                 "✓ " +
                 button.textContent.trim();
         }
+
+        /* =====================================================
+            SINKRONISASI HARI, TANGGAL, DAN JAM
+            ==================================================== */
+
+            function sinkronisasiTanggalWaktu() {
+                const tanggalInput = document.getElementById("tanggal");
+                const jamInput = document.getElementById("jamSerahTerima");
+                const hariSelect = document.getElementById("hari");
+
+                if (!tanggalInput || !jamInput || !hariSelect) {
+                    return;
+                }
+
+                // Gunakan tanggal dan waktu zona WIB dari server Laravel.
+                const waktuServer = new Date(
+                    @json(now('Asia/Jakarta')->format('Y-m-d\TH:i:s'))
+                );
+
+                const tahun = waktuServer.getFullYear();
+                const bulan = String(waktuServer.getMonth() + 1).padStart(2, "0");
+                const tanggal = String(waktuServer.getDate()).padStart(2, "0");
+
+                tanggalInput.value = `${tahun}-${bulan}-${tanggal}`;
+
+                jamInput.value =
+                    String(waktuServer.getHours()).padStart(2, "0") + ":" +
+                    String(waktuServer.getMinutes()).padStart(2, "0");
+
+                const namaHari = [
+                    "Minggu",
+                    "Senin",
+                    "Selasa",
+                    "Rabu",
+                    "Kamis",
+                    "Jumat",
+                    "Sabtu"
+                ];
+
+                hariSelect.value = namaHari[waktuServer.getDay()];
+            }
 
 
         /* =====================================================
@@ -4771,53 +4757,185 @@
         /* =====================================================
            SIMPAN DOKUMEN
         ===================================================== */
-
-        function saveDocument() {
-
-            alert(
-                "Dokumen Serah Terima Dinas berhasil disimpan sementara."
+        async function saveDocument() {
+            const tombolSimpan = document.querySelector(
+                '.button.button-primary[onclick="saveDocument()"]'
             );
+
+            if (!tombolSimpan) {
+                alert("Tombol Simpan tidak ditemukan.");
+                return;
+            }
+
+            const cards = document.querySelectorAll(".signature-card");
+
+            if (cards.length < 2) {
+                alert("Bagian tanda tangan tidak ditemukan.");
+                return;
+            }
+
+            // Ambil tanda tangan yang sudah ditekan tombol Simpan.
+            const getSignature = (card) => {
+                const image = card.querySelector(".signature-result");
+
+                return image?.dataset.signature || null;
+            };
+
+            const tandaTanganPenyerah = getSignature(cards[0]);
+            const tandaTanganPenerima = getSignature(cards[1]);
+
+            // Ambil nama dan NIP dari input yang tersedia.
+            const nipPenyerahInput = cards[0].querySelector("input");
+            const namaPenerimaInput = document.getElementById(
+                "namaPjlPenerima"
+            );
+            const nipPenerimaInput = document.getElementById(
+                "nipPjlPenerima"
+            );
+
+            // Kumpulkan inventaris.
+            const inventaris = Array.from(
+                document.querySelectorAll(".inventory-row")
+            ).map((row) => {
+                const jumlah = row.querySelector(".qty");
+                const kondisi = row.querySelectorAll(".condition");
+
+                return {
+                    nama: row.querySelector(".inventory-name")
+                        ?.textContent.trim() || "",
+                    jumlah: jumlah?.value || "0",
+                    kelengkapan: kondisi[0]?.value || "",
+                    kondisi: kondisi[1]?.value || ""
+                };
+            });
+
+            // Ambil ringkasan KA yang ditampilkan di halaman.
+            const ringkasanKA = {
+                batal: document.getElementById("kaBatal")?.textContent.trim() || "",
+                berjalan: document.getElementById("kaBerjalan")?.textContent.trim() || "",
+                belumLewat: document.getElementById("kaBelumLewat")?.textContent.trim() || ""
+            };
+
+            const payload = {
+            tanggal_serah_terima:
+                document.getElementById("tanggal")?.value || "",
+
+            jam_serah_terima:
+                document.getElementById("jamSerahTerima")?.value || "",
+
+            catatan_penting:
+                document.getElementById("catatanPenting")?.value || "",
+
+                ppka:
+                    document.getElementById("ppka")?.value || "",
+
+                nama_penerima:
+                    namaPenerimaInput?.value.trim() || "",
+
+                nip_penerima:
+                    nipPenerimaInput?.value.trim() || "",
+
+                nip_penyerah:
+                    nipPenyerahInput?.value.trim() || "",
+
+                ringkasan: {
+                    inventaris: inventaris,
+                    kereta_api: ringkasanKA
+                },
+
+                tanda_tangan_penyerah: tandaTanganPenyerah,
+                tanda_tangan_penerima: tandaTanganPenerima
+            };
+
+            // Ambil token CSRF Laravel.
+            const csrfToken = document.querySelector(
+                'meta[name="csrf-token"]'
+            )?.getAttribute("content");
+
+            if (!csrfToken) {
+                alert(
+                    "Token keamanan tidak ditemukan. Pastikan tag meta CSRF tersedia di bagian head."
+                );
+                return;
+            }
+
+            tombolSimpan.disabled = true;
+            const teksAsli = tombolSimpan.textContent;
+            tombolSimpan.textContent = "Menyimpan...";
+
+            try {
+                const response = await fetch(
+                    @json(route('user.serah-terima-dinas.store')),
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Accept": "application/json",
+                            "X-CSRF-TOKEN": csrfToken
+                        },
+                        body: JSON.stringify(payload)
+                    }
+                );
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    if (response.status === 422 && result.errors) {
+                        const pesan = Object.values(result.errors)
+                            .flat()
+                            .join("\n");
+
+                        throw new Error(
+                            pesan || result.message || "Data belum valid."
+                        );
+                    }
+
+                    throw new Error(
+                        result.message || "Gagal menyimpan dokumen."
+                    );
+                }
+
+                alert(
+                    result.message ||
+                    "Dokumen serah terima berhasil disimpan."
+                );
+
+            } catch (error) {
+                console.error("Gagal menyimpan serah terima:", error);
+
+                alert(
+                    "Dokumen gagal disimpan.\n" +
+                    (error.message || "Periksa koneksi dan log Laravel.")
+                );
+            } finally {
+                tombolSimpan.disabled = false;
+                tombolSimpan.textContent = teksAsli;
+            }
         }
+
 
 
         /* =====================================================
            INISIALISASI HALAMAN
         ===================================================== */
 
-        document.addEventListener(
-            "DOMContentLoaded",
-            function() {
+        document.addEventListener("DOMContentLoaded", function() {
+                sinkronisasiTanggalWaktu();
 
                 renderDataKA();
                 updateDataPjlPenerima();
 
-                const namaPenerima =
-                    document.getElementById(
-                        "namaPjlPenerima"
-                    );
-
-                const nipPenerima =
-                    document.getElementById(
-                        "nipPjlPenerima"
-                    );
+                const namaPenerima = document.getElementById("namaPjlPenerima");
+                const nipPenerima = document.getElementById("nipPjlPenerima");
 
                 if (namaPenerima) {
-                    namaPenerima.addEventListener(
-                        "input",
-                        updateDataPjlPenerima
-                    );
+                    namaPenerima.addEventListener("input", updateDataPjlPenerima);
                 }
 
                 if (nipPenerima) {
-                    nipPenerima.addEventListener(
-                        "input",
-                        updateDataPjlPenerima
-                    );
+                    nipPenerima.addEventListener("input", updateDataPjlPenerima);
                 }
-
-            }
-        );
-
+            });
 
         /* =====================================================
            UPDATE SAAT KEMBALI KE TAB
@@ -4828,27 +4946,6 @@
             function() {
 
                 renderDataKA();
-
-            }
-        );
-
-
-        /* =====================================================
-           UPDATE LOCAL STORAGE
-        ===================================================== */
-
-        window.addEventListener(
-            "storage",
-            function(event) {
-
-                if (
-                    event.key ===
-                    REALISASI_KA_STORAGE_KEY
-                ) {
-
-                    renderDataKA();
-
-                }
 
             }
         );

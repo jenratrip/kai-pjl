@@ -1,4 +1,3 @@
-
 <?php
 
 use Illuminate\Support\Facades\Route;
@@ -11,6 +10,10 @@ use App\Http\Controllers\Admin\JplImportController;
 use App\Http\Controllers\Admin\ResortController;
 use App\Http\Controllers\Admin\WilayahController;
 use App\Http\Controllers\Admin\WilayahImportController;
+
+use App\Http\Controllers\User\RealisasiKaController;
+use App\Http\Controllers\User\CatatanDinasController;
+use App\Http\Controllers\User\SerahTerimaDinasController;
 
 use App\Http\Controllers\Superadmin\DashboardController as SuperadminDashboardController;
 use App\Http\Controllers\Superadmin\UserController;
@@ -79,26 +82,78 @@ Route::post('/logout', [
 |--------------------------------------------------------------------------
 */
 
-Route::middleware('auth')
+Route::middleware(['auth', 'role:pjl'])
     ->prefix('user')
     ->name('user.')
     ->group(function () {
 
-        Route::get('/dashboard', function () {
-            return view('user.dashboard');
-        })->name('dashboard');
+        /*
+        |--------------------------------------------------------------------------
+        | Dashboard User
+        |--------------------------------------------------------------------------
+        */
 
-        Route::get('/realisasi-ka', function () {
-            return view('user.realisasi-ka');
-        })->name('realisasi-ka');
+        Route::get('/dashboard', [
+            \App\Http\Controllers\User\DashboardController::class,
+            'index',
+        ])->name('dashboard');
 
-        Route::get('/catatan-dinas', function () {
-            return view('user.catatan-dinas');
-        })->name('catatan-dinas');
 
-        Route::get('/serah-terima-dinas', function () {
-            return view('user.serah-terima-dinas');
-        })->name('serah-terima-dinas');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Realisasi KA
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/realisasi-ka', [
+            RealisasiKaController::class,
+            'index',
+        ])->name('realisasi-ka');
+
+        Route::post('/realisasi-ka', [
+            RealisasiKaController::class,
+            'store',
+        ])->name('realisasi-ka.store');
+
+
+       
+        /*
+        |--------------------------------------------------------------------------
+        | Catatan Dinas
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/catatan-dinas', [
+            CatatanDinasController::class,
+            'index',
+        ])->name('catatan-dinas');
+
+        Route::post('/catatan-dinas', [
+            CatatanDinasController::class,
+            'store',
+        ])->name('catatan-dinas.store');
+
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Serah Terima Dinas
+        |--------------------------------------------------------------------------
+        */
+
+        // Menampilkan halaman Serah Terima Dinas
+        Route::get('/serah-terima-dinas', [
+            SerahTerimaDinasController::class,
+            'index',
+        ])->name('serah-terima-dinas');
+
+        // Menyimpan dokumen Serah Terima Dinas
+        Route::post('/serah-terima-dinas', [
+            SerahTerimaDinasController::class,
+            'store',
+        ])->name('serah-terima-dinas.store');
+
     });
 
 
@@ -134,7 +189,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
         | Import JPL
         |--------------------------------------------------------------------------
         |
-        | Route import harus diletakkan sebelum Route::resource('jpl', ...).
+        | Route import diletakkan sebelum Route::resource('jpl', ...).
         |
         */
 
@@ -230,6 +285,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             WilayahController::class,
             'toggleStatus',
         ])->name('wilayah.toggle-status');
+
     });
 
 
@@ -321,4 +377,5 @@ Route::middleware('superadmin')
             UserController::class,
             'toggleStatus',
         ])->name('users.toggle-status');
+
     });

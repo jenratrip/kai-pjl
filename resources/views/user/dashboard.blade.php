@@ -980,37 +980,37 @@
         <div class="header-right">
 
             <div class="pjl-info">
-
                 <div class="pjl-name">
-                    PJL 78 Lempuyangan
+                    {{ $lokasiDinas }}
                 </div>
 
                 <div class="shift">
-                    Shift B (08:00 - 16:00)
+                    @if ($namaShift !== '-')
+                        {{ $namaShift }}
+                        @if ($jamDinas !== '-')
+                            ({{ $jamDinas }})
+                        @endif
+                    @else
+                        Shift belum ditentukan
+                    @endif
                 </div>
-
             </div>
 
 
             <!-- LOGOUT -->
+            <form action="{{ route('logout') }}" method="POST" class="logout-form">
+                @csrf
 
-            <button
-                type="button"
-                class="logout-btn"
-                onclick="window.location.href='{{ url('/login') }}'"
-            >
+                <button type="submit" class="logout-btn">
+                    <span>↪</span>
+                    <span>Keluar</span>
+                </button>
+            </form>
 
-                <span>↪</span>
 
-                <span>
-                    Keluar
-                </span>
+                    </div>
 
-            </button>
-
-        </div>
-
-    </header>
+                </header>
 
 
     <!-- ========================================
@@ -1029,8 +1029,15 @@
 
             <!-- AVATAR -->
 
-            <div class="avatar">
-                S
+            <div class="employee">
+                <div class="employee-label">
+                    Petugas Jaga Jalan Lintasan (PJL)
+                </div>
+
+                <div class="employee-name">
+                    {{ $user->name ?? '-' }}
+                    (NIP: {{ $user->nip ?? '-' }})
+                </div>
             </div>
 
 
@@ -1063,7 +1070,14 @@
                     </div>
 
                     <div class="info-value">
-                        PJL 78 Lempuyangan
+                        @if ($namaShift !== '-')
+                            {{ $namaShift }}
+                            @if ($jamDinas !== '-')
+                                ({{ $jamDinas }})
+                            @endif
+                        @else
+                            Shift belum ditentukan
+                        @endif
                     </div>
 
                 </div>
@@ -1093,7 +1107,7 @@
                     </div>
 
                     <div class="info-value">
-                        Senin, 30 September 2024
+                        {{ $tanggalTugas }}
                     </div>
 
                 </div>
@@ -1114,15 +1128,19 @@
             </span>
 
             <span>
-
                 <strong>
                     Catatan Dinas Aktif:
                 </strong>
 
-                Mohon perhatikan KA 102 (Sancaka)
-                yang dijadwalkan melintas lebih awal
-                dari jadwal reguler hari ini.
+                @if ($catatanAktif)
+                    {{ $catatanAktif->judul ?? 'Catatan Dinas' }}
 
+                    @if (!empty($catatanAktif->isi_catatan))
+                        — {{ $catatanAktif->isi_catatan }}
+                    @endif
+                @else
+                    Belum ada catatan untuk dinas aktif.
+                @endif
             </span>
 
         </div>
