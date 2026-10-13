@@ -116,15 +116,58 @@
 
 
         {{-- =========================================================
+        | Master Data JPL
+        ========================================================== --}}
+
+        <a
+            href="{{ route('superadmin.jpl.index') }}"
+            class="
+                flex items-center gap-3 rounded-lg px-4 py-3
+                text-sm font-medium transition
+                {{ request()->routeIs('superadmin.jpl.*')
+                    ? 'bg-white/10 text-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }}
+            "
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="1.8"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"
+                />
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M5 8h14M5 16h14"
+                />
+            </svg>
+
+            <span>
+                Master Data JPL
+            </span>
+        </a>
+
+        {{-- =========================================================
         | Activity Log
         ========================================================== --}}
 
         <a
-            href="#"
+            href="{{ route('superadmin.activities.index') }}"
             class="
                 flex items-center gap-3 rounded-lg px-4 py-3
-                text-sm font-medium text-white/70
-                transition hover:bg-white/10 hover:text-white
+                text-sm font-medium transition
+                {{ request()->routeIs('superadmin.activities.*')
+                    ? 'bg-white/10 text-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }}
             "
         >
 
@@ -153,6 +196,35 @@
                 Activity Log
             </span>
 
+        </a>
+
+
+        {{-- Monitoring Sistem --}}
+        <a
+            href="{{ route('superadmin.monitoring.index') }}"
+            class="flex items-center gap-3 rounded-lg px-4 py-3
+                text-sm font-medium transition
+                {{ request()->routeIs('superadmin.monitoring.*')
+                    ? 'bg-white/10 text-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }}"
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="1.8"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M3 3v18h18M7 14l4-4 4 4 5-7"
+                />
+            </svg>
+
+            <span>Monitoring Sistem</span>
         </a>
 
 

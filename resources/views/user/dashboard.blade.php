@@ -1007,10 +1007,9 @@
                 </button>
             </form>
 
+        </div>
+    </header>
 
-                    </div>
-
-                </header>
 
 
     <!-- ========================================
@@ -1041,20 +1040,6 @@
             </div>
 
 
-            <!-- DATA PETUGAS -->
-
-            <div class="employee">
-
-                <div class="employee-label">
-                    Petugas Jaga Jalan Lintasan (PJL)
-                </div>
-
-                <div class="employee-name">
-                    Suhartono (NIP: 199208242015031002)
-                </div>
-
-            </div>
-
 
             <!-- INFORMASI DINAS -->
 
@@ -1069,16 +1054,9 @@
                         LOKASI DINAS
                     </div>
 
-                    <div class="info-value">
-                        @if ($namaShift !== '-')
-                            {{ $namaShift }}
-                            @if ($jamDinas !== '-')
-                                ({{ $jamDinas }})
-                            @endif
-                        @else
-                            Shift belum ditentukan
-                        @endif
-                    </div>
+                <div class="info-value">
+                    {{ $lokasiDinas ?? '-' }}
+                </div>
 
                 </div>
 
@@ -1092,7 +1070,14 @@
                     </div>
 
                     <div class="info-value">
-                        Shift B (Siang)
+                        @if (($namaShift ?? '-') !== '-')
+                            {{ $namaShift }}
+                            @if (($jamDinas ?? '-') !== '-')
+                                ({{ $jamDinas }})
+                            @endif
+                        @else
+                            Shift belum ditentukan
+                        @endif
                     </div>
 
                 </div>
