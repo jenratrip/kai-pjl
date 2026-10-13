@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Support\Facades\Route;
@@ -5,30 +6,33 @@ use Illuminate\Support\Facades\Auth;
 
 use App\Http\Controllers\Auth\LoginController;
 
-// Admin
+// Admin Controllers
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\UserImportController as AdminUserImportController;
+use App\Http\Controllers\Admin\DinasController;
 use App\Http\Controllers\Admin\JplController;
 use App\Http\Controllers\Admin\JplImportController;
 use App\Http\Controllers\Admin\ResortController;
 use App\Http\Controllers\Admin\WilayahController;
 use App\Http\Controllers\Admin\WilayahImportController;
+use App\Http\Controllers\Admin\InventarisController as AdminInventarisController;
+use App\Http\Controllers\Admin\SerahTerimaDinasController as AdminSerahTerimaDinasController;
 
-// User / PJL
+// User / PJL Controllers
 use App\Http\Controllers\User\DashboardController as UserDashboardController;
 use App\Http\Controllers\User\RealisasiKaController;
 use App\Http\Controllers\User\CatatanDinasController;
 use App\Http\Controllers\User\SerahTerimaDinasController;
+use App\Http\Controllers\User\InventarisController as UserInventarisController;
 
-// Superadmin
+// Superadmin Controllers
 use App\Http\Controllers\Superadmin\DashboardController as SuperadminDashboardController;
 use App\Http\Controllers\Superadmin\UserController as SuperadminUserController;
 use App\Http\Controllers\Superadmin\UserImportController as SuperadminUserImportController;
 use App\Http\Controllers\Superadmin\ActivityLogController;
 use App\Http\Controllers\Superadmin\SystemMonitoringController;
 use App\Http\Controllers\Superadmin\JplController as SuperadminJplController;
-
 
 /*
 |--------------------------------------------------------------------------
@@ -54,7 +58,6 @@ Route::get('/', function () {
     return redirect()->route('user.dashboard');
 });
 
-
 /*
 |--------------------------------------------------------------------------
 | Authentication
@@ -78,7 +81,6 @@ Route::post('/logout', [
     'logout',
 ])->middleware('auth')->name('logout');
 
-
 /*
 |--------------------------------------------------------------------------
 | User / PJL
@@ -89,7 +91,6 @@ Route::middleware(['auth', 'role:pjl'])
     ->prefix('user')
     ->name('user.')
     ->group(function () {
-
         Route::get('/dashboard', [
             UserDashboardController::class,
             'index',
@@ -117,18 +118,38 @@ Route::middleware(['auth', 'role:pjl'])
             'store',
         ])->name('catatan-dinas.store');
 
-        // Serah Terima Dinas
+        // Serah Terima Dinas PJL
         Route::get('/serah-terima-dinas', [
             SerahTerimaDinasController::class,
             'index',
         ])->name('serah-terima-dinas');
 
-        Route::post('/serah-terima-dinas', [
+        Route::post('/serah-terima-dinas/catatan', [
+            SerahTerimaDinasController::class,
+            'storeCatatan',
+        ])->name('serah-terima-dinas.catatan.store');
+
+        Route::post('/serah-terima-dinas/inventaris', [
+            SerahTerimaDinasController::class,
+            'storeInventaris',
+        ])->name('serah-terima-dinas.inventaris.store');
+
+        Route::post('/serah-terima-dinas/simpan', [
             SerahTerimaDinasController::class,
             'store',
         ])->name('serah-terima-dinas.store');
-    });
 
+        // Pemeriksaan Inventaris oleh PJL
+        Route::get('/inventaris', [
+            UserInventarisController::class,
+            'index',
+        ])->name('inventaris.index');
+
+        Route::patch('/inventaris/{inventaris}', [
+            UserInventarisController::class,
+            'update',
+        ])->name('inventaris.update');
+    });
 
 /*
 |--------------------------------------------------------------------------
@@ -140,7 +161,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
-
+        // Dashboard Admin
         Route::get('/dashboard', [
             DashboardController::class,
             'index',
@@ -187,6 +208,47 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'toggleStatus',
         ])->name('users.toggle-status');
 
+        // Serah Terima Dinas
+        Route::get('/serah-terima-dinas/updates', [
+            AdminSerahTerimaDinasController::class,
+            'updates',
+        ])->name('serah-terima-dinas.updates');
+
+        Route::get('/serah-terima-dinas', [
+            AdminSerahTerimaDinasController::class,
+            'index',
+        ])->name('serah-terima-dinas.index');
+
+        Route::get('/serah-terima-dinas/{serahTerima}', [
+            AdminSerahTerimaDinasController::class,
+            'show',
+        ])->name('serah-terima-dinas.show');
+
+        Route::post('/serah-terima-dinas/{serahTerima}/konfirmasi', [
+            SerahTerimaDinasController::class,
+            'konfirmasi',
+        ])->name('serah-terima-dinas.konfirmasi');
+
+        // Ekspor dan Impor Jadwal Dinas
+        Route::get('/dinas/export', [
+            DinasController::class,
+            'export',
+        ])->name('dinas.export');
+
+        Route::get('/dinas/template', [
+            DinasController::class,
+            'template',
+        ])->name('dinas.template');
+
+        Route::post('/dinas/import', [
+            DinasController::class,
+            'import',
+        ])->name('dinas.import');
+
+        Route::resource('dinas', DinasController::class)
+            ->except(['show'])
+            ->names('dinas');
+
         // Import JPL
         Route::get('/jpl/import', [
             JplImportController::class,
@@ -220,7 +282,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'toggleStatus',
         ])->name('resort.toggle-status');
 
-        // Import Wilayah
+        // Master Data Wilayah
         Route::get('/wilayah/import/template', [
             WilayahController::class,
             'downloadTemplate',
@@ -248,8 +310,15 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             WilayahController::class,
             'toggleStatus',
         ])->name('wilayah.toggle-status');
-    });
 
+        // Master Inventaris - Khusus Admin
+        Route::middleware('role:admin')->group(function () {
+            Route::resource(
+                'inventaris',
+                AdminInventarisController::class
+            );
+        });
+    });
 
 /*
 |--------------------------------------------------------------------------
@@ -261,8 +330,7 @@ Route::middleware('superadmin')
     ->prefix('superadmin')
     ->name('superadmin.')
     ->group(function () {
-
-        // Dashboard
+        // Dashboard Superadmin
         Route::get('/dashboard', [
             SuperadminDashboardController::class,
             'index',
