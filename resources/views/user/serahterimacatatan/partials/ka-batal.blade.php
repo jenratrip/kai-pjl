@@ -1,4 +1,28 @@
 <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+    @php
+        $kaBatal = collect($ringkasanKA['batal'] ?? [])
+            ->map(function ($ka) {
+                $nomor = trim((string) ($ka['nomor'] ?? '-'));
+                $nama = trim((string) ($ka['nama'] ?? ''));
+
+                return [
+                    'id' => $ka['id'] ?? null,
+                    'nomor' => $nomor,
+                    'nama' => $nama,
+                ];
+            })
+            ->unique(function ($ka) {
+                return $ka['nomor'] . '|' . $ka['nama'];
+            })
+            ->values();
+
+        $daftarNomorKA = $kaBatal
+            ->pluck('nomor')
+            ->filter(fn ($nomor) => $nomor !== '' && $nomor !== '-')
+            ->unique()
+            ->implode(', ');
+    @endphp
+
     {{-- Header bagian --}}
     <div class="mb-4 flex items-center gap-3">
         <span
@@ -18,29 +42,58 @@
         </div>
     </div>
 
-    {{-- Input nomor KA --}}
-    <div>
-        <label
-            for="ka_batal"
-            class="mb-2 block text-sm font-semibold text-slate-700"
-        >
-            Nomor KA yang batal
-        </label>
+    {{-- Nilai otomatis untuk dikirim melalui JavaScript --}}
+    <input
+        type="hidden"
+        id="ka_batal"
+        name="ka_batal"
+        data-summary="ka_batal"
+        value="{{ $daftarNomorKA }}"
+    >
 
-        <textarea
-            id="ka_batal"
-            data-summary="ka_batal"
-            rows="3"
-            placeholder="Contoh: KA 123&#10;KA 456&#10;KA 789"
-            class="w-full rounded-lg border border-slate-300 bg-slate-50 p-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#1d2d50] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-        >{{ old('ka_batal') }}</textarea>
+    {{-- Daftar KA batal dari realisasi --}}
+    <div class="space-y-2">
+        @forelse($kaBatal as $ka)
+            <div
+                class="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                wire:key="ka-batal-{{ $ka['id'] ?? $loop->index }}"
+            >
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-800">
+                            {{ $ka['nomor'] !== '' ? $ka['nomor'] : '-' }}
+                        </p>
 
-        <p class="mt-2 flex items-start gap-2 text-xs leading-relaxed text-slate-500">
-            <span aria-hidden="true">ⓘ</span>
-            <span>
-                Masukkan nomor KA, satu nomor per baris atau pisahkan dengan koma.
-                Jika tidak ada KA yang batal, biarkan kosong.
-            </span>
-        </p>
+                        @if($ka['nama'] !== '' && $ka['nama'] !== '-')
+                            <p class="mt-1 text-sm text-slate-600">
+                                {{ $ka['nama'] }}
+                            </p>
+                        @endif
+                    </div>
+
+                    <span class="shrink-0 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+                        BATAL
+                    </span>
+                </div>
+            </div>
+        @empty
+            <div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center">
+                <p class="text-sm font-medium text-slate-600">
+                    Tidak ada KA yang batal.
+                </p>
+
+                <p class="mt-1 text-xs text-slate-500">
+                    Daftar akan terisi otomatis jika terdapat realisasi KA berstatus batal.
+                </p>
+            </div>
+        @endforelse
     </div>
+
+    <p class="mt-3 flex items-start gap-2 text-xs leading-relaxed text-slate-500">
+        <span aria-hidden="true">ⓘ</span>
+
+        <span>
+            Data diambil otomatis dari Realisasi KA pada dinas aktif. Untuk mengubah status KA, lakukan melalui halaman Realisasi KA.
+        </span>
+    </p>
 </section>

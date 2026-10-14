@@ -185,10 +185,12 @@ class RealisasiKaController extends Controller
             }
         }
 
-        return view('user.realisasi-ka', [
-            'dataKA' => $dataKA,
-            'dinasAktif' => $dinas,
-        ]);
+        
+return view('user.realisasi-ka.index', [
+    'dataKA' => $dataKA,
+    'dinasAktif' => $dinas,
+]);
+
     }
 
     /**
