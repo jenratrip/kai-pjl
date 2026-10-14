@@ -63,7 +63,7 @@ class CatatanDinasController extends Controller
             })->values()->all(),
         ]);
 
-        return view('user.catatan-dinas', compact(
+        return view('user.catatan-dinas.index', compact(
             'catatan',
             'daftarDinas'
         ));

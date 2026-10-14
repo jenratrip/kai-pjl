@@ -111,7 +111,7 @@ class DashboardController extends Controller
                 ->first();
         }
 
-        return view('user.dashboard', [
+        return view('user.dashboard.index', [
             'user' => $user,
             'dinasAktif' => $dinasAktif,
             'lokasiDinas' => $lokasiDinas,

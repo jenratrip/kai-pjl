@@ -1026,6 +1026,649 @@
                 border: 0;
             }
         }
+
+        
+/* =====================================================
+   PERBAIKAN TAMPILAN DAN RESPONSIVITAS REALISASI KA
+   Letakkan di bagian paling bawah CSS
+===================================================== */
+
+/* Ukuran dasar */
+html {
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Header */
+.top-header {
+    height: 68px;
+    padding: 0 28px;
+}
+
+.header-left {
+    gap: 14px;
+}
+
+.hamburger-btn {
+    width: 42px;
+    height: 42px;
+    font-size: 25px;
+}
+
+.header-logo {
+    width: 44px;
+    height: 44px;
+}
+
+.header-title {
+    font-size: 18px;
+}
+
+.header-subtitle {
+    font-size: 12px;
+}
+
+.header-page {
+    font-size: 12px;
+}
+
+.header-avatar {
+    width: 42px;
+    height: 42px;
+    font-size: 15px;
+}
+
+/* Konten utama */
+.main {
+    padding: 92px 32px 40px;
+}
+
+.page-card {
+    max-width: 1700px;
+    padding: 32px;
+    border-radius: 14px;
+}
+
+.company-name {
+    font-size: 16px;
+}
+
+.company-address {
+    font-size: 12px;
+}
+
+.page-title {
+    margin-top: 16px;
+    font-size: clamp(22px, 2vw, 30px);
+    line-height: 1.35;
+}
+
+.page-subtitle {
+    margin: 8px 0 28px;
+    font-size: 14px;
+}
+
+/* Informasi dinas */
+.filter-grid {
+    gap: 16px;
+    margin-bottom: 28px;
+    padding: 20px;
+    border-radius: 10px;
+}
+
+.field-label {
+    margin-bottom: 8px;
+    font-size: 12px;
+}
+
+.field-input {
+    height: 46px;
+    padding: 0 13px;
+    border-radius: 7px;
+    font-size: 14px;
+}
+
+/* Judul dan keterangan bagian */
+.section-title {
+    margin-bottom: 8px;
+    font-size: 19px;
+}
+
+.section-description {
+    margin-bottom: 16px;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+/* Informasi rentang waktu */
+.time-window-info {
+    margin-bottom: 16px;
+    padding: 14px 16px;
+    gap: 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+/* Tabel */
+.table-wrapper {
+    border-radius: 10px;
+}
+
+table {
+    min-width: 1250px;
+}
+
+th {
+    height: 54px;
+    padding: 12px 10px;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+td {
+    height: 66px;
+    padding: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.actual-time,
+.note-input {
+    min-width: 90px;
+    height: 40px;
+    padding: 0 9px;
+    border-radius: 7px;
+    font-size: 13px;
+}
+
+.status-select {
+    min-width: 82px;
+    height: 38px;
+    padding: 0 7px;
+    font-size: 11px;
+}
+
+.check {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 7px;
+    font-size: 16px;
+}
+
+.check-group {
+    gap: 5px;
+}
+
+/* Tambah KA manual */
+.add-section,
+.summary-section {
+    margin-top: 28px;
+}
+
+.add-box,
+.summary-box {
+    padding: 22px;
+    border-radius: 10px;
+}
+
+.add-heading {
+    margin-bottom: 18px;
+    font-size: 17px;
+}
+
+.add-grid {
+    gap: 14px;
+}
+
+.small-field label {
+    margin-bottom: 8px;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.small-input {
+    height: 42px;
+    padding: 0 10px;
+    border-radius: 7px;
+    font-size: 13px;
+}
+
+.mini-checks {
+    min-height: 42px;
+    gap: 7px;
+}
+
+.mini-check {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    font-size: 16px;
+}
+
+.add-button {
+    min-height: 44px;
+    margin-top: 18px;
+    padding: 0 20px;
+    border-radius: 7px;
+    font-size: 13px;
+}
+
+/* Ringkasan */
+.summary-cards {
+    gap: 16px;
+}
+
+.summary-card {
+    min-height: 100px;
+    padding: 18px;
+    border-radius: 9px;
+}
+
+.summary-label {
+    margin-bottom: 10px;
+    font-size: 12px;
+}
+
+.summary-number {
+    font-size: 30px;
+}
+
+.progress-title {
+    margin: 20px 0 10px;
+    font-size: 13px;
+}
+
+.progress-bar {
+    height: 10px;
+}
+
+.progress-description {
+    margin-top: 10px;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+/* Tombol aksi */
+.bottom-row {
+    margin-top: 28px;
+    gap: 20px;
+}
+
+.digital-note {
+    font-size: 12px;
+}
+
+.actions {
+    gap: 10px;
+}
+
+.action-btn {
+    min-height: 44px;
+    padding: 0 17px;
+    border-radius: 7px;
+    font-size: 12px;
+}
+
+/* Tablet */
+@media (max-width: 1100px) {
+    .main {
+        padding: 88px 20px 30px;
+    }
+
+    .page-card {
+        padding: 24px;
+    }
+
+    .filter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .add-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .table-wrapper {
+        max-width: 100%;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+    }
+
+    table {
+        min-width: 1250px;
+    }
+
+    .bottom-row {
+        align-items: stretch;
+    }
+}
+
+/* HP */
+@media (max-width: 700px) {
+    .top-header {
+        height: 60px;
+        padding: 0 12px;
+    }
+
+    .header-left {
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .hamburger-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 22px;
+    }
+
+    .header-logo {
+        width: 36px;
+        height: 36px;
+    }
+
+    .header-title {
+        font-size: 15px;
+    }
+
+    .header-subtitle {
+        font-size: 10px;
+    }
+
+    .header-avatar {
+        width: 36px;
+        height: 36px;
+    }
+
+    .main {
+        padding: 74px 10px 24px;
+    }
+
+    .page-card {
+        padding: 20px 14px;
+        border-radius: 10px;
+    }
+
+    .company-name {
+        font-size: 13px;
+    }
+
+    .company-address {
+        font-size: 10px;
+        line-height: 1.6;
+    }
+
+    .page-title {
+        font-size: 21px;
+    }
+
+    .page-subtitle {
+        margin-bottom: 22px;
+        font-size: 12px;
+    }
+
+    .filter-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+        padding: 15px;
+    }
+
+    .field-label {
+        font-size: 12px;
+    }
+
+    .field-input {
+        height: 44px;
+        font-size: 14px;
+    }
+
+    .section-title {
+        font-size: 17px;
+    }
+
+    .section-description {
+        font-size: 12px;
+    }
+
+    .time-window-info {
+        padding: 12px;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+    }
+
+    .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+        width: 1250px;
+        min-width: 1250px;
+        table-layout: fixed;
+    }
+
+    th {
+        height: 48px;
+        padding: 10px;
+        font-size: 11px;
+    }
+
+    td {
+        height: 60px;
+        padding: 9px;
+        font-size: 12px;
+    }
+
+    .actual-time,
+    .note-input {
+        height: 40px;
+        font-size: 13px;
+    }
+
+    .status-select {
+        height: 38px;
+        font-size: 11px;
+    }
+
+    .check {
+        width: 32px;
+        height: 32px;
+    }
+
+    .add-box,
+    .summary-box {
+        padding: 16px;
+    }
+
+    .add-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px 12px;
+    }
+
+    .small-field label {
+        font-size: 11px;
+    }
+
+    .small-input {
+        height: 42px;
+        font-size: 13px;
+    }
+
+    .mini-checks {
+        justify-content: flex-start;
+    }
+
+    .add-button {
+        width: 100%;
+    }
+
+    .summary-cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .summary-card {
+        min-height: 90px;
+        padding: 13px;
+    }
+
+    .summary-label {
+        font-size: 11px;
+    }
+
+    .summary-number {
+        font-size: 26px;
+    }
+
+    .bottom-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .action-btn {
+        width: 100%;
+        min-height: 44px;
+        white-space: normal;
+        text-align: center;
+    }
+}
+
+/* HP sangat kecil */
+@media (max-width: 380px) {
+    .main {
+        padding-right: 7px;
+        padding-left: 7px;
+    }
+
+    .page-card {
+        padding: 16px 10px;
+    }
+
+    .page-title {
+        font-size: 18px;
+    }
+
+    .add-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .summary-cards {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* Menghormati pengaturan aksesibilitas */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+    }
+}
+
+
+/* ===== PERBAIKAN UKURAN SIDEBAR REALISASI KA ===== */
+
+.sidebar {
+    width: 270px;
+}
+
+.sidebar-brand {
+    padding: 24px 20px;
+}
+
+.sidebar-title {
+    font-size: 17px;
+}
+
+.sidebar-subtitle {
+    font-size: 11px;
+}
+
+.sidebar-menu {
+    padding: 18px 12px;
+}
+
+.menu-item {
+    min-height: 48px;
+    margin-bottom: 6px;
+    padding: 0 14px;
+    gap: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.menu-icon {
+    width: 22px;
+    font-size: 19px;
+    flex-shrink: 0;
+}
+
+.sidebar-bottom {
+    padding: 12px;
+}
+
+.profile-box {
+    padding: 14px;
+    border-radius: 8px;
+}
+
+.profile-label {
+    font-size: 10px;
+}
+
+.profile-name {
+    font-size: 14px;
+}
+
+.profile-nip,
+.profile-shift {
+    font-size: 11px;
+    line-height: 1.7;
+}
+
+.logout-btn {
+    min-height: 46px;
+    padding: 0 14px;
+    gap: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+/* Sidebar di HP */
+@media (max-width: 700px) {
+    .sidebar {
+        width: min(290px, 85vw);
+        max-width: 85vw;
+    }
+
+    .sidebar-title {
+        font-size: 16px;
+    }
+
+    .menu-item {
+        min-height: 46px;
+        font-size: 14px;
+    }
+
+    .profile-name {
+        font-size: 13px;
+    }
+}
+
     </style>
 </head>
 
