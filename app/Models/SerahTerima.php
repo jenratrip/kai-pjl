@@ -12,6 +12,7 @@ class SerahTerima extends Model
     protected $fillable = [
         'dinas_id',
         'dinas_penerima_id',
+        'penerima_user_id',
         'waktu_serah_terima',
         'ringkasan',
         'tanda_tangan_penyerah',
@@ -19,15 +20,30 @@ class SerahTerima extends Model
         'status',
     ];
 
-    protected $casts = [
-        'waktu_serah_terima' => 'datetime',
-        'ringkasan' => 'array',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'waktu_serah_terima' => 'datetime',
+            'ringkasan' => 'array',
+        ];
+    }
 
     /**
      * Dinas yang menyerahkan.
      */
     public function dinasPenyerah(): BelongsTo
+    {
+        return $this->belongsTo(
+            Dinas::class,
+            'dinas_id'
+        );
+    }
+
+    /**
+     * Alias relasi dinas penyerah.
+     * Digunakan untuk kompatibilitas controller.
+     */
+    public function dinas(): BelongsTo
     {
         return $this->belongsTo(
             Dinas::class,
@@ -43,6 +59,17 @@ class SerahTerima extends Model
         return $this->belongsTo(
             Dinas::class,
             'dinas_penerima_id'
+        );
+    }
+
+    /**
+     * User admin/superadmin penerima serah terima.
+     */
+    public function penerima(): BelongsTo
+    {
+        return $this->belongsTo(
+            User::class,
+            'penerima_user_id'
         );
     }
 }

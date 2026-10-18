@@ -29,21 +29,33 @@ class Dinas extends Model
         'is_pengganti' => 'boolean',
     ];
 
+    /**
+     * Petugas yang menjalankan dinas.
+     */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 
+    /**
+     * JPL tempat petugas menjalankan dinas.
+     */
     public function jpl(): BelongsTo
     {
-        return $this->belongsTo(Jpl::class);
+        return $this->belongsTo(Jpl::class, 'jpl_id');
     }
 
+    /**
+     * Shift dinas.
+     */
     public function shift(): BelongsTo
     {
-        return $this->belongsTo(Shift::class);
+        return $this->belongsTo(Shift::class, 'shift_id');
     }
 
+    /**
+     * Petugas yang digantikan jika dinas pengganti.
+     */
     public function userDigantikan(): BelongsTo
     {
         return $this->belongsTo(
@@ -52,8 +64,36 @@ class Dinas extends Model
         );
     }
 
+    /**
+     * Catatan selama dinas.
+     */
     public function catatanDinas(): HasMany
     {
-        return $this->hasMany(CatatanDinas::class);
+        return $this->hasMany(
+            CatatanDinas::class,
+            'dinas_id'
+        );
+    }
+
+    /**
+     * Data serah terima yang berkaitan dengan dinas ini.
+     */
+    public function serahTerima(): HasMany
+    {
+        return $this->hasMany(
+            SerahTerima::class,
+            'dinas_id'
+        );
+    }
+
+    /**
+     * Hasil pemeriksaan inventaris selama dinas.
+     */
+    public function realisasiInventaris(): HasMany
+    {
+        return $this->hasMany(
+            RealisasiInventaris::class,
+            'dinas_id'
+        );
     }
 }

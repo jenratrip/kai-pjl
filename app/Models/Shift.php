@@ -15,13 +15,8 @@ class Shift extends Model
         'jam_selesai',
     ];
 
-    protected $casts = [
-        'jam_mulai' => 'datetime:H:i',
-        'jam_selesai' => 'datetime:H:i',
-    ];
-
     public function dinas(): HasMany
     {
-        return $this->hasMany(Dinas::class);
+        return $this->hasMany(Dinas::class, 'shift_id');
     }
 }

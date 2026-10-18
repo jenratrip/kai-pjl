@@ -11,15 +11,12 @@
         <div class="flex items-center gap-3">
 
             <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
-
                 <span class="text-xs font-bold text-[#f5a400]">
                     KAI
                 </span>
-
             </div>
 
             <div>
-
                 <p class="text-sm font-bold leading-tight">
                     Sistem PJL
                 </p>
@@ -27,11 +24,9 @@
                 <p class="text-[10px] text-blue-200">
                     Admin Panel
                 </p>
-
             </div>
 
         </div>
-
 
         {{-- Close Mobile --}}
         <button
@@ -39,7 +34,6 @@
             @click="sidebarOpen = false"
             class="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white lg:hidden"
         >
-
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-5 w-5"
@@ -54,7 +48,6 @@
                     d="M6 18 18 6M6 6l12 12"
                 />
             </svg>
-
         </button>
 
     </div>
@@ -74,7 +67,6 @@
                     ? 'bg-white/10 text-white'
                     : 'text-blue-100 hover:bg-white/5 hover:text-white' }}"
         >
-
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-5 w-5 shrink-0"
@@ -91,7 +83,6 @@
             </svg>
 
             Dashboard
-
         </a>
 
 
@@ -99,7 +90,9 @@
             MASTER DATA
         ================================================== --}}
         <div
-            x-data="{ open: {{ request()->routeIs('admin.wilayah.*', 'admin.jpl.*') ? 'true' : 'false' }} }"
+            x-data="{
+                open: {{ request()->routeIs('admin.wilayah.*', 'admin.jpl.*') ? 'true' : 'false' }}
+            }"
             class="mt-2"
         >
 
@@ -129,7 +122,6 @@
                     Master Data
 
                 </span>
-
 
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -168,7 +160,6 @@
                     Wilayah
                 </a>
 
-
                 {{-- JPL --}}
                 <a
                     href="{{ route('admin.jpl.index') }}"
@@ -190,7 +181,13 @@
             MANAJEMEN
         ================================================== --}}
         <div
-            x-data="{ open: false }"
+            x-data="{
+                open: {{ request()->routeIs(
+                    'admin.dinas.*',
+                    'admin.jadwal-ka.*',
+                    'admin.inventaris.*'
+                ) ? 'true' : 'false' }}
+            }"
             class="mt-2"
         >
 
@@ -221,7 +218,6 @@
 
                 </span>
 
-
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
                     class="h-4 w-4 transition-transform"
@@ -247,6 +243,19 @@
                 class="mt-1 space-y-1 pl-11"
             >
 
+                {{-- Dinas --}}
+                <a
+                    href="{{ route('admin.dinas.index') }}"
+                    @click="sidebarOpen = false"
+                    class="block rounded-lg px-3 py-2 text-sm transition
+                        {{ request()->routeIs('admin.dinas.*')
+                            ? 'bg-white/10 font-semibold text-white'
+                            : 'text-blue-200 hover:bg-white/5 hover:text-white' }}"
+                >
+                    Dinas
+                </a>
+
+                {{-- Jadwal KA --}}
                 <a
                     href="#"
                     class="block rounded-lg px-3 py-2 text-sm text-blue-200 transition hover:bg-white/5 hover:text-white"
@@ -254,6 +263,7 @@
                     Jadwal KA
                 </a>
 
+                {{-- Inventaris --}}
                 <a
                     href="{{ route('admin.users.index') }}"
                     class="block rounded-lg px-3 py-2 text-sm text-blue-200 transition hover:bg-white/5 hover:text-white"
