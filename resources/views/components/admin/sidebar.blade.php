@@ -1,3 +1,4 @@
+
 <aside
     class="fixed inset-y-0 left-0 z-50 flex w-[230px] -translate-x-full flex-col bg-[#0b1f3a] text-white transition-transform duration-300 lg:translate-x-0"
     :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
@@ -10,10 +11,13 @@
 
         <div class="flex items-center gap-3">
 
-            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
-                <span class="text-xs font-bold text-[#f5a400]">
-                    KAI
-                </span>
+            {{-- Logo KAI --}}
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-1">
+                <img
+                    src="{{ asset('images/logo-kai.jpg') }}"
+                    alt="Logo KAI"
+                    class="h-full w-full object-contain"
+                >
             </div>
 
             <div>
@@ -160,6 +164,7 @@
                     Wilayah
                 </a>
 
+
                 {{-- JPL --}}
                 <a
                     href="{{ route('admin.jpl.index') }}"
@@ -255,6 +260,7 @@
                     Dinas
                 </a>
 
+
                 {{-- Jadwal KA --}}
                 <a
                     href="#"
@@ -263,17 +269,28 @@
                     Jadwal KA
                 </a>
 
-                {{-- Inventaris --}}
+
+                {{-- Manajemen User --}}
                 <a
                     href="{{ route('admin.users.index') }}"
-                    class="block rounded-lg px-3 py-2 text-sm text-blue-200 transition hover:bg-white/5 hover:text-white"
+                    @click="sidebarOpen = false"
+                    class="block rounded-lg px-3 py-2 text-sm transition
+                        {{ request()->routeIs('admin.users.*')
+                            ? 'bg-white/10 font-semibold text-white'
+                            : 'text-blue-200 hover:bg-white/5 hover:text-white' }}"
                 >
                     Manajemen User
                 </a>
 
+
+                {{-- Inventaris --}}
                 <a
-                    href="#"
-                    class="block rounded-lg px-3 py-2 text-sm text-blue-200 transition hover:bg-white/5 hover:text-white"
+                    href="{{ route('admin.inventaris.index') }}"
+                    @click="sidebarOpen = false"
+                    class="block rounded-lg px-3 py-2 text-sm transition
+                        {{ request()->routeIs('admin.inventaris.*')
+                            ? 'bg-white/10 font-semibold text-white'
+                            : 'text-blue-200 hover:bg-white/5 hover:text-white' }}"
                 >
                     Inventaris
                 </a>
