@@ -1,8 +1,6 @@
-
 <header
     class="fixed inset-x-0 top-0 z-30 h-[62px] bg-[#1d2d50] text-white lg:ml-[230px]"
 >
-
     <div class="flex h-full items-center justify-between px-4 sm:px-6">
 
         {{-- =====================================================
@@ -13,9 +11,13 @@
             {{-- Mobile Menu --}}
             <button
                 type="button"
-                @click="sidebarOpen = true"
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/10 lg:hidden"
+                @click="sidebarOpen = !sidebarOpen"
+                :aria-expanded="sidebarOpen.toString()"
+                aria-controls="admin-sidebar"
+                aria-label="Buka atau tutup menu navigasi"
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white transition-colors duration-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 lg:hidden"
             >
+                {{-- Hamburger Icon --}}
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
                     class="h-5 w-5"
@@ -23,12 +25,10 @@
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
                 >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M4 6h16M4 12h16M4 18h16"
-                    />
+                    <path d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
             </button>
 
@@ -87,5 +87,4 @@
         </div>
 
     </div>
-
 </header>

@@ -3,495 +3,193 @@
 @section('title', 'Master Inventaris')
 
 @section('content')
+<div class="p-4 md:p-6">
 
-<div class="px-6 py-6">
-
-    {{-- =========================================================
-        HEADER HALAMAN
-    ========================================================== --}}
-    <div class="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-
+    {{-- HEADER --}}
+    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <h1 class="text-2xl font-bold text-[#1d2d50]">
                 Master Inventaris
             </h1>
-
             <p class="mt-1 text-sm text-gray-500">
-                Kelola data barang dan penempatan inventaris pada setiap JPL.
+                Monitoring kondisi dan penempatan inventaris berdasarkan JPL.
             </p>
         </div>
 
-        <a
-            href="{{ route('admin.inventaris.create') }}"
-            class="inline-flex items-center justify-center gap-2 rounded-lg bg-[#1d2d50] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#14213d]"
-        >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="1.8"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M12 5v14M5 12h14"
-                />
-            </svg>
-
+        <a href="{{ route('admin.inventaris.create') }}"
+           class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1d2d50] px-5 py-3 text-sm font-semibold text-white hover:bg-[#14213d]">
+            <span class="text-lg">+</span>
             Tambah Inventaris
         </a>
-
     </div>
 
-
-    {{-- =========================================================
-        NOTIFIKASI
-    ========================================================== --}}
-    @if (session('success'))
-        <div class="mb-5 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="mt-0.5 h-5 w-5 shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="1.8"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M5 12l4 4L19 6"
-                />
-            </svg>
-
-            <p>{{ session('success') }}</p>
+    @if(session('success'))
+        <div class="mb-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+            {{ session('success') }}
         </div>
     @endif
 
-    @if (session('error'))
-        <div class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {{ session('error') }}
-        </div>
-    @endif
+    {{-- STATISTIK GLOBAL --}}
+    @php
+        $cards = [
+            ['label' => 'Total Jenis Inventaris', 'value' => $statistik['total_jenis'], 'color' => 'text-[#1d2d50]'],
+            ['label' => 'Total Unit Barang', 'value' => $statistik['total_unit'], 'color' => 'text-[#1d2d50]'],
+            ['label' => 'Inventaris Aktif', 'value' => $statistik['aktif'], 'color' => 'text-green-600'],
+            ['label' => 'Kondisi Baik', 'value' => $statistik['baik'], 'color' => 'text-green-600'],
+            ['label' => 'Perlu Perbaikan', 'value' => $statistik['perlu_perbaikan'], 'color' => 'text-amber-600'],
+            ['label' => 'Rusak', 'value' => $statistik['rusak'], 'color' => 'text-red-600'],
+            ['label' => 'Hilang', 'value' => $statistik['hilang'], 'color' => 'text-rose-700'],
+            ['label' => 'Belum Diperiksa', 'value' => $statistik['belum_diperiksa'], 'color' => 'text-gray-600'],
+        ];
+    @endphp
 
-    @if ($errors->any())
-        <div class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <p class="mb-2 font-semibold">
-                Terdapat kesalahan:
-            </p>
-
-            <ul class="list-inside list-disc space-y-1">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
-
-
-    {{-- =========================================================
-        STATISTIK INVENTARIS
-    ========================================================== --}}
-    <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-
-        {{-- Total Barang --}}
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div class="flex items-center gap-4">
-
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-[#1d2d50]">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-6 w-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="1.8"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M4 7h16M6 7v12h12V7M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-                        />
-                    </svg>
-                </div>
-
-                <div>
-                    <p class="text-sm font-medium text-gray-500">
-                        Total Jenis Inventaris
-                    </p>
-
-                    <p class="mt-1 text-2xl font-bold text-[#1d2d50]">
-                        {{ number_format($inventaris->total()) }}
-                    </p>
-                </div>
-
-            </div>
-        </div>
-
-
-        {{-- Inventaris Aktif --}}
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div class="flex items-center gap-4">
-
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-green-600">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-6 w-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="1.8"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M5 12l4 4L19 6"
-                        />
-                    </svg>
-                </div>
-
-                <div>
-                    <p class="text-sm font-medium text-gray-500">
-                        Inventaris Aktif
-                    </p>
-
-                    <p class="mt-1 text-2xl font-bold text-green-600">
-                        {{ number_format($inventaris->getCollection()->where('is_active', true)->count()) }}
-                    </p>
-
-                    <p class="mt-1 text-xs text-gray-400">
-                        Pada halaman ini
-                    </p>
-                </div>
-
-            </div>
-        </div>
-
-
-        {{-- Total Unit --}}
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div class="flex items-center gap-4">
-
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-yellow-50 text-[#d99a00]">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-6 w-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="1.8"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M8 7h8M8 12h8M8 17h5M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"
-                        />
-                    </svg>
-                </div>
-
-                <div>
-                    <p class="text-sm font-medium text-gray-500">
-                        Unit pada Halaman Ini
-                    </p>
-
-                    <p class="mt-1 text-2xl font-bold text-[#1d2d50]">
-                        {{ number_format($inventaris->getCollection()->sum('jumlah')) }}
-                    </p>
-
-                    <p class="mt-1 text-xs text-gray-400">
-                        Akumulasi jumlah barang
-                    </p>
-                </div>
-
-            </div>
-        </div>
-
-    </div>
-
-
-    {{-- =========================================================
-        TABEL MASTER INVENTARIS
-    ========================================================== --}}
-    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-
-        {{-- Header Tabel --}}
-        <div class="flex flex-col gap-3 border-b border-gray-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-
-            <div>
-                <h2 class="text-base font-bold text-[#1d2d50]">
-                    Daftar Inventaris
-                </h2>
-
-                <p class="mt-1 text-xs text-gray-500">
-                    Data barang yang digunakan dalam operasional PJL.
+    <div class="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        @foreach($cards as $card)
+            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                <p class="text-xs font-medium text-gray-500 sm:text-sm">
+                    {{ $card['label'] }}
+                </p>
+                <p class="mt-2 text-2xl font-bold {{ $card['color'] }}">
+                    {{ number_format($card['value']) }}
+                </p>
+                <p class="mt-1 text-[11px] text-gray-400">
+                    Seluruh database
                 </p>
             </div>
+        @endforeach
+    </div>
 
-            <div class="text-sm text-gray-500">
-                Halaman
-                <span class="font-semibold text-[#1d2d50]">
-                    {{ $inventaris->currentPage() }}
-                </span>
-                dari
-                <span class="font-semibold text-[#1d2d50]">
-                    {{ max($inventaris->lastPage(), 1) }}
-                </span>
-            </div>
+    {{-- FILTER --}}
+    @php
+        $filters = [
+            'semua' => 'Semua',
+            'aktif' => 'Aktif',
+            'nonaktif' => 'Nonaktif',
+            'baik' => 'Baik',
+            'perlu_perbaikan' => 'Perlu Perbaikan',
+            'rusak' => 'Rusak',
+            'hilang' => 'Hilang',
+        ];
+    @endphp
 
+    <div class="mb-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div class="mb-4 flex flex-wrap gap-2">
+            @foreach($filters as $key => $label)
+                <a
+                    href="{{ route('admin.inventaris.index', array_filter(['status' => $key, 'search' => $search])) }}"
+                    class="rounded-lg px-4 py-2 text-xs font-semibold transition
+                    {{ $status === $key
+                        ? 'bg-[#1d2d50] text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}"
+                >
+                    {{ $label }}
+                </a>
+            @endforeach
         </div>
 
+        <form method="GET" action="{{ route('admin.inventaris.index') }}"
+              class="flex flex-col gap-3 sm:flex-row">
+            <input type="hidden" name="status" value="{{ $status }}">
 
-        {{-- Isi Tabel --}}
+            <input
+                type="text"
+                name="search"
+                value="{{ $search }}"
+                placeholder="Cari kode atau nama JPL..."
+                class="min-w-0 flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
+            >
+
+            <button type="submit"
+                    class="rounded-lg bg-[#1d2d50] px-5 py-2.5 text-sm font-semibold text-white">
+                Cari JPL
+            </button>
+        </form>
+    </div>
+
+    {{-- DAFTAR JPL --}}
+    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="border-b border-gray-100 px-5 py-4">
+            <h2 class="font-bold text-[#1d2d50]">Inventaris per JPL</h2>
+            <p class="mt-1 text-xs text-gray-500">
+                Klik Detail JPL untuk melihat barang dan kondisi inventaris.
+            </p>
+        </div>
+
         <div class="overflow-x-auto">
-
-            <table class="min-w-full divide-y divide-gray-200">
-
-                <thead class="bg-gray-50">
+            <table class="w-full min-w-[850px] text-sm">
+                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Barang
-                        </th>
-
-                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Kategori
-                        </th>
-
-                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Lokasi / JPL
-                        </th>
-
-                        <th class="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Jumlah
-                        </th>
-
-                        <th class="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Status
-                        </th>
-
-                        <th class="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Aksi
-                        </th>
+                        <th class="px-5 py-4">JPL</th>
+                        <th class="px-5 py-4 text-center">Jenis</th>
+                        <th class="px-5 py-4 text-center">Unit</th>
+                        <th class="px-5 py-4 text-center">Aktif</th>
+                        <th class="px-5 py-4 text-center">Baik</th>
+                        <th class="px-5 py-4 text-center">Rusak</th>
+                        <th class="px-5 py-4 text-right">Aksi</th>
                     </tr>
                 </thead>
 
-
-                <tbody class="divide-y divide-gray-100 bg-white">
-
-                    @forelse ($inventaris as $item)
-
-                        <tr class="transition hover:bg-gray-50">
-
-                            {{-- Informasi Barang --}}
-                            <td class="whitespace-nowrap px-6 py-4">
-                                <div class="flex items-center gap-3">
-
-                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-sm font-bold text-[#1d2d50]">
-                                        {{ strtoupper(substr($item->nama_barang, 0, 1)) }}
-                                    </div>
-
-                                    <div>
-                                        <p class="text-sm font-semibold text-gray-800">
-                                            {{ $item->nama_barang }}
-                                        </p>
-
-                                        <p class="mt-1 text-xs text-gray-500">
-                                            Kode:
-                                            {{ $item->kode_barang ?: '-' }}
-                                        </p>
-                                    </div>
-
-                                </div>
-                            </td>
-
-
-                            {{-- Kategori --}}
-                            <td class="whitespace-nowrap px-6 py-4">
-                                @switch($item->kategori)
-
-                                    @case('perangkat_pengamanan')
-                                        <span class="inline-flex rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">
-                                            Perangkat Pengamanan
-                                        </span>
-                                        @break
-
-                                    @case('alat_pendukung')
-                                        <span class="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-                                            Alat Pendukung
-                                        </span>
-                                        @break
-
-                                    @default
-                                        <span class="inline-flex rounded-full bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700">
-                                            Inventaris PJL
-                                        </span>
-
-                                @endswitch
-                            </td>
-
-
-                            {{-- Lokasi dan JPL --}}
-                            <td class="px-6 py-4">
-                                <p class="text-sm font-medium text-gray-800">
-                                    {{ $item->jpl?->kode_jpl ?? '-' }}
+                <tbody class="divide-y divide-gray-100">
+                    @forelse($jpls as $jpl)
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-5 py-4">
+                                <p class="font-semibold text-[#1d2d50]">
+                                    {{ $jpl->kode_jpl }}
                                 </p>
-
                                 <p class="mt-1 text-xs text-gray-500">
-                                    {{ $item->jpl?->nama_jpl ?? $item->lokasi ?? 'Belum ditentukan' }}
+                                    {{ $jpl->nama_jpl }}
                                 </p>
                             </td>
 
-
-                            {{-- Jumlah --}}
-                            <td class="whitespace-nowrap px-6 py-4 text-center">
-                                <span class="text-sm font-semibold text-gray-800">
-                                    {{ number_format($item->jumlah ?? 0) }}
-                                </span>
-
-                                <span class="text-xs text-gray-500">
-                                    unit
-                                </span>
+                            <td class="px-5 py-4 text-center">
+                                {{ number_format($jpl->inventaris_count) }}
                             </td>
 
-
-                            {{-- Status --}}
-                            <td class="whitespace-nowrap px-6 py-4 text-center">
-                                @if ($item->is_active)
-                                    <span class="inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                                        Aktif
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
-                                        Nonaktif
-                                    </span>
-                                @endif
+                            <td class="px-5 py-4 text-center">
+                                {{ number_format($jpl->total_unit ?? 0) }}
                             </td>
 
-
-                            {{-- Aksi --}}
-                            <td class="whitespace-nowrap px-6 py-4">
-                                <div class="flex items-center justify-center gap-2">
-
-                                    {{-- Edit --}}
-                                    <a
-                                        href="{{ route('admin.inventaris.edit', $item->id) }}"
-                                        title="Edit inventaris"
-                                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-[#1d2d50] transition hover:border-blue-200 hover:bg-blue-50"
-                                    >
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            class="h-4 w-4"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                            stroke-width="1.8"
-                                        >
-                                            <path
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                d="M16.862 4.487l2.651 2.651M8 16l8.5-8.5a2.121 2.121 0 0 1 3 3L11 19H8v-3Z"
-                                            />
-                                        </svg>
-                                    </a>
-
-
-                                    {{-- Hapus --}}
-                                    <form
-                                        action="{{ route('admin.inventaris.destroy', $item->id) }}"
-                                        method="POST"
-                                        onsubmit="return confirm('Yakin ingin menghapus atau menonaktifkan inventaris ini?')"
-                                    >
-                                        @csrf
-                                        @method('DELETE')
-
-                                        <button
-                                            type="submit"
-                                            title="Hapus inventaris"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-red-600 transition hover:border-red-200 hover:bg-red-50"
-                                        >
-                                            <svg
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                class="h-4 w-4"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                stroke="currentColor"
-                                                stroke-width="1.8"
-                                            >
-                                                <path
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                    d="M6 7h12M9 7V4h6v3m-7 0 1 13h6l1-13M10 11v5m4-5v5"
-                                                />
-                                            </svg>
-                                        </button>
-                                    </form>
-
-                                </div>
+                            <td class="px-5 py-4 text-center font-semibold text-green-600">
+                                {{ $jpl->inventaris_aktif_count }}
                             </td>
 
-                        </tr>
+                            <td class="px-5 py-4 text-center text-green-600">
+                                {{ $jpl->inventaris_baik_count }}
+                            </td>
 
-                    @empty
+                            <td class="px-5 py-4 text-center font-semibold text-red-600">
+                                {{ $jpl->inventaris_rusak_count }}
+                            </td>
 
-                        <tr>
-                            <td colspan="6" class="px-6 py-14 text-center">
-
-                                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        class="h-7 w-7"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        stroke-width="1.8"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            d="M4 7h16M6 7v12h12V7M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-                                        />
-                                    </svg>
-                                </div>
-
-                                <p class="mt-4 text-sm font-semibold text-gray-700">
-                                    Belum ada data inventaris
-                                </p>
-
-                                <p class="mt-1 text-sm text-gray-500">
-                                    Tambahkan barang untuk mulai mengelola inventaris PJL.
-                                </p>
-
-                                <a
-                                    href="{{ route('admin.inventaris.create') }}"
-                                    class="mt-4 inline-flex items-center rounded-lg bg-[#1d2d50] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#14213d]"
-                                >
-                                    + Tambah Inventaris
+                            <td class="px-5 py-4 text-right">
+                                <a href="{{ route('admin.inventaris.jpl.show', $jpl->id) }}"
+                                   class="inline-flex rounded-lg bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100">
+                                    Detail JPL →
                                 </a>
-
                             </td>
                         </tr>
-
+                    @empty
+                        <tr>
+                            <td colspan="7" class="px-5 py-12 text-center text-gray-500">
+                                Tidak ada JPL yang sesuai dengan pencarian atau filter.
+                            </td>
+                        </tr>
                     @endforelse
-
                 </tbody>
-
             </table>
-
         </div>
 
-
-        {{-- Pagination --}}
-        @if ($inventaris->hasPages())
-            <div class="border-t border-gray-200 px-6 py-4">
-                {{ $inventaris->links() }}
+        @if($jpls->hasPages())
+            <div class="border-t border-gray-100 px-5 py-4">
+                {{ $jpls->links() }}
             </div>
         @endif
-
     </div>
 
+    <p class="mt-4 text-xs text-gray-500">
+        Status aktif menunjukkan ketersediaan inventaris dalam sistem,
+        sedangkan kondisi menunjukkan hasil pemeriksaan terakhir.
+        Angka kondisi dihitung berdasarkan jenis inventaris, bukan jumlah unit.
+    </p>
 </div>
-
 @endsection
