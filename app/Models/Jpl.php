@@ -10,21 +10,23 @@ class Jpl extends Model
 {
     protected $table = 'jpl';
 
-   protected $fillable = [
-    'kode_jpl',
-    'nama_jpl',
-    'resort_id',
-    'antara',
-    'km_hm',
-    'lokasi',
-    'kota_kabupaten',
-    'provinsi',
-    'jenis_jalur_ka',
-    'titik_koordinat',
-    'status_penjagaan',
-    'keterangan',
-    'is_active',
-];
+    protected $fillable = [
+        'kode_jpl',
+        'nama_jpl',
+        'resort_id',
+        'antara',
+        'km_hm',
+        'lokasi',
+        'kota_kabupaten',
+        'provinsi',
+        'jenis_jalur_ka',
+        'konst_jalan',
+        'titik_koordinat',
+        'lebar_jln',
+        'status_penjagaan',
+        'keterangan',
+        'is_active',
+    ];
 
     protected $casts = [
         'is_active' => 'boolean',

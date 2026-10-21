@@ -20,6 +20,9 @@ class SerahTerima extends Model
         'status',
     ];
 
+    /**
+     * Casting atribut model.
+     */
     protected function casts(): array
     {
         return [
@@ -41,7 +44,7 @@ class SerahTerima extends Model
 
     /**
      * Alias relasi dinas penyerah.
-     * Digunakan untuk kompatibilitas controller.
+     * Dipertahankan untuk kompatibilitas controller.
      */
     public function dinas(): BelongsTo
     {

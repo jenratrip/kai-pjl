@@ -22,11 +22,11 @@
         action="{{ route('superadmin.activities.index') }}"
         class="rounded-xl bg-white p-5 shadow-sm">
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-7">
 
-            <div class="lg:col-span-2">
+            <div class="min-w-0 xl:col-span-2">
                 <label for="search"
-                       class="mb-1 block text-sm font-medium text-gray-700">
+                    class="mb-1 block text-sm font-medium text-gray-700">
                     Pencarian
                 </label>
                 <input
@@ -43,53 +43,43 @@
                 </p>
             </div>
 
-            <div>
+            <div class="min-w-0">
                 <label for="module"
-                       class="mb-1 block text-sm font-medium text-gray-700">
+                    class="mb-1 block text-sm font-medium text-gray-700">
                     Modul
                 </label>
-                <select
-                    id="module"
-                    name="module"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                >
+                <select id="module" name="module"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
                     <option value="">Semua modul</option>
                     @foreach ($modules as $module)
-                        <option
-                            value="{{ $module }}"
-                            @selected(request('module') === $module)
-                        >
+                        <option value="{{ $module }}"
+                            @selected(request('module') === $module)>
                             {{ $module }}
                         </option>
                     @endforeach
                 </select>
             </div>
 
-            <div>
+            <div class="min-w-0">
                 <label for="action"
-                       class="mb-1 block text-sm font-medium text-gray-700">
+                    class="mb-1 block text-sm font-medium text-gray-700">
                     Aktivitas
                 </label>
-                <select
-                    id="action"
-                    name="action"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                >
+                <select id="action" name="action"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
                     <option value="">Semua aktivitas</option>
                     @foreach ($actions as $action)
-                        <option
-                            value="{{ $action }}"
-                            @selected(request('action') === $action)
-                        >
+                        <option value="{{ $action }}"
+                            @selected(request('action') === $action)>
                             {{ ucfirst($action) }}
                         </option>
                     @endforeach
                 </select>
             </div>
 
-            <div>
+            <div class="min-w-0">
                 <label for="start_date"
-                       class="mb-1 block text-sm font-medium text-gray-700">
+                    class="mb-1 block text-sm font-medium text-gray-700">
                     Dari tanggal
                 </label>
                 <input
@@ -97,13 +87,13 @@
                     type="date"
                     name="start_date"
                     value="{{ request('start_date') }}"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    class="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 >
             </div>
 
-            <div>
+            <div class="min-w-0">
                 <label for="end_date"
-                       class="mb-1 block text-sm font-medium text-gray-700">
+                    class="mb-1 block text-sm font-medium text-gray-700">
                     Sampai tanggal
                 </label>
                 <input
@@ -111,25 +101,34 @@
                     type="date"
                     name="end_date"
                     value="{{ request('end_date') }}"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    class="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 >
+            </div>
+
+            <div class="min-w-0">
+                {{-- Ruang label agar tombol sejajar dengan input --}}
+                <label class="invisible mb-1 block text-sm font-medium"
+                    aria-hidden="true">
+                    Reset Filter
+                </label>
+
+                <a
+                    href="{{ route('superadmin.activities.index') }}"
+                    class="inline-flex h-[38px] w-full items-center justify-center whitespace-nowrap rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                    Reset Filter
+                </a>
             </div>
 
         </div>
 
-        <div class="mt-4 flex items-center gap-3">
-            <a
-                href="{{ route('superadmin.activities.index') }}"
-                class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-                Reset Filter
-            </a>
-
+        <div class="mt-3">
             <span id="filter-status"
-                  class="text-xs text-gray-500"
-                  aria-live="polite"></span>
+                class="text-xs text-gray-500"
+                aria-live="polite"></span>
         </div>
     </form>
+
 
     {{-- Tabel aktivitas --}}
     <div id="activity-results">

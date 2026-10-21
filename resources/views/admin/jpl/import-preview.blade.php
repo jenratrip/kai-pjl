@@ -4,71 +4,89 @@
 
 @section('content')
 
-<div class="p-6 lg:p-8">
+@php
+    $prefix = request()->routeIs('superadmin.*')
+        ? 'superadmin'
+        : 'admin';
 
-    {{-- Header --}}
-    <div class="mb-6">
+    $rows = collect($rows ?? []);
+    $total = $rows->count();
 
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    $errorCount = $rows->where('status', 'error')->count();
+    $duplicateCount = $rows->where('status', 'duplikat')->count();
+    $newResortCount = $rows->where('status', 'baru')->count();
+    $validCount = $rows->where('status', 'valid')->count();
 
-            <div>
+    $readyCount = $validCount + $newResortCount;
+    $skippedCount = $errorCount + $duplicateCount;
 
-                <h1 class="text-2xl font-bold text-[#1d2d50]">
-                    Preview Import JPL
-                </h1>
+    $existingResortNames = $existingResortNames ?? [];
+    $newResortNames = $newResortNames ?? [];
 
-                <p class="mt-1 text-sm text-gray-500">
-                    Periksa data sebelum dimasukkan ke sistem.
-                </p>
+    // Partial import: tetap bisa konfirmasi jika ada data valid.
+    $canImport = $readyCount > 0;
 
-            </div>
+    // Seluruh 11 kolom sesuai urutan Excel.
+    $columns = [
+        'kode_jpl' => 'NO JPL',
+        'km_hm' => 'KM / HM',
+        'antara' => 'ANTARA',
+        'status_penjagaan' => 'STATUS PENJAGAAN',
+        'jenis_jalur_ka' => 'JENIS JALUR',
+        'konst_jalan' => 'KONST JALAN',
+        'titik_koordinat' => 'TITIK KOORDINAT',
+        'lebar_jln' => 'LEBAR JLN (m)',
+        'resort' => 'RESORT',
+        'nama_jpl' => 'NAMA JLN / DAERAH',
+        'kota_kabupaten' => 'KOTA / KABUPATEN',
+    ];
+@endphp
 
-            <a
-                href="{{ route('admin.jpl.import') }}"
-                class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-            >
-                Kembali
-            </a>
+<div class="p-4 lg:p-8">
 
+    {{-- HEADER --}}
+    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+        <div>
+            <h1 class="text-2xl font-bold text-[#1d2d50]">
+                Preview Import JPL
+            </h1>
+
+            <p class="mt-1 text-sm text-gray-500">
+                Periksa seluruh data Excel sebelum disimpan ke sistem.
+            </p>
         </div>
+
+        <a
+            href="{{ route($prefix . '.jpl.import') }}"
+            class="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+        >
+            ← Kembali
+        </a>
 
     </div>
 
-
-    {{-- Flash Error --}}
+    {{-- FLASH ERROR --}}
     @if(session('error'))
 
         <div class="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
 
-            <div class="flex gap-3">
+            <p class="font-semibold text-red-800">
+                Import tidak dapat dilakukan
+            </p>
 
-                <div class="text-red-600">
-                    ⚠
-                </div>
-
-                <div>
-
-                    <p class="font-semibold text-red-800">
-                        Import tidak dapat dilakukan
-                    </p>
-
-                    <p class="mt-1 text-sm text-red-700">
-                        {{ session('error') }}
-                    </p>
-
-                </div>
-
-            </div>
+            <p class="mt-1 text-sm text-red-700">
+                {{ session('error') }}
+            </p>
 
         </div>
 
     @endif
 
+    {{-- WILAYAH --}}
+    <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
 
-    {{-- Wilayah --}}
-    <div class="mb-6 rounded-2xl border border-[#1d2d50]/10 bg-white p-6 shadow-sm">
-
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
             <div>
 
@@ -84,12 +102,12 @@
 
             <div class="rounded-xl bg-blue-50 px-4 py-3">
 
-                <p class="text-xs text-blue-500">
-                    Seluruh Resort dari Excel
+                <p class="text-xs text-blue-600">
+                    Resort dari Excel akan dihubungkan
                 </p>
 
                 <p class="mt-1 text-sm font-semibold text-blue-800">
-                    akan terhubung ke Wilayah ini
+                    ke wilayah ini
                 </p>
 
             </div>
@@ -98,15 +116,14 @@
 
     </div>
 
+    {{-- STATISTIK --}}
+    <div class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
 
-    {{-- Statistik --}}
-    <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-        {{-- Total JPL --}}
+        {{-- TOTAL --}}
         <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
 
             <p class="text-sm text-gray-500">
-                Total JPL
+                Total Baris
             </p>
 
             <p class="mt-2 text-3xl font-bold text-[#1d2d50]">
@@ -115,22 +132,20 @@
 
         </div>
 
+        {{-- SIAP DISIMPAN --}}
+        <div class="rounded-2xl border border-green-200 bg-green-50 p-5 shadow-sm">
 
-        {{-- Resort Existing --}}
-        <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-
-            <p class="text-sm text-gray-500">
-                Resort Ditemukan
+            <p class="text-sm text-green-700">
+                Siap Disimpan
             </p>
 
-            <p class="mt-2 text-3xl font-bold text-green-600">
-                {{ count($existingResortNames) }}
+            <p class="mt-2 text-3xl font-bold text-green-700">
+                {{ $readyCount }}
             </p>
 
         </div>
 
-
-        {{-- Resort Baru --}}
+        {{-- RESORT BARU --}}
         <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
 
             <p class="text-sm text-amber-700">
@@ -143,33 +158,27 @@
 
         </div>
 
+        {{-- DUPLIKAT --}}
+        <div class="rounded-2xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
 
-        {{-- Error --}}
-        <div class="
-            rounded-2xl border p-5 shadow-sm
-            {{ $errorCount > 0
-                ? 'border-red-200 bg-red-50'
-                : 'border-green-200 bg-green-50'
-            }}
-        ">
-
-            <p class="
-                text-sm
-                {{ $errorCount > 0
-                    ? 'text-red-700'
-                    : 'text-green-700'
-                }}
-            ">
-                Data Bermasalah
+            <p class="text-sm text-orange-700">
+                Duplikat
             </p>
 
-            <p class="
-                mt-2 text-3xl font-bold
-                {{ $errorCount > 0
-                    ? 'text-red-700'
-                    : 'text-green-700'
-                }}
-            ">
+            <p class="mt-2 text-3xl font-bold text-orange-700">
+                {{ $duplicateCount }}
+            </p>
+
+        </div>
+
+        {{-- ERROR --}}
+        <div class="rounded-2xl border border-red-200 bg-red-50 p-5 shadow-sm">
+
+            <p class="text-sm text-red-700">
+                Error
+            </p>
+
+            <p class="mt-2 text-3xl font-bold text-red-700">
                 {{ $errorCount }}
             </p>
 
@@ -177,16 +186,19 @@
 
     </div>
 
-
-    {{-- Resort yang akan digunakan --}}
+    {{-- INFORMASI RESORT --}}
     <div class="mb-6 grid gap-6 lg:grid-cols-2">
 
-        {{-- Existing --}}
+        {{-- RESORT EXISTING --}}
         <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
 
             <h2 class="font-semibold text-[#1d2d50]">
-                Resort yang sudah tersedia
+                Resort yang Sudah Tersedia
             </h2>
+
+            <p class="mt-1 text-xs text-gray-500">
+                {{ count($existingResortNames) }} Resort ditemukan.
+            </p>
 
             @if(count($existingResortNames) > 0)
 
@@ -205,20 +217,23 @@
             @else
 
                 <p class="mt-4 text-sm text-gray-500">
-                    Tidak ada Resort yang sudah tersedia pada Wilayah ini.
+                    Tidak ada Resort yang cocok dengan wilayah tujuan.
                 </p>
 
             @endif
 
         </div>
 
-
-        {{-- New --}}
+        {{-- RESORT BARU --}}
         <div class="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
 
             <h2 class="font-semibold text-amber-900">
-                Resort yang akan dibuat otomatis
+                Resort yang Akan Dibuat
             </h2>
+
+            <p class="mt-1 text-xs text-amber-700">
+                Resort baru akan dibuat otomatis saat konfirmasi.
+            </p>
 
             @if(count($newResortNames) > 0)
 
@@ -237,7 +252,6 @@
             @else
 
                 <p class="mt-4 text-sm text-amber-700">
-                    Tidak ada Resort baru.
                     Semua Resort sudah tersedia.
                 </p>
 
@@ -247,31 +261,20 @@
 
     </div>
 
-
-    {{-- Status --}}
+    {{-- INFORMASI VALIDASI --}}
     @if($errorCount > 0)
 
-        <div class="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
+        <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
 
-            <div class="flex gap-3">
+            <p class="font-semibold text-amber-800">
+                ⚠ Terdapat {{ $errorCount }} baris bermasalah.
+            </p>
 
-                <div class="text-red-600">
-                    ⚠
-                </div>
-
-                <div>
-
-                    <p class="font-semibold text-red-800">
-                        Terdapat {{ $errorCount }} data yang perlu diperbaiki.
-                    </p>
-
-                    <p class="mt-1 text-sm text-red-700">
-                        Import belum dapat dilakukan sampai seluruh data valid.
-                    </p>
-
-                </div>
-
-            </div>
+            <p class="mt-1 text-sm text-amber-700">
+                Import tetap dapat dilakukan selama terdapat data valid.
+                Baris dengan status Error akan dilewati dan tidak disimpan
+                ke database.
+            </p>
 
         </div>
 
@@ -279,89 +282,115 @@
 
         <div class="mb-6 rounded-xl border border-green-200 bg-green-50 p-4">
 
-            <div class="flex gap-3">
+            <p class="font-semibold text-green-800">
+                ✓ Tidak ditemukan error validasi.
+            </p>
 
-                <div class="text-green-600">
-                    ✓
-                </div>
-
-                <div>
-
-                    <p class="font-semibold text-green-800">
-                        Semua data valid dan siap diimport.
-                    </p>
-
-                    <p class="mt-1 text-sm text-green-700">
-                        Resort yang belum tersedia akan dibuat otomatis
-                        di bawah Wilayah <strong>{{ $wilayahName }}</strong>.
-                    </p>
-
-                </div>
-
-            </div>
+            <p class="mt-1 text-sm text-green-700">
+                {{ $readyCount }} baris diperkirakan siap disimpan.
+            </p>
 
         </div>
 
     @endif
 
+    {{-- INFORMASI DUPLIKAT --}}
+    @if($duplicateCount > 0)
 
-    {{-- Table --}}
-    <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div class="mb-6 rounded-xl border border-orange-200 bg-orange-50 p-4">
 
-        <div class="border-b border-gray-200 px-6 py-5">
+            <p class="font-semibold text-orange-800">
+                Perhatian: {{ $duplicateCount }} Data Duplikat
+            </p>
 
-            <h2 class="font-semibold text-[#1d2d50]">
-                Data JPL
-            </h2>
-
-            <p class="mt-1 text-sm text-gray-500">
-                Menampilkan hasil pembacaan dari file Excel.
+            <p class="mt-1 text-sm text-orange-700">
+                Data yang dianggap memiliki identitas sama dengan data
+                di database atau baris lain dalam Excel akan dilewati.
+                Data tersebut tetap ditampilkan pada preview.
             </p>
 
         </div>
 
+    @endif
 
-        <div class="overflow-x-auto">
+    {{-- RINGKASAN PARTIAL IMPORT --}}
+    <div class="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
 
-            <table class="min-w-full text-sm">
+        <h3 class="font-semibold text-blue-900">
+            Ringkasan Import
+        </h3>
+
+        <p class="mt-2 text-sm text-blue-800">
+            Dari <strong>{{ $total }}</strong> baris yang terbaca,
+            <strong>{{ $readyCount }}</strong> baris memenuhi syarat
+            untuk disimpan dan <strong>{{ $skippedCount }}</strong>
+            baris akan dilewati.
+        </p>
+
+        <p class="mt-1 text-xs text-blue-700">
+            Jumlah akhir dapat berubah jika data database berubah
+            setelah preview dibuat.
+        </p>
+
+    </div>
+
+    {{-- TABEL PREVIEW --}}
+    <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+
+        <div class="flex flex-col gap-3 border-b border-gray-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+
+            <div>
+
+                <h2 class="font-semibold text-[#1d2d50]">
+                    Data JPL dari Excel
+                </h2>
+
+                <p class="mt-1 text-sm text-gray-500">
+                    Menampilkan 11 kolom sumber beserta nomor baris dan hasil validasi.
+                </p>
+
+            </div>
+
+            <span class="inline-flex w-fit rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600">
+                {{ $total }} Baris
+            </span>
+
+        </div>
+
+        <div class="border-b border-blue-100 bg-blue-50 px-6 py-3">
+
+            <p class="text-xs text-blue-700">
+                ↔ Geser tabel ke kanan atau kiri untuk melihat seluruh kolom.
+                Tanda — menunjukkan nilai kosong.
+            </p>
+
+        </div>
+
+        <div class="max-w-full overflow-x-auto">
+
+            <table class="min-w-max border-collapse text-sm">
 
                 <thead class="bg-[#f8f9fb]">
 
                     <tr>
 
-                        <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-600">
-                            No
+                        <th class="sticky left-0 z-20 whitespace-nowrap border-b border-r border-gray-200 bg-[#f8f9fb] px-4 py-3 text-left font-semibold text-gray-600">
+                            Baris Excel
                         </th>
 
-                        <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-600">
-                            Resort
-                        </th>
+                        @foreach($columns as $label)
 
-                        <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-600">
-                            Antara
-                        </th>
+                            <th class="whitespace-nowrap border-b border-gray-200 px-4 py-3 text-left font-semibold text-gray-600">
+                                {{ $label }}
+                            </th>
 
-                        <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-600">
-                            KM / HM
-                        </th>
+                        @endforeach
 
-                        <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-600">
-                            No JPL
-                        </th>
-
-                        <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-600">
-                            Nama JPL
-                        </th>
-
-                        <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-600">
-                            Kota / Kabupaten
-                        </th>
-
-                        <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-600">
+                        <th class="whitespace-nowrap border-b border-gray-200 px-4 py-3 text-left font-semibold text-gray-600">
                             Status
                         </th>
 
-                        <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-600">
+                        <th class="min-w-[280px] border-b border-gray-200 px-4 py-3 text-left font-semibold text-gray-600">
                             Keterangan
                         </th>
 
@@ -369,127 +398,121 @@
 
                 </thead>
 
-
                 <tbody class="divide-y divide-gray-100">
 
                     @forelse($rows as $row)
 
-                        <tr class="hover:bg-gray-50">
+                        @php
+                            $status = $row['status'] ?? 'error';
 
-                            <td class="whitespace-nowrap px-4 py-3 text-gray-500">
+                            $rowBackground = match($status) {
+                                'error' => 'bg-red-50/40',
+                                'duplikat' => 'bg-orange-50/40',
+                                'baru' => 'bg-amber-50/30',
+                                default => 'bg-white',
+                            };
+
+                            $statusClass = match($status) {
+                                'error' => 'bg-red-100 text-red-700',
+                                'duplikat' => 'bg-orange-100 text-orange-700',
+                                'baru' => 'bg-amber-100 text-amber-700',
+                                default => 'bg-green-100 text-green-700',
+                            };
+
+                            $statusLabel = match($status) {
+                                'error' => 'Error',
+                                'duplikat' => 'Duplikat',
+                                'baru' => 'Resort Baru',
+                                default => 'Valid',
+                            };
+                        @endphp
+
+                        <tr class="{{ $rowBackground }} hover:bg-blue-50/50">
+
+                            {{-- NOMOR BARIS EXCEL --}}
+                            <td class="sticky left-0 z-10 whitespace-nowrap border-r border-gray-200 px-4 py-3 font-semibold text-gray-700 {{ $rowBackground }}">
                                 {{ $row['row'] ?? '-' }}
                             </td>
 
+                            {{-- SELURUH KOLOM EXCEL --}}
+                            @foreach($columns as $key => $label)
 
-                            <td class="whitespace-nowrap px-4 py-3">
+                                @php
+                                    $value = $row[$key] ?? null;
 
-                                <span class="font-medium text-gray-800">
-                                    {{ $row['resort'] ?? '-' }}
+                                    $isEmpty = $value === null
+                                        || trim((string) $value) === '';
+                                @endphp
+
+                                <td class="max-w-[300px] px-4 py-3 align-top text-gray-700">
+
+                                    @if($isEmpty)
+
+                                        <span class="text-gray-400">
+                                            —
+                                        </span>
+
+                                    @elseif(
+                                        $key === 'kode_jpl'
+                                        && mb_strtolower(trim((string) $value)) === 'liar'
+                                    )
+
+                                        <span class="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                                            {{ $value }}
+                                        </span>
+
+                                    @else
+
+                                        <span class="block min-w-[75px] break-words">
+                                            {{ $value }}
+                                        </span>
+
+                                    @endif
+
+                                </td>
+
+                            @endforeach
+
+                            {{-- STATUS --}}
+                            <td class="whitespace-nowrap px-4 py-3 align-top">
+
+                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $statusClass }}">
+                                    {{ $statusLabel }}
                                 </span>
 
                             </td>
 
-
-                            <td class="whitespace-nowrap px-4 py-3 text-gray-600">
-                                {{ $row['antara'] ?? '-' }}
-                            </td>
-
-
-                            <td class="whitespace-nowrap px-4 py-3 text-gray-600">
-                                {{ $row['km_hm'] ?? '-' }}
-                            </td>
-
-
-                            <td class="whitespace-nowrap px-4 py-3">
-
-                                @if(($row['kode_jpl'] ?? null) === 'Liar')
-
-                                    <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
-                                        Liar
-                                    </span>
-
-                                @else
-
-                                    <span class="font-medium text-gray-800">
-                                        {{ $row['kode_jpl'] ?? '-' }}
-                                    </span>
-
-                                @endif
-
-                            </td>
-
-
-                            <td class="min-w-[220px] px-4 py-3 text-gray-700">
-                                {{ $row['nama_jpl'] ?? '-' }}
-                            </td>
-
-
-                            <td class="whitespace-nowrap px-4 py-3 text-gray-600">
-                                {{ $row['kota_kabupaten'] ?? '-' }}
-                            </td>
-
-
-                            <td class="whitespace-nowrap px-4 py-3">
-
-                                @if(($row['status'] ?? '') === 'error')
-
-                                    <span class="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
-                                        Error
-                                    </span>
-
-                                @elseif(($row['status'] ?? '') === 'baru')
-
-                                    <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                                        Resort Baru
-                                    </span>
-                                    
-                                @elseif (($row['status'] ?? '') === 'duplikat')
-                                    <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                                        Duplikat
-                                    </span>
-
-                                @else
-
-                                    <span class="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
-                                        Valid
-                                    </span>
-
-                                @endif
-
-                            </td>
-
-
-                            <td class="min-w-[280px] px-4 py-3">
+                            {{-- KETERANGAN --}}
+                            <td class="min-w-[280px] max-w-[380px] px-4 py-3 align-top">
 
                                 @if(!empty($row['errors']))
 
-                                    <ul class="space-y-1 text-xs text-red-600">
+                                    <ul class="space-y-1 text-xs text-red-700">
 
                                         @foreach($row['errors'] as $error)
-
-                                            <li>
-                                                • {{ $error }}
-                                            </li>
-
+                                            <li>• {{ $error }}</li>
                                         @endforeach
 
                                     </ul>
 
-                                @elseif(!empty($row['notes']))
+                                @endif
 
-                                    <ul class="space-y-1 text-xs text-amber-700">
+                                @if(!empty($row['notes']))
+
+                                    <ul class="mt-1 space-y-1 text-xs text-amber-700">
 
                                         @foreach($row['notes'] as $note)
-
-                                            <li>
-                                                • {{ $note }}
-                                            </li>
-
+                                            <li>• {{ $note }}</li>
                                         @endforeach
 
                                     </ul>
 
-                                @else
+                                @endif
+
+                                @if(
+                                    empty($row['errors'])
+                                    && empty($row['notes'])
+                                )
 
                                     <span class="text-xs text-green-600">
                                         Data siap diimport.
@@ -506,7 +529,7 @@
                         <tr>
 
                             <td
-                                colspan="9"
+                                colspan="{{ count($columns) + 3 }}"
                                 class="px-6 py-12 text-center text-sm text-gray-500"
                             >
                                 Tidak ada data JPL yang ditemukan.
@@ -522,59 +545,78 @@
 
         </div>
 
+        {{-- FOOTER ACTION --}}
+        <div class="border-t border-gray-200 bg-gray-50 px-6 py-5">
 
-        {{-- Footer Action --}}
-        <div class="flex flex-col gap-3 border-t border-gray-200 bg-gray-50 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 
-            <div>
+                <div>
 
-                @if($errorCount > 0)
+                    @if($canImport)
 
-                    <p class="text-sm font-medium text-red-600">
-                        Import tidak tersedia karena masih terdapat data bermasalah.
-                    </p>
+                        <p class="text-sm font-semibold text-gray-800">
+                            {{ $readyCount }} dari {{ $total }} baris siap diimport.
+                        </p>
 
-                @else
+                        <p class="mt-1 text-xs text-gray-500">
+                            {{ $errorCount }} error dan
+                            {{ $duplicateCount }} duplikat akan dilewati.
+                        </p>
 
-                    <p class="text-sm text-gray-600">
-                        {{ $total }} data JPL siap dimasukkan ke sistem.
-                    </p>
+                    @else
 
-                @endif
+                        <p class="text-sm font-semibold text-red-700">
+                            Tidak ada data valid yang dapat diimport.
+                        </p>
 
-            </div>
+                        <p class="mt-1 text-xs text-gray-500">
+                            Upload ulang file dengan minimal satu baris valid.
+                        </p>
 
+                    @endif
 
-            <div class="flex gap-3">
+                </div>
 
-                <a
-                    href="{{ route('admin.jpl.import') }}"
-                    class="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                >
-                    Upload Ulang
-                </a>
+                <div class="flex flex-col gap-3 sm:flex-row">
 
-
-                @if($errorCount === 0 && $total > 0)
-
-                    <form
-                        action="{{ route('admin.jpl.import.confirm') }}"
-                        method="POST"
+                    <a
+                        href="{{ route($prefix . '.jpl.import') }}"
+                        class="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                     >
+                        Upload Ulang
+                    </a>
 
-                        @csrf
+                    @if($canImport)
+
+                        <form
+                            action="{{ route($prefix . '.jpl.import.confirm') }}"
+                            method="POST"
+                            onsubmit="return confirm('Lanjutkan import JPL? Hanya data valid yang akan disimpan. Data error dan duplikat akan dilewati. Resort baru akan dibuat otomatis.')"
+                        >
+                            @csrf
+
+                            <button
+                                type="submit"
+                                class="inline-flex w-full items-center justify-center rounded-xl bg-[#1d2d50] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#14233f]"
+                            >
+                                Konfirmasi Import ({{ $readyCount }})
+                            </button>
+
+                        </form>
+
+                    @else
 
                         <button
-                            type="submit"
-                            onclick="return confirm('Import {{ $total }} data JPL ke Wilayah {{ addslashes($wilayahName) }}? Resort yang belum ada akan dibuat otomatis.')"
-                            class="inline-flex items-center justify-center rounded-xl bg-[#1d2d50] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#14233f]"
+                            type="button"
+                            disabled
+                            class="inline-flex cursor-not-allowed items-center justify-center rounded-xl bg-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-500"
                         >
                             Konfirmasi Import
                         </button>
 
-                    </form>
+                    @endif
 
-                @endif
+                </div>
 
             </div>
 
