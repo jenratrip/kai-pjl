@@ -26,15 +26,20 @@
     --radius: 10px;
 }
 
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
 /* ========================================
    BODY
 ======================================== */
 
 body {
-    font-family: Arial, Helvetica, sans-serif;
+    min-height: 100vh;
     background: var(--background);
     color: var(--text);
-    min-height: 100vh;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 15px;
 }
 
 a {
@@ -43,73 +48,73 @@ a {
 }
 
 /* ========================================
-   HEADER
+   HEADER (PUTIH, SAMA DENGAN HALAMAN LAIN)
 ======================================== */
 
 .topbar {
-    width: 100%;
-    min-height: 64px;
-    background: var(--navy);
+    position: sticky;
+    top: 0;
+    z-index: 50;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 32px;
-    color: var(--white);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    gap: 20px;
+    width: 100%;
+    min-height: 62px;
+    padding: 0 24px;
+    background: var(--white);
+    border-bottom: 1px solid #E5E7EB;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    color: #1D2D50;
 }
 
-/* ========================================
-   BRAND
-======================================== */
+/* BRAND */
 
 .brand {
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 0;
 }
 
 .kai-logo {
-    width: 46px;
-    height: 34px;
-    background: var(--white);
-    border-radius: 5px;
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
     flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    overflow: hidden;
 }
 
 .kai-logo img {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: contain;
-    display: block;
 }
 
 .brand-text {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
+    min-width: 0;
 }
 
 .brand-title {
+    color: #1D2D50;
     font-size: 14px;
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: 0.1px;
+    font-weight: 800;
+    line-height: 1.3;
 }
 
 .brand-subtitle {
-    font-size: 8px;
-    color: #D9E1EE;
-    line-height: 1;
-    letter-spacing: 0.4px;
+    color: #64748B;
+    font-size: 11px;
+    line-height: 1.3;
 }
 
-/* ========================================
-   HEADER RIGHT
-======================================== */
+/* HEADER KANAN */
 
 .header-right {
     display: flex;
@@ -118,135 +123,114 @@ a {
 }
 
 .pjl-info {
-    text-align: right;
     padding-right: 18px;
-    border-right: 1px solid rgba(255, 255, 255, 0.25);
+    border-right: 1px solid #E5E7EB;
+    text-align: right;
 }
 
 .pjl-name {
-    font-size: 10px;
+    margin-bottom: 3px;
+    color: #1D2D50;
+    font-size: 13px;
     font-weight: 700;
-    margin-bottom: 4px;
 }
 
 .shift {
-    font-size: 8px;
-    color: #D9E1EE;
+    color: #64748B;
+    font-size: 11px;
 }
 
-/* ========================================
-   LOGOUT
-======================================== */
+/* TOMBOL KELUAR */
+
+.logout-form {
+    margin: 0;
+}
 
 .logout-btn {
-    height: 32px;
-    min-width: 82px;
-    padding: 0 13px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--white);
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 7px;
+    gap: 8px;
+    height: 38px;
+    min-width: 92px;
+    padding: 0 14px;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    background: var(--white);
+    color: #B91C1C;
     font-family: inherit;
-    font-size: 9px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background .2s ease;
 }
 
 .logout-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.75);
+    background: #FEF2F2;
 }
 
 /* ========================================
-   MAIN CONTENT
+   KONTEN UTAMA
 ======================================== */
 
 .content {
     width: 100%;
-    max-width: 1200px;
+    max-width: 1500px;
     margin: 0 auto;
-    padding: 30px 32px 50px;
+    padding: 38px 4% 60px;
 }
 
 /* ========================================
-   USER CARD
+   KARTU PETUGAS
 ======================================== */
 
 .user-card {
+    display: flex;
+    align-items: center;
+    gap: 28px;
     width: 100%;
-    min-height: 105px;
+    min-height: 140px;
+    padding: 28px;
     background: var(--white);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    display: flex;
-    align-items: center;
-    padding: 20px 22px;
     box-shadow: 0 2px 8px rgba(15, 23, 42, 0.025);
 }
 
-/* ========================================
-   AVATAR
-======================================== */
-
-.avatar {
-    width: 48px;
-    height: 48px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: var(--navy);
-    color: var(--white);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: 700;
-    margin-right: 16px;
-}
-
-/* ========================================
-   EMPLOYEE
-======================================== */
-
 .employee {
     flex: 1;
-    min-width: 230px;
-    padding-right: 20px;
+    min-width: 250px;
 }
 
 .employee-label {
+    margin-bottom: 9px;
     color: var(--muted);
-    font-size: 9px;
+    font-size: 13px;
     font-weight: 500;
-    margin-bottom: 6px;
 }
 
 .employee-name {
     color: var(--navy-dark);
-    font-size: 13px;
+    font-size: 17px;
     font-weight: 700;
-    line-height: 1.5;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
 }
-
-/* ========================================
-   EMPLOYEE INFO
-======================================== */
 
 .employee-info {
     display: flex;
     align-items: stretch;
+    flex: 1;
+    min-width: 0;
 }
 
 .info-item {
-    min-width: 155px;
-    padding: 2px 24px;
     display: flex;
+    flex: 1;
     flex-direction: column;
     justify-content: center;
+    min-width: 0;
+    padding: 4px 22px;
 }
 
 .info-item:first-child {
@@ -258,45 +242,46 @@ a {
 }
 
 .info-label {
+    margin-bottom: 9px;
     color: var(--muted);
-    font-size: 8px;
+    font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.3px;
-    margin-bottom: 6px;
+    letter-spacing: 0.4px;
 }
 
 .info-value {
     color: var(--navy-dark);
-    font-size: 9px;
+    font-size: 13px;
     font-weight: 700;
-    white-space: nowrap;
-    line-height: 1.4;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
 }
 
 /* ========================================
-   ALERT / CATATAN DINAS
+   CATATAN DINAS AKTIF
 ======================================== */
 
 .alert {
-    width: 100%;
-    min-height: 44px;
-    margin-top: 18px;
-    padding: 10px 14px;
-    border: 1px solid var(--info-border);
-    background: var(--info-bg);
-    border-radius: 8px;
     display: flex;
     align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 58px;
+    margin-top: 24px;
+    padding: 15px 18px;
+    border: 1px solid var(--info-border);
+    border-radius: 8px;
+    background: var(--info-bg);
     color: var(--blue);
-    font-size: 9px;
-    line-height: 1.5;
+    font-size: 13px;
+    line-height: 1.7;
 }
 
 .alert-icon {
-    width: 25px;
     flex-shrink: 0;
-    margin-right: 6px;
-    font-size: 15px;
+    width: 28px;
+    margin-right: 2px;
+    font-size: 19px;
     font-weight: 700;
     text-align: center;
 }
@@ -306,60 +291,50 @@ a {
 }
 
 /* ========================================
-   MENU TITLE
+   MENU OPERASIONAL
 ======================================== */
 
 .menu-title {
-    margin-top: 28px;
-    margin-bottom: 14px;
+    margin-top: 36px;
+    margin-bottom: 18px;
     color: var(--navy-dark);
-    font-size: 14px;
+    font-size: 20px;
     font-weight: 700;
 }
 
-/* ========================================
-   MENU GRID
-======================================== */
-
 .menu-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 22px;
 }
 
-/* ========================================
-   MENU CARD
-======================================== */
-
 .menu-card {
-    min-height: 135px;
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    position: relative;
+    min-height: 175px;
+    padding: 24px;
     overflow: hidden;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
     box-shadow: 0 2px 8px rgba(15, 23, 42, 0.025);
-    transition:
-        transform 0.2s ease,
-        border-color 0.2s ease,
-        box-shadow 0.2s ease;
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
 }
 
 .menu-card::before {
     content: "";
     position: absolute;
     top: 0;
-    left: 0;
     right: 0;
+    left: 0;
     height: 3px;
     background: var(--navy);
     transform: scaleX(0);
     transform-origin: center;
-    transition: transform 0.2s ease;
+    transition: transform .2s ease;
 }
 
 .menu-card:hover {
@@ -372,26 +347,20 @@ a {
     transform: scaleX(1);
 }
 
-/* ========================================
-   MENU ICON
-======================================== */
-
 .menu-icon {
-    width: 42px;
-    height: 42px;
-    margin-bottom: 12px;
-    background: #F1F4F8;
-    border: 1px solid #E7EBF0;
-    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 15px;
+    background: #F1F4F8;
+    border: 1px solid #E7EBF0;
+    border-radius: 10px;
     color: var(--navy);
-    font-size: 18px;
+    font-size: 23px;
     font-weight: 700;
-    transition:
-        background 0.2s ease,
-        transform 0.2s ease;
+    transition: background .2s ease, transform .2s ease;
 }
 
 .menu-card:hover .menu-icon {
@@ -399,468 +368,12 @@ a {
     transform: scale(1.04);
 }
 
-/* ========================================
-   MENU TEXT
-======================================== */
-
 .menu-text {
     color: var(--navy-dark);
-    font-size: 11px;
+    font-size: 15px;
     font-weight: 700;
-    text-align: center;
-}
-
-/* ========================================
-   TABLET AWAL
-======================================== */
-
-@media (max-width: 950px) {
-    .topbar {
-        padding: 0 24px;
-    }
-
-    .content {
-        padding: 25px 24px 45px;
-    }
-
-    .user-card {
-        align-items: flex-start;
-        flex-wrap: wrap;
-    }
-
-    .employee {
-        padding-right: 0;
-    }
-
-    .employee-info {
-        width: 100%;
-        margin-top: 20px;
-        padding-top: 18px;
-        border-top: 1px solid var(--border);
-    }
-
-    .info-item {
-        flex: 1;
-        min-width: 0;
-    }
-
-    .info-item:first-child {
-        padding-left: 0;
-    }
-
-    .menu-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-/* ========================================
-   MOBILE AWAL
-======================================== */
-
-@media (max-width: 650px) {
-    body {
-        overflow-x: hidden;
-    }
-
-    .topbar {
-        min-height: 60px;
-        padding: 0 14px;
-    }
-
-    .brand {
-        gap: 9px;
-    }
-
-    .kai-logo {
-        width: 40px;
-        height: 30px;
-    }
-
-    .brand-title {
-        font-size: 12px;
-    }
-
-    .brand-subtitle {
-        font-size: 6.5px;
-    }
-
-    .pjl-info {
-        display: none;
-    }
-
-    .header-right {
-        gap: 0;
-    }
-
-    .logout-btn {
-        height: 30px;
-        min-width: 68px;
-        font-size: 8px;
-    }
-
-    /* CONTENT */
-
-    .content {
-        padding: 18px 14px 35px;
-    }
-
-    /* USER CARD */
-
-    .user-card {
-        min-height: auto;
-        padding: 17px;
-        display: grid;
-        grid-template-columns: 44px 1fr;
-        column-gap: 12px;
-        row-gap: 16px;
-        align-items: center;
-    }
-
-    .avatar {
-        width: 44px;
-        height: 44px;
-        margin-right: 0;
-        font-size: 12px;
-    }
-
-    .employee {
-        min-width: 0;
-        padding-right: 0;
-    }
-
-    .employee-label {
-        font-size: 8px;
-        line-height: 1.4;
-        margin-bottom: 4px;
-    }
-
-    .employee-name {
-        font-size: 11px;
-        line-height: 1.5;
-    }
-
-    /* INFO */
-
-    .employee-info {
-        width: 100%;
-        grid-column: 1 / -1;
-        margin-top: 0;
-        padding-top: 0;
-        border-top: none;
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .info-item {
-        width: 100%;
-        min-width: 0;
-        padding: 11px 0;
-    }
-
-    .info-item:first-child {
-        padding-top: 0;
-    }
-
-    .info-item + .info-item {
-        border-left: none;
-        border-top: 1px solid var(--border);
-    }
-
-    .info-label {
-        font-size: 7px;
-        margin-bottom: 5px;
-    }
-
-    .info-value {
-        font-size: 9px;
-        white-space: normal;
-        line-height: 1.5;
-    }
-
-    /* ALERT */
-
-    .alert {
-        margin-top: 15px;
-        padding: 10px 11px;
-        align-items: flex-start;
-        font-size: 8.5px;
-        line-height: 1.55;
-    }
-
-    .alert-icon {
-        width: 20px;
-        margin-top: 1px;
-        margin-right: 4px;
-        font-size: 13px;
-    }
-
-    /* MENU TITLE */
-
-    .menu-title {
-        margin-top: 23px;
-        margin-bottom: 12px;
-        font-size: 12px;
-    }
-
-    /* MENU */
-
-    .menu-grid {
-        grid-template-columns: 1fr;
-        gap: 10px;
-    }
-
-    .menu-card {
-        width: 100%;
-        min-height: 78px;
-        flex-direction: row;
-        justify-content: flex-start;
-        padding: 0 18px;
-        gap: 14px;
-    }
-
-    /* MOBILE SIDE LINE */
-
-    .menu-card::before {
-        width: 3px;
-        height: 100%;
-        top: 0;
-        bottom: 0;
-        right: auto;
-        transform: scaleY(0);
-    }
-
-    .menu-card:hover {
-        transform: none;
-    }
-
-    .menu-card:hover::before {
-        transform: scaleY(1);
-    }
-
-    /* ICON */
-
-    .menu-icon {
-        width: 38px;
-        height: 38px;
-        flex-shrink: 0;
-        margin-bottom: 0;
-        font-size: 16px;
-    }
-
-    /* TEXT */
-
-    .menu-text {
-        font-size: 11px;
-        text-align: left;
-    }
-}
-
-/* ========================================
-   MOBILE KECIL AWAL
-======================================== */
-
-@media (max-width: 380px) {
-    .topbar {
-        padding: 0 10px;
-    }
-
-    .content {
-        padding: 15px 10px 30px;
-    }
-
-    .user-card {
-        padding: 14px;
-    }
-
-    .employee-name {
-        font-size: 10px;
-    }
-
-    .alert {
-        font-size: 8px;
-    }
-
-    .menu-card {
-        min-height: 74px;
-        padding: 0 14px;
-    }
-
-    .menu-icon {
-        width: 34px;
-        height: 34px;
-        font-size: 15px;
-    }
-
-    .menu-text {
-        font-size: 10px;
-    }
-}
-
-/* ========================================
-   DASHBOARD RESPONSIVE IMPROVEMENT
-======================================== */
-
-/* Ukuran dasar */
-
-html {
-    -webkit-text-size-adjust: 100%;
-}
-
-body {
-    font-size: 15px;
-}
-
-/* Header */
-
-.topbar {
-    min-height: 76px;
-    padding: 14px 4%;
-    gap: 20px;
-}
-
-.brand {
-    gap: 14px;
-}
-
-.kai-logo {
-    width: 56px;
-    height: 42px;
-    border-radius: 7px;
-}
-
-.brand-title {
-    font-size: 18px;
-}
-
-.brand-subtitle {
-    font-size: 11px;
-    letter-spacing: 0.3px;
-}
-
-.header-right {
-    gap: 22px;
-}
-
-.pjl-name {
-    font-size: 13px;
-}
-
-.shift {
-    font-size: 11px;
-}
-
-.logout-btn {
-    height: 40px;
-    min-width: 100px;
-    padding: 0 16px;
-    font-size: 13px;
-}
-
-/* Konten utama */
-
-.content {
-    width: 100%;
-    max-width: 1500px;
-    padding: 38px 4% 60px;
-}
-
-/* Kartu profil */
-
-.user-card {
-    min-height: 140px;
-    padding: 28px;
-    gap: 28px;
-}
-
-.employee {
-    min-width: 250px;
-}
-
-.employee-label {
-    font-size: 13px;
-    margin-bottom: 9px;
-}
-
-.employee-name {
-    font-size: 17px;
-    line-height: 1.6;
-    overflow-wrap: anywhere;
-}
-
-.employee-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.info-item {
-    flex: 1;
-    min-width: 0;
-    padding: 4px 22px;
-}
-
-.info-label {
-    font-size: 11px;
-    margin-bottom: 9px;
-    letter-spacing: 0.4px;
-}
-
-.info-value {
-    font-size: 13px;
-    line-height: 1.6;
-    white-space: normal;
-    overflow-wrap: anywhere;
-}
-
-/* Catatan dinas aktif */
-
-.alert {
-    min-height: 58px;
-    margin-top: 24px;
-    padding: 15px 18px;
-    font-size: 13px;
-    line-height: 1.7;
-    gap: 8px;
-}
-
-.alert-icon {
-    width: 28px;
-    margin-right: 2px;
-    font-size: 19px;
-}
-
-/* Judul menu */
-
-.menu-title {
-    margin-top: 36px;
-    margin-bottom: 18px;
-    font-size: 20px;
-}
-
-/* Menu operasional */
-
-.menu-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 22px;
-}
-
-.menu-card {
-    min-height: 175px;
-    padding: 24px;
-    border-radius: 12px;
-}
-
-.menu-icon {
-    width: 52px;
-    height: 52px;
-    margin-bottom: 15px;
-    font-size: 23px;
-    border-radius: 10px;
-}
-
-.menu-text {
-    font-size: 15px;
     line-height: 1.5;
+    text-align: center;
 }
 
 /* ========================================
@@ -869,7 +382,7 @@ body {
 
 @media (max-width: 900px) {
     .topbar {
-        padding: 14px 24px;
+        padding: 0 20px;
     }
 
     .content {
@@ -877,20 +390,20 @@ body {
     }
 
     .user-card {
-        align-items: flex-start;
         flex-wrap: wrap;
+        align-items: flex-start;
         gap: 24px;
     }
 
     .employee {
         flex: 1 1 100%;
+        min-width: 0;
     }
 
     .employee-info {
         flex: 1 1 100%;
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        margin-top: 0;
         padding-top: 20px;
         border-top: 1px solid var(--border);
     }
@@ -901,10 +414,6 @@ body {
 
     .info-item:first-child {
         padding-left: 0;
-    }
-
-    .info-item + .info-item {
-        border-left: 1px solid var(--border);
     }
 
     .menu-grid {
@@ -922,43 +431,50 @@ body {
 ======================================== */
 
 @media (max-width: 600px) {
+    body {
+        overflow-x: hidden;
+    }
+
     .topbar {
-        min-height: 66px;
-        padding: 12px 16px;
+        min-height: 60px;
+        padding: 0 14px;
         gap: 10px;
     }
 
     .brand {
         gap: 9px;
-        min-width: 0;
     }
 
     .kai-logo {
-        width: 42px;
-        height: 32px;
+        width: 36px;
+        height: 36px;
     }
 
     .brand-title {
-        font-size: 14px;
+        font-size: 12px;
     }
 
     .brand-subtitle {
-        font-size: 8px;
+        font-size: 9px;
     }
 
     .pjl-info {
         display: none;
     }
 
+    .header-right {
+        gap: 0;
+    }
+
     .logout-btn {
-        min-width: 76px;
         height: 36px;
+        min-width: 76px;
         padding: 0 10px;
-        font-size: 11px;
+        font-size: 12px;
     }
 
     .content {
-        padding: 22px 16px 35px;
+        padding: 20px 16px 35px;
     }
 
     .user-card {
@@ -977,7 +493,6 @@ body {
 
     .employee-info {
         grid-template-columns: 1fr;
-        gap: 0;
         padding-top: 8px;
     }
 
@@ -1000,9 +515,15 @@ body {
     }
 
     .alert {
+        align-items: flex-start;
         margin-top: 18px;
         padding: 13px;
         font-size: 12px;
+    }
+
+    .alert-icon {
+        width: 22px;
+        font-size: 16px;
     }
 
     .menu-title {
@@ -1016,17 +537,34 @@ body {
     }
 
     .menu-card {
-        min-height: 88px;
         flex-direction: row;
         justify-content: flex-start;
         gap: 16px;
+        min-height: 88px;
         padding: 16px 20px;
     }
 
+    .menu-card::before {
+        top: 0;
+        bottom: 0;
+        right: auto;
+        width: 3px;
+        height: 100%;
+        transform: scaleY(0);
+    }
+
+    .menu-card:hover {
+        transform: none;
+    }
+
+    .menu-card:hover::before {
+        transform: scaleY(1);
+    }
+
     .menu-icon {
+        flex-shrink: 0;
         width: 44px;
         height: 44px;
-        flex-shrink: 0;
         margin-bottom: 0;
         font-size: 20px;
     }
@@ -1037,9 +575,15 @@ body {
     }
 }
 
-/* HP kecil */
+/* ========================================
+   HP KECIL
+======================================== */
 
 @media (max-width: 360px) {
+    .topbar {
+        padding: 0 10px;
+    }
+
     .content {
         padding-right: 12px;
         padding-left: 12px;
@@ -1049,12 +593,8 @@ body {
         padding: 16px;
     }
 
-    .brand-subtitle {
-        font-size: 7px;
-    }
-
     .logout-btn {
         min-width: 66px;
-        font-size: 10px;
+        font-size: 11px;
     }
 }

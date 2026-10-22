@@ -2,12 +2,19 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SerahTerima extends Model
 {
     protected $table = 'serah_terima';
+
+    /**
+     * Status yang dianggap sudah disetujui, sehingga data terkunci.
+     * Sesuai enum di migration: draft, menunggu_penerima, selesai.
+     */
+    public const STATUS_TERKUNCI = ['selesai'];
 
     protected $fillable = [
         'dinas_id',
@@ -29,6 +36,25 @@ class SerahTerima extends Model
             'waktu_serah_terima' => 'datetime',
             'ringkasan' => 'array',
         ];
+    }
+
+    /**
+     * Apakah data ini sudah disetujui dan tidak boleh diedit lagi.
+     */
+    public function isTerkunci(): bool
+    {
+        return in_array($this->status, self::STATUS_TERKUNCI, true);
+    }
+
+    /**
+     * Batasi data pada serah terima dari dinas milik user tertentu.
+     */
+    public function scopeMilikUser(Builder $query, int $userId): Builder
+    {
+        return $query->whereHas(
+            'dinas',
+            fn (Builder $dinas) => $dinas->where('user_id', $userId)
+        );
     }
 
     /**
@@ -66,7 +92,7 @@ class SerahTerima extends Model
     }
 
     /**
-     * User admin/superadmin penerima serah terima.
+     * User admin/superadmin penerima serah terima (opsional).
      */
     public function penerima(): BelongsTo
     {

@@ -11,6 +11,12 @@ use Illuminate\View\View;
 class SerahTerimaDinasController extends Controller
 {
     /**
+     * Status yang tampil di halaman admin.
+     * Draft tidak ditampilkan karena belum dikirim oleh petugas.
+     */
+    private const STATUS_TAMPIL = ['menunggu_penerima', 'selesai'];
+
+    /**
      * Relasi yang digunakan pada daftar dan detail.
      */
     private function relasi(): array
@@ -24,18 +30,40 @@ class SerahTerimaDinasController extends Controller
     }
 
     /**
-     * Query dasar: hanya pengajuan milik akun penerima yang login.
+     * Admin atau superadmin saja yang boleh melihat pengajuan.
+     */
+    private function pastikanAdmin(): void
+    {
+        abort_unless(
+            in_array((int) auth()->user()?->role_id, [2, 3], true),
+            403,
+            'Hanya admin atau superadmin yang dapat melihat serah terima dinas.'
+        );
+    }
+
+    /**
+     * Query dasar: semua serah terima yang sudah dikirim petugas.
+     *
+     * Penerima kini cukup diketik namanya oleh petugas, sehingga
+     * penerima_user_id bisa kosong. Karena itu daftar tidak lagi
+     * difilter berdasarkan akun penerima.
      */
     private function queryPengajuan(Request $request)
     {
         $query = SerahTerima::with($this->relasi())
-            ->where('penerima_user_id', auth()->id());
+            ->whereIn('status', self::STATUS_TAMPIL);
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
         }
 
-        return $query;
+        // Yang menunggu konfirmasi ditampilkan lebih dulu.
+        return $query
+            ->orderByRaw(
+                "CASE WHEN status = 'menunggu_penerima' THEN 0 ELSE 1 END"
+            )
+            ->latest('waktu_serah_terima')
+            ->latest('id');
     }
 
     /**
@@ -43,8 +71,13 @@ class SerahTerimaDinasController extends Controller
      */
     public function index(Request $request): View
     {
+        $this->pastikanAdmin();
+
+        $request->validate([
+            'status' => ['nullable', 'in:menunggu_penerima,selesai'],
+        ]);
+
         $serahTerima = $this->queryPengajuan($request)
-            ->latest('id')
             ->paginate(10)
             ->withQueryString();
 
@@ -61,6 +94,8 @@ class SerahTerimaDinasController extends Controller
      */
     public function updates(Request $request): JsonResponse
     {
+        $this->pastikanAdmin();
+
         $request->validate([
             'status' => [
                 'nullable',
@@ -69,7 +104,6 @@ class SerahTerimaDinasController extends Controller
         ]);
 
         $items = $this->queryPengajuan($request)
-            ->latest('id')
             ->limit(10)
             ->get();
 
@@ -89,6 +123,10 @@ class SerahTerimaDinasController extends Controller
                 'jpl' => $jpl?->nama_jpl
                     ?? $jpl?->kode_jpl
                     ?? '—',
+
+                // Nama penerima yang diketik petugas (atau akun penerima).
+                'penerima' => data_get($item->ringkasan, 'nama_penerima')
+                    ?: ($item->penerima?->name ?? '—'),
 
                 'waktu' => $item->waktu_serah_terima
                     ? $item->waktu_serah_terima->format('d/m/Y H:i')
@@ -115,7 +153,6 @@ class SerahTerimaDinasController extends Controller
             'success' => true,
             'items' => $data,
             'total_menunggu' => SerahTerima::query()
-                ->where('penerima_user_id', auth()->id())
                 ->where('status', 'menunggu_penerima')
                 ->count(),
             'server_time' => now()->toIso8601String(),
@@ -124,14 +161,18 @@ class SerahTerimaDinasController extends Controller
 
     /**
      * Detail pengajuan.
+     *
+     * Admin boleh membuka semua pengajuan yang sudah dikirim.
+     * Jika penerima_user_id diisi, konfirmasi tetap dibatasi
+     * oleh controller konfirmasi pada akun yang dituju.
      */
     public function show(SerahTerima $serahTerima): View
     {
+        $this->pastikanAdmin();
+
         abort_unless(
-            (int) $serahTerima->penerima_user_id ===
-                (int) auth()->id(),
-            403,
-            'Pengajuan ini bukan ditujukan kepada akun Anda.'
+            in_array($serahTerima->status, self::STATUS_TAMPIL, true),
+            404
         );
 
         $serahTerima->load($this->relasi());

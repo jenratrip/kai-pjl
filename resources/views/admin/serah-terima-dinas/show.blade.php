@@ -1,4 +1,3 @@
-
 @extends('layouts.admin')
 
 @section('title', 'Detail Serah Terima Dinas')
@@ -127,19 +126,18 @@
         'catatan_serah_terima', 'catatan',
     ];
 
+    // nama_penerima sudah ditampilkan di Informasi Pengajuan,
+    // jadi tidak perlu muncul lagi di Informasi Tambahan.
+    $keysDisembunyikan = ['nama_penerima'];
+
     $dataTambahan = collect($ringkasan)->reject(
         fn ($value, $key) => in_array((string) $key, $keysDikenal, true)
+            || in_array((string) $key, $keysDisembunyikan, true)
     );
 
-    $renderDaftar = function ($data) use ($formatNilai) {
-        if (!is_array($data) || count($data) === 0) {
-            return '—';
-        }
-
-        return collect($data)->map(
-            fn ($item) => $formatNilai($item)
-        )->implode("\n");
-    };
+    // Nama penerima: diketik petugas (ringkasan) atau akun penerima.
+    $namaPenerima = data_get($ringkasan, 'nama_penerima')
+        ?: ($serahTerima->penerima?->name ?? '—');
 @endphp
 
 <div class="mx-auto max-w-7xl px-5 py-8 sm:px-8">
@@ -234,7 +232,7 @@
             <div>
                 <p class="text-sm text-slate-500">Penerima</p>
                 <p class="mt-1 font-semibold text-slate-800">
-                    {{ $serahTerima->penerima?->name ?? '—' }}
+                    {{ $namaPenerima }}
                 </p>
             </div>
 
@@ -425,9 +423,10 @@
                         ></canvas>
                     </div>
 
+                    {{-- Nama field harus sama dengan key validasi di controller konfirmasi --}}
                     <input
                         type="hidden"
-                        name="tanda_tangan"
+                        name="tanda_tangan_penerima"
                         id="tandaTanganInput"
                     >
 
@@ -474,19 +473,43 @@
 
         let drawing = false;
         let hasSignature = false;
+        let lastWidth = 0;
+
+        function applyStyle() {
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#1d2d50';
+        }
 
         function resizeCanvas() {
             const rect = canvas.getBoundingClientRect();
             const ratio = window.devicePixelRatio || 1;
 
+            // Abaikan resize yang tidak mengubah lebar (mis. keyboard/address bar di HP),
+            // karena mengubah ukuran canvas akan menghapus gambar.
+            if (lastWidth && Math.round(rect.width) === lastWidth) return;
+
+            // Simpan gambar lama agar tanda tangan tidak hilang saat lebar berubah.
+            const snapshot = hasSignature ? canvas.toDataURL('image/png') : null;
+            const oldCssWidth = lastWidth || rect.width;
+            const oldCssHeight = rect.height;
+
             canvas.width = Math.max(1, Math.round(rect.width * ratio));
             canvas.height = Math.max(1, Math.round(rect.height * ratio));
 
             ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-            ctx.lineWidth = 2.5;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.strokeStyle = '#1d2d50';
+            applyStyle();
+
+            lastWidth = Math.round(rect.width);
+
+            if (snapshot) {
+                const img = new Image();
+                img.onload = function () {
+                    ctx.drawImage(img, 0, 0, oldCssWidth, oldCssHeight);
+                };
+                img.src = snapshot;
+            }
         }
 
         function getPosition(event) {
@@ -502,7 +525,6 @@
             event.preventDefault();
 
             drawing = true;
-            hasSignature = true;
             canvas.setPointerCapture(event.pointerId);
 
             const pos = getPosition(event);
@@ -518,6 +540,9 @@
             const pos = getPosition(event);
             ctx.lineTo(pos.x, pos.y);
             ctx.stroke();
+
+            // Tandai ada tanda tangan hanya jika benar-benar ada goresan.
+            hasSignature = true;
         });
 
         function stopDrawing() {
@@ -530,7 +555,11 @@
         canvas.addEventListener('lostpointercapture', stopDrawing);
 
         clearButton.addEventListener('click', function () {
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+
             hasSignature = false;
             input.value = '';
         });

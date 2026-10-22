@@ -1,6 +1,6 @@
 <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
     <div class="mb-4 flex items-center gap-3">
-        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-[#1d2d50] text-sm font-bold text-white">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1d2d50] text-sm font-bold text-white">
             7
         </span>
 
@@ -8,6 +8,25 @@
             Petugas yang berdinas
         </h2>
     </div>
+
+    @php
+        $namaPenerimaLama = old(
+            'nama_penerima',
+            data_get($serahTerima, 'ringkasan.nama_penerima', '')
+        );
+        $nipPenerimaLama = old(
+            'nip_penerima',
+            data_get($serahTerima, 'ringkasan.nip_penerima', '')
+        );
+    @endphp
+
+    {{-- Penanda data yang sedang diedit dari riwayat --}}
+    @if (!empty($modeEdit) && $serahTerima)
+        <input type="hidden"
+               name="serah_terima_id"
+               value="{{ $serahTerima->id }}"
+               form="serahTerimaSubmitForm">
+    @endif
 
     <div class="grid gap-3 md:grid-cols-2">
         {{-- Petugas penyerah --}}
@@ -25,37 +44,38 @@
             </p>
         </div>
 
-        {{-- Admin penerima --}}
+        {{-- Penerima: langsung diketik --}}
         <div class="rounded-lg bg-slate-50 p-4">
-            <label
-                for="penerima_user_id"
-                class="block text-xs font-semibold text-slate-500"
-            >
-                Admin penerima serah terima
+            <label for="nama_penerima"
+                   class="block text-xs font-semibold text-slate-500">
+                Nama penerima serah terima
             </label>
 
-            <select
-                id="penerima_user_id"
-                name="penerima_user_id"
-                form="serahTerimaSubmitForm"
-                required
-                class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            >
-                <option value="">Pilih admin penerima</option>
+            <input id="nama_penerima"
+                   type="text"
+                   name="nama_penerima"
+                   form="serahTerimaSubmitForm"
+                   value="{{ $namaPenerimaLama }}"
+                   maxlength="255"
+                   required
+                   autocomplete="off"
+                   placeholder="Ketik nama penerima"
+                   class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
 
-                @foreach ($admins as $admin)
-                    <option value="{{ $admin->id }}">
-                        {{ $admin->name }}{{ $admin->nip ? ' — '.$admin->nip : '' }}
-                    </option>
-                @endforeach
-            </select>
+            <label for="nip_penerima"
+                   class="mt-3 block text-xs font-semibold text-slate-500">
+                NIPP/NIPKWT
+            </label>
 
-            @if ($admins->isEmpty())
-                <p class="mt-2 text-xs text-red-600">
-                    Belum ada admin aktif yang dapat menerima serah terima.
-                    Hubungi administrator sistem.
-                </p>
-            @endif
+            <input id="nip_penerima"
+                   type="text"
+                   name="nip_penerima"
+                   form="serahTerimaSubmitForm"
+                   value="{{ $nipPenerimaLama }}"
+                   maxlength="50"
+                   autocomplete="off"
+                   placeholder="Ketik NIP penerima"
+                   class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
         </div>
     </div>
 </section>

@@ -66,7 +66,7 @@ Route::get('/', function () {
     }
 
     if ($user->hasRole('pjl')) {
-        return redirect()->route('user.dashboard');
+        return redirect()->route('user.realisasi-ka');
     }
 
     abort(403, 'Role pengguna tidak dikenali.');
@@ -144,6 +144,24 @@ Route::middleware(['auth', 'role:pjl'])
             SerahTerimaDinasController::class,
             'index',
         ])->name('serah-terima-dinas');
+
+        // Riwayat serah terima milik petugas.
+        Route::get('/serah-terima-dinas/riwayat', [
+            SerahTerimaDinasController::class,
+            'riwayat',
+        ])->name('serah-terima-dinas.riwayat');
+
+        // Membuka kembali serah terima dari riwayat (hanya yang belum terkunci).
+        Route::get('/serah-terima-dinas/riwayat/{serahTerima}/edit', [
+            SerahTerimaDinasController::class,
+            'edit',
+        ])->whereNumber('serahTerima')->name('serah-terima-dinas.edit');
+
+        // Melihat serah terima dari riwayat (hanya-baca, untuk yang sudah disetujui).
+        Route::get('/serah-terima-dinas/riwayat/{serahTerima}', [
+            SerahTerimaDinasController::class,
+            'show',
+        ])->whereNumber('serahTerima')->name('serah-terima-dinas.show');
 
         Route::post('/serah-terima-dinas/catatan', [
             SerahTerimaDinasController::class,

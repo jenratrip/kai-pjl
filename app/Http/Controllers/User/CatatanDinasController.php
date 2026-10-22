@@ -71,6 +71,8 @@ class CatatanDinasController extends Controller
 
     /**
      * Menyimpan catatan dinas.
+     * Dipakai oleh halaman Catatan Dinas (modal) dan
+     * form cepat di halaman Realisasi KA.
      */
     public function store(Request $request)
     {
@@ -94,6 +96,12 @@ class CatatanDinasController extends Controller
                 'required',
                 'string',
                 'max:5000',
+            ],
+            // Penanda halaman asal (opsional).
+            'redirect_to' => [
+                'nullable',
+                'string',
+                'in:realisasi-ka',
             ],
         ]);
 
@@ -132,6 +140,13 @@ class CatatanDinasController extends Controller
                 'waktu_catatan' => now(),
             ]);
         });
+
+        // Kembali ke halaman Realisasi KA jika form dikirim dari sana.
+        if (($validated['redirect_to'] ?? null) === 'realisasi-ka') {
+            return redirect()
+                ->to(route('user.realisasi-ka') . '#catatanDinasQuick')
+                ->with('success', 'Catatan dinas berhasil disimpan.');
+        }
 
         return redirect()
             ->route('user.catatan-dinas')
