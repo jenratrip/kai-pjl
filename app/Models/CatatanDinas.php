@@ -19,10 +19,15 @@ class CatatanDinas extends Model
         'status',
         'tindak_lanjut',
         'waktu_catatan',
+        'status_review',
+        'catatan_revisi',
+        'ditinjau_oleh',
+        'ditinjau_pada',
     ];
 
     protected $casts = [
         'waktu_catatan' => 'datetime',
+        'ditinjau_pada' => 'datetime',
     ];
 
     public function dinas(): BelongsTo
@@ -33,6 +38,11 @@ class CatatanDinas extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function ditinjauOleh(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'ditinjau_oleh');
     }
 
     public function attachments(): HasMany

@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\WilayahController;
 use App\Http\Controllers\Admin\WilayahImportController;
 use App\Http\Controllers\Admin\InventarisController as AdminInventarisController;
 use App\Http\Controllers\Admin\SerahTerimaDinasController as AdminSerahTerimaDinasController;
+use App\Http\Controllers\Admin\CatatanDinasController as AdminCatatanDinasController;
 use App\Http\Controllers\Admin\JadwalKaController;
 use App\Http\Controllers\Admin\JadwalKaImportController;
 use App\Http\Controllers\Admin\RealisasiKaSettingController;
@@ -51,7 +52,7 @@ use App\Http\Controllers\Superadmin\JplController as SuperadminJplController;
 // ======================================================
 
 Route::get('/', function () {
-    if (! Auth::check()) {
+    if (!Auth::check()) {
         return redirect()->route('login');
     }
 
@@ -130,7 +131,7 @@ Route::middleware(['auth', 'role:pjl'])
         ])->name('realisasi-ka.store');
 
 
-        // CATATAN DINAS
+        // CATATAN DINAS USER
 
         Route::get('/catatan-dinas', [
             CatatanDinasController::class,
@@ -143,7 +144,7 @@ Route::middleware(['auth', 'role:pjl'])
         ])->name('catatan-dinas.store');
 
 
-        // SERAH TERIMA DINAS
+        // SERAH TERIMA DINAS USER
 
         Route::get('/serah-terima-dinas', [
             SerahTerimaDinasController::class,
@@ -265,6 +266,26 @@ Route::middleware(['auth', 'role:admin,superadmin'])
 
 
         // ==================================================
+        // REVIEW CATATAN DINAS ADMIN + SUPERADMIN
+        // ==================================================
+
+        Route::get('/catatan-dinas', [
+            AdminCatatanDinasController::class,
+            'index',
+        ])->name('catatan-dinas.index');
+
+        Route::get('/catatan-dinas/{catatanDinas}', [
+            AdminCatatanDinasController::class,
+            'show',
+        ])->name('catatan-dinas.show');
+
+        Route::patch('/catatan-dinas/{catatanDinas}', [
+            AdminCatatanDinasController::class,
+            'update',
+        ])->name('catatan-dinas.update');
+
+
+        // ==================================================
         // SERAH TERIMA DINAS ADMIN
         // ==================================================
 
@@ -288,7 +309,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'update',
         ])->name('serah-terima-dinas.update');
 
-        // Tetap menggunakan controller User sesuai route awal.
+        // Konfirmasi tanda tangan tetap menggunakan controller User.
         Route::post('/serah-terima-dinas/{serahTerima}/konfirmasi', [
             SerahTerimaDinasController::class,
             'konfirmasi',
@@ -356,7 +377,6 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'confirm',
         ])->name('jadwal-ka.import.confirm');
 
-        // Detail harus diletakkan setelah route import.
         Route::get('/jadwal-ka/{jpl}', [
             JadwalKaController::class,
             'show',

@@ -18,61 +18,45 @@ class SerahTerima extends Model
         'tanda_tangan_penyerah',
         'tanda_tangan_penerima',
         'status',
+
+        // Review Admin, terpisah dari status tanda tangan.
+        'status_review',
+        'catatan_revisi',
+        'ditinjau_oleh',
+        'ditinjau_pada',
     ];
 
-    /**
-     * Casting atribut model.
-     */
     protected function casts(): array
     {
         return [
             'waktu_serah_terima' => 'datetime',
             'ringkasan' => 'array',
+            'ditinjau_pada' => 'datetime',
         ];
     }
 
-    /**
-     * Dinas yang menyerahkan.
-     */
     public function dinasPenyerah(): BelongsTo
     {
-        return $this->belongsTo(
-            Dinas::class,
-            'dinas_id'
-        );
+        return $this->belongsTo(Dinas::class, 'dinas_id');
     }
 
-    /**
-     * Alias relasi dinas penyerah.
-     * Dipertahankan untuk kompatibilitas controller.
-     */
     public function dinas(): BelongsTo
     {
-        return $this->belongsTo(
-            Dinas::class,
-            'dinas_id'
-        );
+        return $this->belongsTo(Dinas::class, 'dinas_id');
     }
 
-    /**
-     * Dinas yang menerima.
-     */
     public function dinasPenerima(): BelongsTo
     {
-        return $this->belongsTo(
-            Dinas::class,
-            'dinas_penerima_id'
-        );
+        return $this->belongsTo(Dinas::class, 'dinas_penerima_id');
     }
 
-    /**
-     * User admin/superadmin penerima serah terima.
-     */
     public function penerima(): BelongsTo
     {
-        return $this->belongsTo(
-            User::class,
-            'penerima_user_id'
-        );
+        return $this->belongsTo(User::class, 'penerima_user_id');
+    }
+
+    public function ditinjauOleh(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'ditinjau_oleh');
     }
 }

@@ -1,4 +1,3 @@
-
 @extends('layouts.admin')
 
 @section('title', 'Detail Serah Terima Dinas')
@@ -130,20 +129,11 @@
     $dataTambahan = collect($ringkasan)->reject(
         fn ($value, $key) => in_array((string) $key, $keysDikenal, true)
     );
-
-    $renderDaftar = function ($data) use ($formatNilai) {
-        if (!is_array($data) || count($data) === 0) {
-            return '—';
-        }
-
-        return collect($data)->map(
-            fn ($item) => $formatNilai($item)
-        )->implode("\n");
-    };
 @endphp
 
 <div class="mx-auto max-w-7xl px-5 py-8 sm:px-8">
 
+    {{-- Header --}}
     <div class="mb-6">
         <a href="{{ route('admin.serah-terima-dinas.index') }}"
            class="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-blue-900">
@@ -156,8 +146,9 @@
                 <h1 class="text-3xl font-bold text-[#1d2d50]">
                     Detail Serah Terima Dinas
                 </h1>
+
                 <p class="mt-2 text-slate-500">
-                    Periksa data dan konfirmasikan penerimaan serah terima dari petugas PJL.
+                    Periksa data serah terima, tanda tangan, dan hasil review administrasi.
                 </p>
             </div>
 
@@ -167,6 +158,7 @@
         </div>
     </div>
 
+    {{-- Notifikasi --}}
     @if (session('success'))
         <div class="mb-6 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
             {{ session('success') }}
@@ -182,6 +174,7 @@
     @if ($errors->any())
         <div class="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
             <p class="font-semibold">Pengajuan belum dapat diproses.</p>
+
             <ul class="mt-2 list-inside list-disc text-sm">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
@@ -190,7 +183,8 @@
         </div>
     @endif
 
-    <div class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    {{-- Informasi Pengajuan --}}
+    <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 class="mb-5 text-lg font-bold text-[#1d2d50]">
             Informasi Pengajuan
         </h2>
@@ -245,13 +239,15 @@
                 </p>
             </div>
         </div>
-    </div>
+    </section>
 
-    <div class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    {{-- Ringkasan Serah Terima --}}
+    <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="mb-6">
             <h2 class="text-lg font-bold text-[#1d2d50]">
                 Ringkasan Serah Terima
             </h2>
+
             <p class="mt-1 text-sm text-slate-500">
                 Rangkuman kondisi peralatan, perjalanan KA, dan catatan petugas PJL.
             </p>
@@ -259,6 +255,7 @@
 
         <div class="space-y-6">
 
+            {{-- Kondisi alat --}}
             <section>
                 <h3 class="mb-3 font-semibold text-slate-800">
                     1. Kondisi Alat Pengamanan
@@ -271,6 +268,7 @@
                                 <p class="text-sm text-slate-500">
                                     {{ is_string($nama) ? $labelKunci($nama) : 'Peralatan' }}
                                 </p>
+
                                 <p class="mt-1 font-semibold text-slate-800">
                                     {{ $formatNilai($kondisi) }}
                                 </p>
@@ -282,6 +280,7 @@
                 @endif
             </section>
 
+            {{-- Catatan alat --}}
             <section>
                 <h3 class="mb-3 font-semibold text-slate-800">
                     2. Catatan Alat Pengamanan
@@ -294,6 +293,7 @@
                                 <p class="text-sm text-slate-500">
                                     {{ is_string($nama) ? $labelKunci($nama) : 'Catatan alat' }}
                                 </p>
+
                                 <p class="mt-1 whitespace-pre-wrap text-slate-800">
                                     {{ $formatNilai($catatanAlat) }}
                                 </p>
@@ -307,6 +307,7 @@
 
             <div class="border-t border-slate-100"></div>
 
+            {{-- Data perjalanan KA --}}
             @foreach ([
                 '3. KA Batal' => $kaBatal,
                 '4. KA Berjalan' => $kaBerjalan,
@@ -331,15 +332,20 @@
                 </section>
             @endforeach
 
+            {{-- Catatan serah terima --}}
             <section>
                 <h3 class="mb-3 font-semibold text-slate-800">
                     6. Catatan Serah Terima
                 </h3>
+
                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <p class="whitespace-pre-wrap break-words text-slate-700">{{ $formatNilai($catatan) }}</p>
+                    <p class="whitespace-pre-wrap break-words text-slate-700">
+                        {{ $formatNilai($catatan) }}
+                    </p>
                 </div>
             </section>
 
+            {{-- Informasi tambahan --}}
             @if ($dataTambahan->isNotEmpty())
                 <section class="border-t border-slate-100 pt-5">
                     <h3 class="mb-3 font-semibold text-slate-800">
@@ -352,6 +358,7 @@
                                 <p class="text-sm text-slate-500">
                                     {{ $labelKunci($key) }}
                                 </p>
+
                                 <p class="mt-1 break-words text-slate-800">
                                     {{ $formatNilai($value) }}
                                 </p>
@@ -362,11 +369,13 @@
             @endif
 
         </div>
-    </div>
+    </section>
 
+    {{-- Tanda tangan --}}
     <div class="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
 
-        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        {{-- Tanda tangan penyerah --}}
+        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 class="mb-4 text-lg font-bold text-[#1d2d50]">
                 Tanda Tangan Penyerah
             </h2>
@@ -379,6 +388,7 @@
                         class="max-h-40 max-w-full object-contain"
                     >
                 </div>
+
                 <p class="mt-3 text-sm text-green-700">
                     Tanda tangan penyerah tersedia.
                 </p>
@@ -387,9 +397,10 @@
                     Belum ada tanda tangan penyerah.
                 </div>
             @endif
-        </div>
+        </section>
 
-        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        {{-- Tanda tangan penerima --}}
+        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 class="mb-4 text-lg font-bold text-[#1d2d50]">
                 Tanda Tangan Penerima
             </h2>
@@ -402,6 +413,7 @@
                         class="max-h-40 max-w-full object-contain"
                     >
                 </div>
+
                 <p class="mt-3 text-sm text-green-700">
                     Tanda tangan penerima tersedia.
                 </p>
@@ -453,12 +465,156 @@
                     Tanda tangan penerima belum tersedia.
                 </div>
             @endif
-        </div>
+        </section>
     </div>
+
+    {{-- Review Admin --}}
+    @php
+        $statusReview = $serahTerima->status_review ?? 'menunggu_review';
+
+        $statusReviewClass = match ($statusReview) {
+            'disetujui' => 'bg-green-100 text-green-800',
+            'perlu_revisi' => 'bg-red-100 text-red-800',
+            default => 'bg-amber-100 text-amber-800',
+        };
+
+        $statusReviewLabel = match ($statusReview) {
+            'disetujui' => 'Disetujui',
+            'perlu_revisi' => 'Perlu Revisi',
+            default => 'Menunggu Review',
+        };
+    @endphp
+
+    <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="mb-5">
+            <h2 class="text-lg font-bold text-[#1d2d50]">
+                Review Admin
+            </h2>
+
+            <p class="mt-1 text-sm text-slate-500">
+                Tinjau kelengkapan serah terima dan simpan keputusan review.
+                Keputusan ini tidak mengubah status tanda tangan.
+            </p>
+        </div>
+
+        <div class="mb-5">
+            <span class="inline-flex rounded-full px-4 py-2 text-sm font-semibold {{ $statusReviewClass }}">
+                {{ $statusReviewLabel }}
+            </span>
+        </div>
+
+        <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+                <p class="text-sm text-slate-500">Ditinjau oleh</p>
+                <p class="mt-1 font-medium text-slate-800">
+                    {{ $serahTerima->ditinjauOleh?->name ?? 'Belum ditinjau' }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-slate-500">Waktu review</p>
+                <p class="mt-1 font-medium text-slate-800">
+                    {{ $serahTerima->ditinjau_pada?->format('d/m/Y H:i') ?? '—' }}
+                </p>
+            </div>
+        </div>
+
+        @if ($serahTerima->catatan_revisi)
+            <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4">
+                <h3 class="font-semibold text-red-800">
+                    Catatan Revisi Sebelumnya
+                </h3>
+
+                <p class="mt-2 whitespace-pre-line break-words text-sm text-red-700">{{ $serahTerima->catatan_revisi }}</p>
+            </div>
+        @endif
+
+        <form
+            action="{{ route('admin.serah-terima-dinas.update', $serahTerima->id) }}"
+            method="POST"
+        >
+            @csrf
+            @method('PATCH')
+
+            <div class="mb-4">
+                <label
+                    for="status_review"
+                    class="mb-2 block text-sm font-medium text-slate-700"
+                >
+                    Keputusan Review
+                </label>
+
+                <select
+                    id="status_review"
+                    name="status_review"
+                    required
+                    class="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                >
+                    <option value="">Pilih keputusan</option>
+
+                    <option
+                        value="disetujui"
+                        @selected(old('status_review', $serahTerima->status_review) === 'disetujui')
+                    >
+                        ACC / Setujui
+                    </option>
+
+                    <option
+                        value="perlu_revisi"
+                        @selected(old('status_review', $serahTerima->status_review) === 'perlu_revisi')
+                    >
+                        Minta Revisi
+                    </option>
+                </select>
+            </div>
+
+            <div class="mb-5">
+                <label
+                    for="catatan_revisi"
+                    class="mb-2 block text-sm font-medium text-slate-700"
+                >
+                    Catatan Revisi
+                    <span class="font-normal text-slate-500">
+                        (wajib jika meminta revisi)
+                    </span>
+                </label>
+
+                <textarea
+                    id="catatan_revisi"
+                    name="catatan_revisi"
+                    rows="4"
+                    maxlength="5000"
+                    class="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    placeholder="Jelaskan bagian serah terima yang perlu diperbaiki..."
+                >{{ old('catatan_revisi', $serahTerima->catatan_revisi) }}</textarea>
+
+                <p class="mt-1 text-xs text-slate-500">
+                    Maksimal 5.000 karakter.
+                </p>
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+                <button
+                    type="submit"
+                    class="rounded-lg bg-[#1d2d50] px-5 py-2.5 font-semibold text-white transition hover:bg-[#293f69]"
+                >
+                    Simpan Keputusan Review
+                </button>
+
+                <a
+                    href="{{ route('admin.serah-terima-dinas.index') }}"
+                    class="rounded-lg border border-slate-300 px-5 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                    Kembali ke Daftar
+                </a>
+            </div>
+        </form>
+    </section>
 
 </div>
 @endsection
 
+{{-- JavaScript tanda tangan penerima --}}
 @if ($serahTerima->status === 'menunggu_penerima' && !$serahTerima->tanda_tangan_penerima)
     @push('scripts')
     <script>
@@ -487,6 +643,9 @@
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.strokeStyle = '#1d2d50';
+
+            hasSignature = false;
+            input.value = '';
         }
 
         function getPosition(event) {
