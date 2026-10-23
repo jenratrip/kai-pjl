@@ -8,17 +8,27 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SerahTerima extends Model
 {
+    /**
+     * Nama tabel database.
+     */
     protected $table = 'serah_terima';
 
     /**
-     * Status yang dianggap sudah disetujui,
-     * sehingga data terkunci.
+     * Status review yang membuat data terkunci.
      *
-     * Sesuai enum migration:
-     * draft, menunggu_penerima, selesai.
+     * Status tanda tangan dan status review memiliki fungsi berbeda:
+     * - status: draft, menunggu_penerima, selesai
+     * - status_review: menunggu_review, disetujui, perlu_revisi
+     *
+     * Data hanya terkunci setelah disetujui admin/superadmin.
      */
-    public const STATUS_TERKUNCI = ['selesai'];
+    public const STATUS_TERKUNCI = [
+        'disetujui',
+    ];
 
+    /**
+     * Kolom yang dapat diisi melalui mass assignment.
+     */
     protected $fillable = [
         'dinas_id',
         'dinas_penerima_id',
@@ -29,13 +39,16 @@ class SerahTerima extends Model
         'tanda_tangan_penerima',
         'status',
 
-        // Review Admin, terpisah dari status tanda tangan.
+        // Review oleh admin/superadmin.
         'status_review',
         'catatan_revisi',
         'ditinjau_oleh',
         'ditinjau_pada',
     ];
 
+    /**
+     * Konversi tipe data atribut model.
+     */
     protected function casts(): array
     {
         return [
@@ -46,20 +59,21 @@ class SerahTerima extends Model
     }
 
     /**
-     * Apakah data sudah selesai dan terkunci.
+     * Memeriksa apakah serah terima sudah disetujui
+     * dan tidak boleh diubah lagi oleh petugas.
      */
     public function isTerkunci(): bool
     {
         return in_array(
-            $this->status,
+            $this->status_review,
             self::STATUS_TERKUNCI,
             true
         );
     }
 
     /**
-     * Batasi data pada serah terima dari dinas
-     * milik user tertentu.
+     * Scope untuk mengambil serah terima yang berasal
+     * dari dinas milik user tertentu.
      */
     public function scopeMilikUser(
         Builder $query,
@@ -75,24 +89,32 @@ class SerahTerima extends Model
     }
 
     /**
-     * Dinas yang menyerahkan.
+     * Relasi ke dinas yang menyerahkan.
      */
     public function dinasPenyerah(): BelongsTo
     {
-        return $this->belongsTo(Dinas::class, 'dinas_id');
+        return $this->belongsTo(
+            Dinas::class,
+            'dinas_id'
+        );
     }
 
     /**
-     * Relasi dinas utama untuk kompatibilitas
-     * dengan query milik user.
+     * Relasi utama ke dinas.
+     *
+     * Dipertahankan untuk kompatibilitas dengan query
+     * yang menggunakan relasi dinas.
      */
     public function dinas(): BelongsTo
     {
-        return $this->belongsTo(Dinas::class, 'dinas_id');
+        return $this->belongsTo(
+            Dinas::class,
+            'dinas_id'
+        );
     }
 
     /**
-     * Dinas penerima.
+     * Relasi ke dinas penerima, jika tersedia.
      */
     public function dinasPenerima(): BelongsTo
     {
@@ -103,7 +125,7 @@ class SerahTerima extends Model
     }
 
     /**
-     * Akun user penerima, jika tersedia.
+     * Relasi ke akun PJL yang ditunjuk sebagai penerima.
      */
     public function penerima(): BelongsTo
     {
@@ -114,7 +136,7 @@ class SerahTerima extends Model
     }
 
     /**
-     * Admin atau superadmin yang meninjau.
+     * Relasi ke admin/superadmin yang meninjau serah terima.
      */
     public function ditinjauOleh(): BelongsTo
     {

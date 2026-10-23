@@ -4,24 +4,12 @@
 
 @section('content')
 @php
-    $status = $serahTerima->status;
-
-    $statusClass = match ($status) {
-        'selesai' => 'bg-green-100 text-green-800',
-        'menunggu_penerima' => 'bg-amber-100 text-amber-800',
-        default => 'bg-slate-100 text-slate-700',
-    };
-
-    $statusLabel = match ($status) {
-        'selesai' => 'Selesai',
-        'menunggu_penerima' => 'Menunggu konfirmasi penerima',
-        default => ucfirst(str_replace('_', ' ', $status ?? 'Tidak diketahui')),
-    };
-
     /*
-     * Normalisasi ringkasan JSON agar kompatibel dengan
-     * data array maupun string JSON dari database.
-     */
+    |--------------------------------------------------------------------------
+    | NORMALISASI RINGKASAN
+    |--------------------------------------------------------------------------
+    */
+
     $ringkasan = $serahTerima->ringkasan;
 
     if (is_string($ringkasan)) {
@@ -34,10 +22,18 @@
 
     $ringkasan = is_array($ringkasan) ? $ringkasan : [];
 
-    $ambil = function (array $data, array $keys, $default = null) {
+    /*
+    |--------------------------------------------------------------------------
+    | HELPER DATA
+    |--------------------------------------------------------------------------
+    */
+
+    $ambil = function ($data, array $keys, $default = null) {
         foreach ($keys as $key) {
-            if (array_key_exists($key, $data)) {
-                return $data[$key];
+            $value = data_get($data, $key);
+
+            if ($value !== null && $value !== '') {
+                return $value;
             }
         }
 
@@ -71,6 +67,14 @@
             return implode('; ', $hasil);
         }
 
+        if (is_object($nilai)) {
+            if (method_exists($nilai, 'toArray')) {
+                return $formatNilai($nilai->toArray());
+            }
+
+            return '—';
+        }
+
         if (is_bool($nilai)) {
             return $nilai ? 'Ya' : 'Tidak';
         }
@@ -91,6 +95,62 @@
             (string) $key
         ));
     };
+
+    $normalisasiDaftar = function ($data) {
+        if (is_string($data)) {
+            $decoded = json_decode($data, true);
+
+            if (is_array($decoded)) {
+                $data = $decoded;
+            } else {
+                return trim($data) !== '' ? [$data] : [];
+            }
+        }
+
+        return is_array($data) ? $data : [];
+    };
+
+    $nilaiPertama = function ($data, array $keys, $default = '—') {
+        foreach ($keys as $key) {
+            $value = data_get($data, $key);
+
+            if ($value !== null && $value !== '') {
+                return $value;
+            }
+        }
+
+        return $default;
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATUS PENGAJUAN
+    |--------------------------------------------------------------------------
+    */
+
+    $status = $serahTerima->status;
+
+    $statusClass = match ($status) {
+        'selesai' => 'bg-green-100 text-green-800',
+        'menunggu_penerima' => 'bg-amber-100 text-amber-800',
+        default => 'bg-slate-100 text-slate-700',
+    };
+
+    $statusLabel = match ($status) {
+        'selesai' => 'Selesai',
+        'menunggu_penerima' => 'Menunggu konfirmasi penerima',
+        default => ucfirst(str_replace(
+            '_',
+            ' ',
+            $status ?? 'Tidak diketahui'
+        )),
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | DATA RINGKASAN
+    |--------------------------------------------------------------------------
+    */
 
     $alat = $ambil($ringkasan, [
         'alat',
@@ -118,10 +178,72 @@
         'ka_belum_lewat_data',
     ], []);
 
+    $keretaApi = $ambil($ringkasan, [
+        'kereta_api',
+    ], []);
+
+    $inventaris = $ambil($ringkasan, [
+        'inventaris',
+        'inventaris_data',
+    ], []);
+
     $catatan = $ambil($ringkasan, [
         'catatan_serah_terima',
+        'catatan_penting',
         'catatan',
     ]);
+
+    $alat = $normalisasiDaftar($alat);
+    $alatCatatan = $normalisasiDaftar($alatCatatan);
+    $kaBatal = $normalisasiDaftar($kaBatal);
+    $kaBerjalan = $normalisasiDaftar($kaBerjalan);
+    $kaBelumLewat = $normalisasiDaftar($kaBelumLewat);
+    $keretaApi = $normalisasiDaftar($keretaApi);
+    $inventaris = $normalisasiDaftar($inventaris);
+
+    /*
+    |--------------------------------------------------------------------------
+    | IDENTITAS PPKA / PENYERAH DAN PENERIMA
+    |--------------------------------------------------------------------------
+    |
+    | PPKA dan penyerah ditampilkan sebagai satu identitas.
+    | Data PPKA di ringkasan diprioritaskan, kemudian data penyerah
+    | dari dinas digunakan sebagai fallback.
+    |
+    */
+
+    $namaPpka = $ambil($ringkasan, [
+        'nama_ppka',
+        'ppka',
+        'nama_penyerah',
+    ]);
+
+    $nipPpka = $ambil($ringkasan, [
+        'nip_ppka',
+        'nip_penyerah',
+    ]);
+
+    $namaPpka = $namaPpka
+        ?: ($serahTerima->dinasPenyerah?->user?->name ?? '—');
+
+    $nipPpka = $nipPpka
+        ?: ($serahTerima->dinasPenyerah?->user?->nip ?? '—');
+
+    $namaPenerima = data_get($ringkasan, 'nama_penerima')
+        ?: ($serahTerima->penerima?->name ?? '—');
+
+    $nipPenerima = data_get($ringkasan, 'nip_penerima')
+        ?: ($serahTerima->penerima?->nip ?? '—');
+
+    /*
+    |--------------------------------------------------------------------------
+    | INFORMASI TAMBAHAN
+    |--------------------------------------------------------------------------
+    |
+    | Semua kunci yang sudah ditampilkan pada bagian khusus tidak
+    | ditampilkan ulang sebagai informasi tambahan.
+    |
+    */
 
     $keysDikenal = [
         'alat',
@@ -129,33 +251,46 @@
         'kondisi_alat',
         'alat_catatan',
         'catatan_alat',
+
         'ka_batal',
         'ka_batal_data',
         'ka_berjalan',
         'ka_berjalan_data',
         'ka_belum_lewat',
         'ka_belum_lewat_data',
+        'kereta_api',
+
+        'inventaris',
+        'inventaris_data',
+
         'catatan_serah_terima',
+        'catatan_penting',
         'catatan',
+
+        'nama_penerima',
+        'nip_penerima',
+
+        'ppka',
+        'nama_ppka',
+        'nip_ppka',
+        'nama_penyerah',
+        'nip_penyerah',
     ];
 
-    $keysDisembunyikan = ['nama_penerima'];
-
     $dataTambahan = collect($ringkasan)->reject(
-        fn ($value, $key) =>
-            in_array((string) $key, $keysDikenal, true)
-            || in_array((string) $key, $keysDisembunyikan, true)
+        fn ($value, $key) => in_array(
+            (string) $key,
+            $keysDikenal,
+            true
+        )
     );
 
     /*
-     * Nama penerima berasal dari ringkasan atau akun penerima.
-     */
-    $namaPenerima = data_get($ringkasan, 'nama_penerima')
-        ?: ($serahTerima->penerima?->name ?? '—');
+    |--------------------------------------------------------------------------
+    | STATUS REVIEW
+    |--------------------------------------------------------------------------
+    */
 
-    /*
-     * Status review administrasi.
-     */
     $statusReview = $serahTerima->status_review ?? 'menunggu_review';
 
     $statusReviewClass = match ($statusReview) {
@@ -170,27 +305,59 @@
         default => 'Menunggu Review',
     };
 
-    /*
-     * Admin hanya boleh melakukan review setelah penerima
-     * membubuhkan tanda tangan.
-     */
     $penerimaanTerkonfirmasi = filled(
         $serahTerima->tanda_tangan_penerima
     );
 
-    /*
-     * Review yang sudah disetujui tidak dapat diproses ulang
-     * melalui halaman ini.
-     */
     $reviewSudahDisetujui = $statusReview === 'disetujui';
+
+    /*
+    |--------------------------------------------------------------------------
+    | DATA MASTER JADWAL KA
+    |--------------------------------------------------------------------------
+    */
+
+    $jadwalIds = collect($keretaApi)
+        ->filter(fn ($item) => is_array($item))
+        ->pluck('jadwal_ka_id')
+        ->filter()
+        ->unique()
+        ->values();
+
+    $jadwalMaster = collect();
+
+    if ($jadwalIds->isNotEmpty()) {
+        $jadwalMaster = \App\Models\JadwalKa::whereIn(
+            'id',
+            $jadwalIds
+        )->get()->keyBy('id');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | FORMAT TANGGAL
+    |--------------------------------------------------------------------------
+    */
+
+    $formatTanggal = function ($tanggal) {
+        if (!$tanggal) {
+            return '—';
+        }
+
+        try {
+            return $tanggal instanceof \Carbon\CarbonInterface
+                ? $tanggal->format('d/m/Y H:i')
+                : \Illuminate\Support\Carbon::parse($tanggal)
+                    ->format('d/m/Y H:i');
+        } catch (\Throwable $e) {
+            return (string) $tanggal;
+        }
+    };
 @endphp
 
 <div class="mx-auto max-w-7xl px-5 py-8 sm:px-8">
 
-    {{-- ===================================================== --}}
     {{-- HEADER --}}
-    {{-- ===================================================== --}}
-
     <div class="mb-6">
         <a
             href="{{ route('admin.serah-terima-dinas.index') }}"
@@ -218,15 +385,10 @@
         </div>
     </div>
 
-    {{-- ===================================================== --}}
     {{-- NOTIFIKASI --}}
-    {{-- ===================================================== --}}
-
     @if (session('success'))
-        <div class="mb-6 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
-            <span class="font-bold" aria-hidden="true">✓</span>
-
-            <p>{{ session('success') }}</p>
+        <div class="mb-6 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
+            {{ session('success') }}
         </div>
     @endif
 
@@ -238,9 +400,7 @@
 
     @if ($errors->any())
         <div class="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
-            <p class="font-semibold">
-                Pengajuan belum dapat diproses.
-            </p>
+            <p class="font-semibold">Pengajuan belum dapat diproses.</p>
 
             <ul class="mt-2 list-inside list-disc text-sm">
                 @foreach ($errors->all() as $error)
@@ -250,10 +410,7 @@
         </div>
     @endif
 
-    {{-- ===================================================== --}}
     {{-- INFORMASI PENGAJUAN --}}
-    {{-- ===================================================== --}}
-
     <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 class="mb-5 text-lg font-bold text-[#1d2d50]">
             Informasi Pengajuan
@@ -261,25 +418,22 @@
 
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
 
+            {{-- PPKA / PENYERAH --}}
             <div>
-                <p class="text-sm text-slate-500">
-                    Petugas PJL Penyerah
-                </p>
+                <p class="text-sm text-slate-500">PPKA / Petugas Penyerah</p>
 
                 <p class="mt-1 font-semibold text-slate-800">
-                    {{ $serahTerima->dinasPenyerah?->user?->name ?? 'Tidak tersedia' }}
+                    {{ $namaPpka }}
                 </p>
 
                 <p class="text-sm text-slate-500">
-                    NIP:
-                    {{ $serahTerima->dinasPenyerah?->user?->nip ?? '—' }}
+                    NIP: {{ $nipPpka }}
                 </p>
             </div>
 
+            {{-- JPL --}}
             <div>
-                <p class="text-sm text-slate-500">
-                    JPL
-                </p>
+                <p class="text-sm text-slate-500">JPL</p>
 
                 <p class="mt-1 font-semibold text-slate-800">
                     {{ $serahTerima->dinasPenyerah?->jpl?->nama_jpl
@@ -288,59 +442,49 @@
                 </p>
             </div>
 
+            {{-- WAKTU SERAH TERIMA --}}
             <div>
-                <p class="text-sm text-slate-500">
-                    Waktu Serah Terima
-                </p>
+                <p class="text-sm text-slate-500">Waktu Serah Terima</p>
 
                 <p class="mt-1 font-semibold text-slate-800">
-                    {{ $serahTerima->waktu_serah_terima
-                        ? $serahTerima->waktu_serah_terima->format('d/m/Y H:i')
-                        : '—' }}
+                    {{ $formatTanggal($serahTerima->waktu_serah_terima) }}
                 </p>
             </div>
 
+            {{-- SHIFT --}}
             <div>
-                <p class="text-sm text-slate-500">
-                    Shift Penyerah
-                </p>
+                <p class="text-sm text-slate-500">Shift Penyerah</p>
 
                 <p class="mt-1 font-semibold text-slate-800">
                     {{ $serahTerima->dinasPenyerah?->shift?->nama_shift ?? '—' }}
                 </p>
             </div>
 
+            {{-- PENERIMA --}}
             <div>
-                <p class="text-sm text-slate-500">
-                    Petugas Penerima
-                </p>
+                <p class="text-sm text-slate-500">Petugas Penerima</p>
 
                 <p class="mt-1 font-semibold text-slate-800">
                     {{ $namaPenerima }}
                 </p>
 
-                <p class="mt-1 text-xs text-slate-500">
-                    Petugas pada shift berikutnya.
+                <p class="mt-1 text-sm text-slate-500">
+                    NIP: {{ $nipPenerima }}
                 </p>
             </div>
 
+            {{-- ID PENGAJUAN --}}
             <div>
-                <p class="text-sm text-slate-500">
-                    ID Pengajuan
-                </p>
+                <p class="text-sm text-slate-500">ID Pengajuan</p>
 
                 <p class="mt-1 font-semibold text-slate-800">
                     #{{ $serahTerima->id }}
                 </p>
             </div>
-
         </div>
     </section>
 
-    {{-- ===================================================== --}}
-    {{-- RINGKASAN SERAH TERIMA --}}
-    {{-- ===================================================== --}}
-
+    {{-- RINGKASAN --}}
     <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="mb-6">
             <h2 class="text-lg font-bold text-[#1d2d50]">
@@ -348,20 +492,19 @@
             </h2>
 
             <p class="mt-1 text-sm text-slate-500">
-                Rangkuman kondisi peralatan, perjalanan KA,
-                dan catatan petugas PJL.
+                Rangkuman kondisi alat, perjalanan KA, inventaris, dan catatan petugas.
             </p>
         </div>
 
         <div class="space-y-6">
 
-            {{-- Kondisi alat --}}
+            {{-- KONDISI ALAT --}}
             <section>
                 <h3 class="mb-3 font-semibold text-slate-800">
                     1. Kondisi Alat Pengamanan
                 </h3>
 
-                @if (is_array($alat) && count($alat))
+                @if (count($alat))
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         @foreach ($alat as $nama => $kondisi)
                             <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -382,13 +525,13 @@
                 @endif
             </section>
 
-            {{-- Catatan alat --}}
+            {{-- CATATAN ALAT --}}
             <section>
                 <h3 class="mb-3 font-semibold text-slate-800">
                     2. Catatan Alat Pengamanan
                 </h3>
 
-                @if (is_array($alatCatatan) && count($alatCatatan))
+                @if (count($alatCatatan))
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         @foreach ($alatCatatan as $nama => $catatanAlat)
                             <div class="rounded-xl border border-slate-200 p-4">
@@ -411,39 +554,366 @@
 
             <div class="border-t border-slate-100"></div>
 
-            {{-- Data perjalanan KA --}}
-            @foreach ([
-                '3. KA Batal' => $kaBatal,
-                '4. KA Berjalan' => $kaBerjalan,
-                '5. KA Belum Lewat' => $kaBelumLewat,
-            ] as $judul => $dataPerjalanan)
-                <section>
-                    <h3 class="mb-3 font-semibold text-slate-800">
-                        {{ $judul }}
+            {{-- DETAIL PERJALANAN KA --}}
+            <section>
+                <div class="mb-3">
+                    <h3 class="font-semibold text-slate-800">
+                        3. Detail Perjalanan Kereta Api
                     </h3>
 
-                    <div class="rounded-xl border border-slate-200 p-4">
-                        @if (is_array($dataPerjalanan) && count($dataPerjalanan))
-                            <ul class="list-inside list-disc space-y-2 text-slate-700">
-                                @foreach ($dataPerjalanan as $ka)
-                                    <li class="break-words">
-                                        {{ $formatNilai($ka) }}
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @else
-                            <p class="text-slate-500">
-                                Tidak ada data.
-                            </p>
-                        @endif
-                    </div>
-                </section>
-            @endforeach
+                    <p class="mt-1 text-sm text-slate-500">
+                        Data jadwal, realisasi perjalanan KA, dan pemeriksaan
+                        peralatan perlintasan pada saat serah terima.
+                    </p>
+                </div>
 
-            {{-- Catatan serah terima --}}
+                @if (count($keretaApi) && is_array(reset($keretaApi)))
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">No.</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Nomor KA</th>
+                                    <th class="min-w-48 px-4 py-3 text-left font-semibold text-slate-700">Nama KA</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Dari (Hulu)</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Ke (Hilir)</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Jadwal</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Jam Aktual</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Status</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">SEMBOYAN 21</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">GENTA</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">PINTU PERLINTASAN</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">SEMBOYAN 35</th>
+                                    <th class="min-w-40 px-4 py-3 text-left font-semibold text-slate-700">Keterangan</th>
+                                </tr>
+                            </thead>
+
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                @foreach ($keretaApi as $index => $ka)
+                                    @if (is_array($ka))
+                                        @php
+                                            $idJadwal = data_get($ka, 'jadwal_ka_id');
+
+                                            $master = $idJadwal
+                                                ? $jadwalMaster->get($idJadwal)
+                                                : null;
+
+                                            /*
+                                             * Snapshot diprioritaskan agar
+                                             * riwayat serah terima konsisten.
+                                             */
+                                            $nomorKa = $nilaiPertama($ka, [
+                                                'nomor',
+                                                'nomor_ka',
+                                                'no_ka',
+                                                'kode_ka',
+                                            ]);
+
+                                            $namaKa = $nilaiPertama($ka, [
+                                                'nama',
+                                                'nama_ka',
+                                                'nama_kereta',
+                                            ]);
+
+                                            $jadwal = $nilaiPertama($ka, [
+                                                'jadwal',
+                                                'jam_jadwal',
+                                                'jam',
+                                                'jam_berangkat',
+                                            ]);
+
+                                            $aktual = $nilaiPertama($ka, [
+                                                'aktual',
+                                                'jam_aktual',
+                                            ]);
+
+                                            $statusKa = $nilaiPertama($ka, [
+                                                'status',
+                                                'status_realisasi',
+                                            ]);
+
+                                            $keteranganKa = $nilaiPertama($ka, [
+                                                'keterangan',
+                                                'catatan',
+                                            ]);
+
+                                            $semboyan21 = $nilaiPertama($ka, [
+                                                'semboyan21',
+                                                'semboyan_21',
+                                            ]);
+
+                                            $genta = $nilaiPertama($ka, [
+                                                'genta',
+                                            ]);
+
+                                            $pintu = $nilaiPertama($ka, [
+                                                'pintu',
+                                                'pintu_perlintasan',
+                                            ]);
+
+                                            $semboyan35 = $nilaiPertama($ka, [
+                                                'semboyan35',
+                                                'semboyan_35',
+                                            ]);
+
+                                            $dari = $nilaiPertama($ka, [
+                                                'dari',
+                                                'asal',
+                                                'stasiun_asal',
+                                                'stasiun_dari',
+                                                'dari_stasiun',
+                                                'hulu',
+                                                'relasi_hulu',
+                                            ], null);
+
+                                            $ke = $nilaiPertama($ka, [
+                                                'ke',
+                                                'tujuan',
+                                                'stasiun_tujuan',
+                                                'stasiun_ke',
+                                                'ke_stasiun',
+                                                'hilir',
+                                                'relasi_hilir',
+                                            ], null);
+
+                                            if ($master) {
+                                                $atributMaster = $master->getAttributes();
+
+                                                if ($nomorKa === '—') {
+                                                    $nomorKa = $nilaiPertama(
+                                                        $atributMaster,
+                                                        [
+                                                            'nomor',
+                                                            'nomor_ka',
+                                                            'no_ka',
+                                                            'kode_ka',
+                                                        ]
+                                                    );
+                                                }
+
+                                                if ($namaKa === '—') {
+                                                    $namaKa = $nilaiPertama(
+                                                        $atributMaster,
+                                                        [
+                                                            'nama',
+                                                            'nama_ka',
+                                                            'nama_kereta',
+                                                        ]
+                                                    );
+                                                }
+
+                                                if ($dari === null || $dari === '—') {
+                                                    $dari = $nilaiPertama(
+                                                        $atributMaster,
+                                                        [
+                                                            'dari',
+                                                            'asal',
+                                                            'stasiun_asal',
+                                                            'stasiun_dari',
+                                                            'dari_stasiun',
+                                                            'hulu',
+                                                        ]
+                                                    );
+                                                }
+
+                                                if ($ke === null || $ke === '—') {
+                                                    $ke = $nilaiPertama(
+                                                        $atributMaster,
+                                                        [
+                                                            'ke',
+                                                            'tujuan',
+                                                            'stasiun_tujuan',
+                                                            'stasiun_ke',
+                                                            'ke_stasiun',
+                                                            'hilir',
+                                                        ]
+                                                    );
+                                                }
+                                            }
+
+                                            $statusNormal = strtoupper(
+                                                trim((string) $statusKa)
+                                            );
+
+                                            $kelasStatus = match ($statusNormal) {
+                                                'JALAN',
+                                                'BERJALAN',
+                                                'SELESAI' =>
+                                                    'bg-green-100 text-green-700',
+
+                                                'BATAL',
+                                                'DIBATALKAN',
+                                                'TIDAK JALAN' =>
+                                                    'bg-red-100 text-red-700',
+
+                                                'BELUM' =>
+                                                    'bg-amber-100 text-amber-700',
+
+                                                default =>
+                                                    'bg-slate-100 text-slate-700',
+                                            };
+                                        @endphp
+
+                                        <tr class="transition hover:bg-slate-50">
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-500">
+                                                {{ $index + 1 }}
+                                            </td>
+
+                                            <td class="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
+                                                {{ $formatNilai($nomorKa) }}
+                                            </td>
+
+                                            <td class="px-4 py-3 text-slate-700">
+                                                {{ $formatNilai($namaKa) }}
+                                            </td>
+
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
+                                                {{ $formatNilai($dari) }}
+                                            </td>
+
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
+                                                {{ $formatNilai($ke) }}
+                                            </td>
+
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
+                                                {{ $formatNilai($jadwal) }}
+                                            </td>
+
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
+                                                {{ $formatNilai($aktual) }}
+                                            </td>
+
+                                            <td class="whitespace-nowrap px-4 py-3">
+                                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $kelasStatus }}">
+                                                    {{ $formatNilai($statusKa) }}
+                                                </span>
+                                            </td>
+
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
+                                                {{ $formatNilai($semboyan21) }}
+                                            </td>
+
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
+                                                {{ $formatNilai($genta) }}
+                                            </td>
+
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
+                                                {{ $formatNilai($pintu) }}
+                                            </td>
+
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
+                                                {{ $formatNilai($semboyan35) }}
+                                            </td>
+
+                                            <td class="px-4 py-3 text-slate-600">
+                                                {{ $formatNilai($keteranganKa) }}
+                                            </td>
+                                        </tr>
+                                    @endif
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="space-y-4">
+                        @foreach ([
+                            'KA Batal' => $kaBatal,
+                            'KA Berjalan' => $kaBerjalan,
+                            'KA Belum Lewat' => $kaBelumLewat,
+                        ] as $judul => $daftarKA)
+                            <div class="rounded-xl border border-slate-200 p-4">
+                                <h4 class="mb-2 font-semibold text-slate-700">
+                                    {{ $judul }}
+                                </h4>
+
+                                @if (count($daftarKA))
+                                    <ul class="list-inside list-disc space-y-2 text-slate-700">
+                                        @foreach ($daftarKA as $ka)
+                                            <li class="break-words">
+                                                {{ $formatNilai($ka) }}
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @else
+                                    <p class="text-sm text-slate-500">
+                                        Tidak ada data.
+                                    </p>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </section>
+
+            {{-- INVENTARIS --}}
             <section>
                 <h3 class="mb-3 font-semibold text-slate-800">
-                    6. Catatan Serah Terima
+                    4. Kondisi Inventaris
+                </h3>
+
+                @if (count($inventaris) && is_array(reset($inventaris)))
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">No.</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">Kode Barang</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">Nama Barang</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">Kategori</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">Jumlah</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">Kondisi</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">Catatan</th>
+                                </tr>
+                            </thead>
+
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                @foreach ($inventaris as $index => $barang)
+                                    @if (is_array($barang))
+                                        <tr>
+                                            <td class="px-4 py-3 text-slate-600">
+                                                {{ $index + 1 }}
+                                            </td>
+
+                                            <td class="px-4 py-3 text-slate-700">
+                                                {{ $nilaiPertama($barang, ['kode_barang']) }}
+                                            </td>
+
+                                            <td class="px-4 py-3 font-medium text-slate-800">
+                                                {{ $nilaiPertama($barang, ['nama_barang', 'nama']) }}
+                                            </td>
+
+                                            <td class="px-4 py-3 text-slate-700">
+                                                {{ $nilaiPertama($barang, ['kategori']) }}
+                                            </td>
+
+                                            <td class="px-4 py-3 text-slate-700">
+                                                {{ $nilaiPertama($barang, ['jumlah_aktual', 'jumlah_master', 'jumlah']) }}
+                                            </td>
+
+                                            <td class="px-4 py-3 text-slate-700">
+                                                {{ $nilaiPertama($barang, ['kondisi', 'status']) }}
+                                            </td>
+
+                                            <td class="px-4 py-3 text-slate-700">
+                                                {{ $nilaiPertama($barang, ['catatan']) }}
+                                            </td>
+                                        </tr>
+                                    @endif
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <p class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-500">
+                        Belum ada data inventaris pada snapshot serah terima ini.
+                    </p>
+                @endif
+            </section>
+
+            {{-- CATATAN SERAH TERIMA --}}
+            <section>
+                <h3 class="mb-3 font-semibold text-slate-800">
+                    5. Catatan Serah Terima
                 </h3>
 
                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -451,7 +921,7 @@
                 </div>
             </section>
 
-            {{-- Informasi tambahan --}}
+            {{-- INFORMASI TAMBAHAN --}}
             @if ($dataTambahan->isNotEmpty())
                 <section class="border-t border-slate-100 pt-5">
                     <h3 class="mb-3 font-semibold text-slate-800">
@@ -477,14 +947,10 @@
         </div>
     </section>
 
-    {{-- ===================================================== --}}
-    {{-- TANDA TANGAN PENYERAH DAN PENERIMA --}}
-    {{-- ADMIN HANYA MELIHAT TANDA TANGAN --}}
-    {{-- ===================================================== --}}
-
+    {{-- TANDA TANGAN --}}
     <div class="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
 
-        {{-- Tanda tangan penyerah --}}
+        {{-- TANDA TANGAN PENYERAH --}}
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 class="mb-4 text-lg font-bold text-[#1d2d50]">
                 Tanda Tangan Penyerah
@@ -494,7 +960,7 @@
                 <div class="flex min-h-48 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <img
                         src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($serahTerima->tanda_tangan_penyerah) }}"
-                        alt="Tanda tangan petugas PJL penyerah"
+                        alt="Tanda tangan petugas penyerah"
                         class="max-h-40 max-w-full object-contain"
                     >
                 </div>
@@ -509,7 +975,7 @@
             @endif
         </section>
 
-        {{-- Tanda tangan penerima --}}
+        {{-- TANDA TANGAN PENERIMA --}}
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 class="mb-4 text-lg font-bold text-[#1d2d50]">
                 Tanda Tangan Penerima
@@ -519,7 +985,7 @@
                 <div class="flex min-h-48 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <img
                         src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($serahTerima->tanda_tangan_penerima) }}"
-                        alt="Tanda tangan petugas PJL penerima"
+                        alt="Tanda tangan petugas penerima"
                         class="max-h-40 max-w-full object-contain"
                     >
                 </div>
@@ -529,35 +995,13 @@
                 </p>
             @else
                 <div class="flex min-h-48 flex-col items-center justify-center rounded-xl border border-dashed border-amber-300 bg-amber-50 p-6 text-center">
-                    <svg
-                        class="mb-3 h-10 w-10 text-amber-600"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                    >
-                        <circle
-                            cx="12"
-                            cy="12"
-                            r="9"
-                            stroke-width="1.5"
-                        />
-
-                        <path
-                            stroke-linecap="round"
-                            stroke-width="1.5"
-                            d="M12 7v5l3 2"
-                        />
-                    </svg>
-
                     <p class="font-semibold text-amber-900">
                         Menunggu konfirmasi penerima
                     </p>
 
                     <p class="mt-1 text-sm text-amber-800">
-                        Petugas PJL shift berikutnya harus mengonfirmasi
-                        penerimaan dan membubuhkan tanda tangan melalui
-                        halaman petugas.
+                        Petugas PJL shift berikutnya harus mengonfirmasi penerimaan
+                        dan membubuhkan tanda tangan melalui halaman petugas.
                     </p>
                 </div>
             @endif
@@ -565,36 +1009,27 @@
 
     </div>
 
-    {{-- ===================================================== --}}
     {{-- REVIEW ADMIN --}}
-    {{-- ===================================================== --}}
-
     <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-
         <div class="mb-5">
             <h2 class="text-lg font-bold text-[#1d2d50]">
                 Review Admin
             </h2>
 
             <p class="mt-1 text-sm text-slate-500">
-                Admin melakukan pemeriksaan administratif terhadap
-                data serah terima setelah penerima mengonfirmasi dinas.
+                Review administratif dilakukan setelah penerima mengonfirmasi dinas.
             </p>
         </div>
 
-        {{-- Status review --}}
         <div class="mb-5">
             <span class="inline-flex rounded-full px-4 py-2 text-sm font-semibold {{ $statusReviewClass }}">
                 {{ $statusReviewLabel }}
             </span>
         </div>
 
-        {{-- Informasi peninjauan --}}
         <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-                <p class="text-sm text-slate-500">
-                    Ditinjau oleh
-                </p>
+                <p class="text-sm text-slate-500">Ditinjau oleh</p>
 
                 <p class="mt-1 font-medium text-slate-800">
                     {{ $serahTerima->ditinjauOleh?->name ?? 'Belum ditinjau' }}
@@ -602,131 +1037,53 @@
             </div>
 
             <div>
-                <p class="text-sm text-slate-500">
-                    Waktu review
-                </p>
+                <p class="text-sm text-slate-500">Waktu review</p>
 
                 <p class="mt-1 font-medium text-slate-800">
-                    {{ $serahTerima->ditinjau_pada?->format('d/m/Y H:i') ?? '—' }}
+                    {{ $formatTanggal($serahTerima->ditinjau_pada) }}
                 </p>
             </div>
         </div>
 
-        {{-- Alasan revisi sebelumnya --}}
         @if ($serahTerima->catatan_revisi)
             <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4">
-                <div class="flex items-start gap-3">
-                    <svg
-                        class="mt-0.5 h-5 w-5 shrink-0 text-red-600"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"
-                        />
-                    </svg>
+                <h3 class="font-semibold text-red-800">
+                    Alasan Revisi
+                </h3>
 
-                    <div>
-                        <h3 class="font-semibold text-red-800">
-                            Alasan Revisi
-                        </h3>
-
-                        <p class="mt-2 whitespace-pre-line break-words text-sm text-red-700">{{ $serahTerima->catatan_revisi }}</p>
-                    </div>
-                </div>
+                <p class="mt-2 whitespace-pre-line break-words text-sm text-red-700">{{ $serahTerima->catatan_revisi }}</p>
             </div>
         @endif
 
-        {{-- Menunggu penerimaan --}}
         @if (!$penerimaanTerkonfirmasi)
-
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <div class="flex items-start gap-3">
-                    <svg
-                        class="mt-0.5 h-6 w-6 shrink-0 text-amber-600"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                    >
-                        <circle
-                            cx="12"
-                            cy="12"
-                            r="9"
-                            stroke-width="1.5"
-                        />
+                <p class="font-semibold text-amber-900">
+                    Review belum dapat dilakukan
+                </p>
 
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="1.5"
-                            d="M12 7v5l3 2"
-                        />
-                    </svg>
-
-                    <div>
-                        <p class="font-semibold text-amber-900">
-                            Review belum dapat dilakukan
-                        </p>
-
-                        <p class="mt-1 text-sm text-amber-800">
-                            Menunggu petugas PJL pada shift berikutnya
-                            mengonfirmasi penerimaan dan membubuhkan
-                            tanda tangan terlebih dahulu.
-                        </p>
-                    </div>
-                </div>
+                <p class="mt-1 text-sm text-amber-800">
+                    Menunggu penerima mengonfirmasi penerimaan dan membubuhkan tanda tangan.
+                </p>
             </div>
 
-        {{-- Sudah disetujui --}}
         @elseif ($reviewSudahDisetujui)
-
             <div class="rounded-xl border border-green-200 bg-green-50 p-4">
-                <div class="flex items-start gap-3">
-                    <svg
-                        class="mt-0.5 h-6 w-6 shrink-0 text-green-600"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="m5 12 4 4L19 6"
-                        />
-                    </svg>
+                <p class="font-semibold text-green-900">
+                    Serah terima telah disetujui
+                </p>
 
-                    <div>
-                        <p class="font-semibold text-green-900">
-                            Serah terima telah disetujui
-                        </p>
-
-                        <p class="mt-1 text-sm text-green-800">
-                            Keputusan review administrasi telah tersimpan.
-                        </p>
-                    </div>
-                </div>
+                <p class="mt-1 text-sm text-green-800">
+                    Keputusan review administrasi telah tersimpan.
+                </p>
             </div>
 
-        {{-- Tombol review --}}
         @else
-
             <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <p class="mb-4 text-sm text-slate-600">
-                    Pastikan seluruh informasi telah diperiksa sebelum
-                    memilih keputusan.
+                    Pastikan seluruh informasi telah diperiksa sebelum memilih keputusan.
                 </p>
 
                 <div class="flex flex-col gap-3 sm:flex-row">
-
-                    {{-- Tombol setujui --}}
                     <form
                         action="{{ route('admin.serah-terima-dinas.update', $serahTerima->id) }}"
                         method="POST"
@@ -736,76 +1093,30 @@
                         @csrf
                         @method('PATCH')
 
-                        <input
-                            type="hidden"
-                            name="status_review"
-                            value="disetujui"
-                        >
-
-                        <input
-                            type="hidden"
-                            name="catatan_revisi"
-                            value=""
-                        >
+                        <input type="hidden" name="status_review" value="disetujui">
+                        <input type="hidden" name="catatan_revisi" value="">
 
                         <button
                             type="submit"
-                            class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300 focus:ring-offset-2"
+                            class="w-full rounded-xl bg-green-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300 focus:ring-offset-2"
                         >
-                            <svg
-                                class="h-5 w-5"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="m5 12 4 4L19 6"
-                                />
-                            </svg>
-
-                            Setujui Serah Terima
+                            ✓ Setujui Serah Terima
                         </button>
                     </form>
 
-                    {{-- Tombol tolak / revisi --}}
                     <button
                         type="button"
                         id="bukaModalRevisi"
-                        class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2"
+                        class="flex-1 rounded-xl bg-red-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2"
                     >
-                        <svg
-                            class="h-5 w-5"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M6 18 18 6M6 6l12 12"
-                            />
-                        </svg>
-
-                        Tolak / Minta Revisi
+                        ✕ Tolak / Minta Revisi
                     </button>
-
                 </div>
             </div>
-
         @endif
-
     </section>
 
-    {{-- ===================================================== --}}
-    {{-- MODAL ALASAN REVISI --}}
-    {{-- ===================================================== --}}
-
+    {{-- MODAL REVISI --}}
     @if ($penerimaanTerkonfirmasi && !$reviewSudahDisetujui)
         <div
             id="modalRevisi"
@@ -817,39 +1128,18 @@
         >
             <div class="my-auto w-full max-w-lg rounded-2xl bg-white shadow-2xl">
 
-                {{-- Header modal --}}
                 <div class="flex items-start justify-between gap-4 border-b border-slate-100 p-6">
                     <div>
-                        <div class="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-red-100">
-                            <svg
-                                class="h-6 w-6 text-red-600"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M6 18 18 6M6 6l12 12"
-                                />
-                            </svg>
+                        <div class="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-red-100 text-xl text-red-600">
+                            ✕
                         </div>
 
-                        <h2
-                            id="judulModalRevisi"
-                            class="text-xl font-bold text-slate-900"
-                        >
+                        <h2 id="judulModalRevisi" class="text-xl font-bold text-slate-900">
                             Tolak / Minta Revisi
                         </h2>
 
-                        <p
-                            id="deskripsiModalRevisi"
-                            class="mt-2 text-sm leading-6 text-slate-500"
-                        >
-                            Tuliskan alasan yang jelas agar petugas PJL
-                            mengetahui bagian yang perlu diperbaiki.
+                        <p id="deskripsiModalRevisi" class="mt-2 text-sm leading-6 text-slate-500">
+                            Tuliskan alasan yang jelas agar petugas PJL mengetahui bagian yang perlu diperbaiki.
                         </p>
                     </div>
 
@@ -859,24 +1149,10 @@
                         aria-label="Tutup modal"
                         class="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                     >
-                        <svg
-                            class="h-5 w-5"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M6 18 18 6M6 6l12 12"
-                            />
-                        </svg>
+                        ✕
                     </button>
                 </div>
 
-                {{-- Form alasan --}}
                 <form
                     action="{{ route('admin.serah-terima-dinas.update', $serahTerima->id) }}"
                     method="POST"
@@ -885,19 +1161,11 @@
                     @csrf
                     @method('PATCH')
 
-                    <input
-                        type="hidden"
-                        name="status_review"
-                        value="perlu_revisi"
-                    >
+                    <input type="hidden" name="status_review" value="perlu_revisi">
 
                     <div class="p-6">
-                        <label
-                            for="alasanRevisi"
-                            class="mb-2 block text-sm font-semibold text-slate-700"
-                        >
-                            Alasan revisi
-                            <span class="text-red-600">*</span>
+                        <label for="alasanRevisi" class="mb-2 block text-sm font-semibold text-slate-700">
+                            Alasan revisi <span class="text-red-600">*</span>
                         </label>
 
                         <textarea
@@ -908,7 +1176,7 @@
                             maxlength="5000"
                             required
                             class="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-red-500 focus:ring-4 focus:ring-red-100"
-                            placeholder="Contoh: Kondisi alat pengamanan belum dijelaskan secara lengkap. Mohon lengkapi catatan sebelum mengajukan kembali."
+                            placeholder="Jelaskan bagian yang harus diperbaiki..."
                         >{{ old('catatan_revisi', $serahTerima->catatan_revisi) }}</textarea>
 
                         <div class="mt-2 flex items-start justify-between gap-3">
@@ -916,22 +1184,19 @@
                                 Minimal 5 karakter dan maksimal 5.000 karakter.
                             </p>
 
-                            <span
-                                id="jumlahKarakterRevisi"
-                                class="shrink-0 text-xs text-slate-400"
-                            >0/5000</span>
+                            <span id="jumlahKarakterRevisi" class="shrink-0 text-xs text-slate-400">
+                                0/5000
+                            </span>
                         </div>
 
                         <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
                             <p class="text-xs leading-5 text-amber-800">
-                                Keputusan ini akan tercatat sebagai permintaan
-                                revisi. Pastikan alasan yang diberikan spesifik
-                                dan dapat ditindaklanjuti oleh petugas.
+                                Keputusan ini akan tercatat sebagai permintaan revisi.
+                                Pastikan alasannya spesifik dan dapat ditindaklanjuti.
                             </p>
                         </div>
                     </div>
 
-                    {{-- Footer modal --}}
                     <div class="flex flex-col-reverse gap-3 rounded-b-2xl border-t border-slate-100 bg-slate-50 p-6 sm:flex-row sm:justify-end">
                         <button
                             type="button"
@@ -944,54 +1209,31 @@
                         <button
                             type="submit"
                             id="kirimRevisi"
-                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300"
+                            class="rounded-xl bg-red-600 px-5 py-2.5 font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300"
                         >
-                            <svg
-                                class="h-5 w-5"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M5 13 9 17 19 7"
-                                />
-                            </svg>
-
                             Kirim Keputusan
                         </button>
                     </div>
                 </form>
-
             </div>
         </div>
     @endif
 
-    {{-- Tombol kembali --}}
+    {{-- KEMBALI --}}
     <div class="flex justify-start pb-4">
         <a
             href="{{ route('admin.serah-terima-dinas.index') }}"
             class="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50"
         >
-            <span aria-hidden="true">←</span>
-            Kembali ke Daftar Pengajuan
+            ← Kembali ke Daftar Pengajuan
         </a>
     </div>
 
 </div>
 @endsection
 
-{{-- ========================================================= --}}
-{{-- JAVASCRIPT MODAL REVIEW --}}
-{{-- ========================================================= --}}
-
-@if (
-    $penerimaanTerkonfirmasi
-    && !$reviewSudahDisetujui
-)
+{{-- JAVASCRIPT MODAL --}}
+@if ($penerimaanTerkonfirmasi && !$reviewSudahDisetujui)
     @push('scripts')
         <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -1003,14 +1245,7 @@
             const form = document.getElementById('formRevisi');
             const jumlahKarakter = document.getElementById('jumlahKarakterRevisi');
 
-            if (
-                !modal
-                || !buka
-                || !tutup
-                || !batal
-                || !alasan
-                || !form
-            ) {
+            if (!modal || !buka || !tutup || !batal || !alasan || !form) {
                 return;
             }
 
@@ -1028,20 +1263,15 @@
 
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
-
                 document.body.classList.add('overflow-hidden');
 
                 perbaruiJumlahKarakter();
-
-                window.setTimeout(function () {
-                    alasan.focus();
-                }, 50);
+                alasan.focus();
             }
 
             function tutupModal() {
                 modal.classList.add('hidden');
                 modal.classList.remove('flex');
-
                 document.body.classList.remove('overflow-hidden');
 
                 if (elemenSebelumnya) {
@@ -1085,7 +1315,6 @@
 
                     alasan.reportValidity();
                     alasan.focus();
-
                     return;
                 }
 
@@ -1098,24 +1327,15 @@
 
                     alasan.reportValidity();
                     alasan.focus();
-
                     return;
                 }
 
                 alasan.setCustomValidity('');
-
-                /*
-                 * Hilangkan spasi di awal dan akhir sebelum dikirim.
-                 */
                 alasan.value = nilai;
             });
 
             perbaruiJumlahKarakter();
 
-            /*
-             * Jika validasi Laravel gagal, buka kembali modal
-             * agar alasan tidak perlu dimasukkan ulang.
-             */
             @if ($errors->has('catatan_revisi'))
                 bukaModal();
             @endif
