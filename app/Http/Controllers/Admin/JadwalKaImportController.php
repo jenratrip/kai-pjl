@@ -8,6 +8,7 @@ use App\Models\JadwalKa;
 use App\Models\Jpl;
 use App\Models\KeretaApi;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -30,14 +31,26 @@ class JadwalKaImportController extends Controller
      */
     public function preview(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
+            'tanggal_berlaku' => [
+                'required',
+                'date_format:Y-m-d',
+            ],
             'file' => [
                 'required',
                 'file',
                 'mimes:xlsx,xls',
                 'max:20480',
             ],
+        ], [
+            'tanggal_berlaku.required' => 'Tanggal jadwal KA wajib dipilih.',
+            'tanggal_berlaku.date_format' => 'Format tanggal jadwal tidak valid.',
+            'file.required' => 'File Excel wajib dipilih.',
+            'file.mimes' => 'File harus berformat XLS atau XLSX.',
+            'file.max' => 'Ukuran file maksimal 20 MB.',
         ]);
+
+        $tanggalBerlaku = $validated['tanggal_berlaku'];
 
         $path = $request->file('file')->store(
             'imports/jadwal-ka',
@@ -102,7 +115,7 @@ class JadwalKaImportController extends Controller
                         $row['error'] = 'Kode JPL pada sheet tidak ditemukan.';
                     }
 
-                    if ($row['valid'] && $jpl) {
+                    if (($row['valid'] ?? false) && $jpl) {
                         $nomorKa = trim((string) $row['nomor_ka']);
                         $jam = $row['jam_lewat'];
 
@@ -115,19 +128,18 @@ class JadwalKaImportController extends Controller
                         $kereta = $keretaCache[$nomorKa];
 
                         /*
-                         * Identitas jadwal reguler:
-                         * nomor KA + JPL + jam lewat.
+                         * Identitas jadwal:
+                         * nomor KA + JPL + jam lewat + tanggal berlaku.
                          */
                         $key = implode('|', [
                             mb_strtolower($nomorKa),
                             (string) $jpl->id,
                             (string) $jam,
+                            $tanggalBerlaku,
                         ]);
 
                         $duplicateInWorkbook = isset($seenKeys[$key]);
 
-                        // Simpan identitas agar kemunculan berikutnya
-                        // dapat ditandai sebagai duplikat.
                         $seenKeys[$key] = true;
 
                         $duplicateInDatabase = false;
@@ -137,8 +149,10 @@ class JadwalKaImportController extends Controller
                                 ->where('kereta_api_id', $kereta->id)
                                 ->where('jpl_id', $jpl->id)
                                 ->where('jam_lewat', $jam)
-                                ->whereNull('hari_berlaku')
-                                ->whereNull('tanggal_berlaku')
+                                ->whereDate(
+                                    'tanggal_berlaku',
+                                    $tanggalBerlaku
+                                )
                                 ->exists();
                         }
 
@@ -147,7 +161,7 @@ class JadwalKaImportController extends Controller
 
                         if ($row['duplicate']) {
                             $row['error'] = $duplicateInDatabase
-                                ? 'Jadwal reguler sudah ada di database.'
+                                ? 'Jadwal untuk tanggal ini sudah ada di database.'
                                 : 'Duplikat pada workbook yang sama.';
                         }
                     }
@@ -171,30 +185,40 @@ class JadwalKaImportController extends Controller
             if ($headerSheetCount === 0 || empty($previewRows)) {
                 Storage::disk('local')->delete($path);
 
-                return back()
+                return redirect()
+                    ->route('admin.jadwal-ka.import')
                     ->withErrors([
                         'file' => 'Tidak ditemukan baris jadwal KA yang dapat dibaca.',
                     ])
-                    ->withInput();
+                    ->withInput([
+                        'tanggal_berlaku' => $tanggalBerlaku,
+                    ]);
             }
 
-            // Konfirmasi hanya diperbolehkan jika tidak ada error
-            // dan seluruh sheet yang terbaca memiliki JPL.
+            $hasInvalidRows = collect($previewRows)->contains(
+                fn ($row) => ! ($row['valid'] ?? false)
+            );
+
+            // Konfirmasi hanya diperbolehkan jika tidak ada error,
+            // baris tidak valid, atau sheet yang tidak cocok dengan JPL.
             $canConfirm = empty($importErrors)
+                && ! $hasInvalidRows
                 && collect($sheets)->every(
                     fn ($sheet) => $sheet['jpl_found']
                 );
 
             $token = (string) Str::uuid();
 
-            // Simpan lokasi file sementara untuk proses konfirmasi.
+            // Simpan lokasi file dan tanggal berlaku untuk konfirmasi.
             session()->put("jadwal_ka_import.{$token}", [
                 'path' => $path,
+                'tanggal_berlaku' => $tanggalBerlaku,
                 'created_at' => now()->timestamp,
             ]);
 
             return view('admin.jadwal-ka.preview', [
                 'token' => $token,
+                'tanggalBerlaku' => $tanggalBerlaku,
                 'sheets' => $sheets,
                 'rows' => $previewRows,
                 'importErrors' => $importErrors,
@@ -202,17 +226,21 @@ class JadwalKaImportController extends Controller
 
                 'validCount' => collect($previewRows)
                     ->filter(
-                        fn ($row) => $row['valid'] && ! $row['duplicate']
+                        fn ($row) => ($row['valid'] ?? false)
+                            && ! ($row['duplicate'] ?? false)
                     )
                     ->count(),
 
                 'invalidCount' => collect($previewRows)
-                    ->filter(fn ($row) => ! $row['valid'])
+                    ->filter(
+                        fn ($row) => ! ($row['valid'] ?? false)
+                    )
                     ->count(),
 
                 'duplicateCount' => collect($previewRows)
                     ->filter(
-                        fn ($row) => $row['valid'] && $row['duplicate']
+                        fn ($row) => ($row['valid'] ?? false)
+                            && ($row['duplicate'] ?? false)
                     )
                     ->count(),
 
@@ -232,10 +260,12 @@ class JadwalKaImportController extends Controller
                     . $e->getMessage();
             }
 
-            // Jika preview gagal, tetap di halaman import.
             return redirect()
                 ->route('admin.jadwal-ka.import')
-                ->withErrors(['file' => $message]);
+                ->withErrors(['file' => $message])
+                ->withInput([
+                    'tanggal_berlaku' => $tanggalBerlaku,
+                ]);
         }
     }
 
@@ -261,7 +291,9 @@ class JadwalKaImportController extends Controller
         }
 
         // Preview berlaku selama dua jam.
-        if (now()->timestamp - ($import['created_at'] ?? 0) > 7200) {
+        if (
+            now()->timestamp - ($import['created_at'] ?? 0) > 7200
+        ) {
             Storage::disk('local')->delete($import['path']);
             session()->forget($key);
 
@@ -269,6 +301,38 @@ class JadwalKaImportController extends Controller
                 ->route('admin.jadwal-ka.import')
                 ->withErrors([
                     'file' => 'Preview kedaluwarsa. Silakan upload ulang.',
+                ]);
+        }
+
+        $tanggalBerlaku = $import['tanggal_berlaku'] ?? null;
+
+        /*
+         * Validasi ulang tanggal dari session.
+         * Tanggal tidak diambil dari input konfirmasi pengguna.
+         */
+        if (! is_string($tanggalBerlaku)) {
+            return redirect()
+                ->route('admin.jadwal-ka.import')
+                ->withErrors([
+                    'file' => 'Tanggal berlaku tidak ditemukan pada sesi preview. Silakan upload ulang.',
+                ]);
+        }
+
+        $dateParts = explode('-', $tanggalBerlaku);
+
+        if (
+            count($dateParts) !== 3
+            || ! checkdate(
+                (int) ($dateParts[1] ?? 0),
+                (int) ($dateParts[2] ?? 0),
+                (int) ($dateParts[0] ?? 0)
+            )
+            || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $tanggalBerlaku)
+        ) {
+            return redirect()
+                ->route('admin.jadwal-ka.import')
+                ->withErrors([
+                    'file' => 'Tanggal berlaku pada sesi preview tidak valid. Silakan upload ulang.',
                 ]);
         }
 
@@ -295,6 +359,7 @@ class JadwalKaImportController extends Controller
             DB::transaction(function () use (
                 $absolutePath,
                 $batch,
+                $tanggalBerlaku,
                 &$inserted,
                 &$skipped,
                 &$duplicates
@@ -333,7 +398,7 @@ class JadwalKaImportController extends Controller
                     }
 
                     foreach ($result['rows'] as $row) {
-                        if (! $row['valid']) {
+                        if (! ($row['valid'] ?? false)) {
                             throw new \RuntimeException(
                                 'Terdapat baris tidak valid pada sheet '
                                 . $result['sheet']
@@ -348,6 +413,7 @@ class JadwalKaImportController extends Controller
                             mb_strtolower($nomorKa),
                             (string) $jpl->id,
                             (string) $jam,
+                            $tanggalBerlaku,
                         ]);
 
                         // Lewati duplikat dalam workbook.
@@ -373,7 +439,7 @@ class JadwalKaImportController extends Controller
                                     'jenis' => null,
                                 ]);
                             } elseif (
-                                $row['nama_ka'] !== null
+                                ($row['nama_ka'] ?? null) !== null
                                 && trim((string) $kereta->nama_ka) === ''
                             ) {
                                 $kereta->update([
@@ -386,30 +452,69 @@ class JadwalKaImportController extends Controller
 
                         $kereta = $keretaCache[$nomorKa];
 
-                        // Cek jadwal reguler yang sudah ada di database.
-                        $exists = JadwalKa::query()
+                        /*
+                         * Cek duplikasi berdasarkan KA, JPL, jam, dan tanggal.
+                         * Jadwal pada tanggal lain tidak dianggap duplikat.
+                         */
+                        $existing = JadwalKa::query()
                             ->where('kereta_api_id', $kereta->id)
                             ->where('jpl_id', $jpl->id)
                             ->where('jam_lewat', $jam)
-                            ->whereNull('hari_berlaku')
-                            ->whereNull('tanggal_berlaku')
-                            ->exists();
+                            ->whereDate('tanggal_berlaku', $tanggalBerlaku)
+                            ->first();
 
-                        if ($exists) {
+                        if ($existing) {
+                            /*
+                             * Backfill rute untuk data lama yang belum memiliki
+                             * dari/ke. Data jadwal yang sudah ada tidak dibuat
+                             * ulang dan tidak menimpa rute yang sudah terisi.
+                             */
+                            $routeUpdates = [];
+
+                            if (
+                                empty($existing->dari)
+                                && ! empty($row['dari'])
+                            ) {
+                                $routeUpdates['dari'] = trim(
+                                    (string) $row['dari']
+                                );
+                            }
+
+                            if (
+                                empty($existing->ke)
+                                && ! empty($row['ke'])
+                            ) {
+                                $routeUpdates['ke'] = trim(
+                                    (string) $row['ke']
+                                );
+                            }
+
+                            if (! empty($routeUpdates)) {
+                                $existing->update($routeUpdates);
+                            }
+
                             $duplicates++;
                             $skipped++;
 
                             continue;
                         }
 
-                        // Simpan jadwal baru.
+                        // Simpan jadwal termasuk stasiun asal dan tujuan.
                         JadwalKa::create([
                             'kereta_api_id' => $kereta->id,
+                            'dari' => isset($row['dari'])
+                                && trim((string) $row['dari']) !== ''
+                                    ? trim((string) $row['dari'])
+                                    : null,
+                            'ke' => isset($row['ke'])
+                                && trim((string) $row['ke']) !== ''
+                                    ? trim((string) $row['ke'])
+                                    : null,
                             'jpl_id' => $jpl->id,
                             'jam_lewat' => $jam,
                             'hari_berlaku' => null,
-                            'tanggal_berlaku' => null,
-                            'keterangan' => $row['keterangan'],
+                            'tanggal_berlaku' => $tanggalBerlaku,
+                            'keterangan' => $row['keterangan'] ?? null,
                             'is_active' => true,
                             'batch_import' => $batch,
                         ]);
@@ -425,7 +530,9 @@ class JadwalKaImportController extends Controller
             Storage::disk('local')->delete($import['path']);
             session()->forget($key);
 
-            $message = "Import selesai. {$inserted} jadwal ditambahkan; "
+            $message = "Import selesai untuk tanggal "
+                . Carbon::parse($tanggalBerlaku)->format('d-m-Y')
+                . ". {$inserted} jadwal ditambahkan; "
                 . "{$skipped} baris dilewati";
 
             if ($duplicates > 0) {
@@ -434,10 +541,6 @@ class JadwalKaImportController extends Controller
 
             $message .= ". Batch: {$batch}";
 
-            /*
-             * PENTING:
-             * Jika import berhasil, pindah ke index Jadwal KA.
-             */
             return redirect()
                 ->route('admin.jadwal-ka.index')
                 ->with('success', $message);
@@ -453,10 +556,6 @@ class JadwalKaImportController extends Controller
                     . $e->getMessage();
             }
 
-            /*
-             * Jika import gagal, tetap arahkan pengguna
-             * ke halaman import agar bisa mencoba kembali.
-             */
             return redirect()
                 ->route('admin.jadwal-ka.import')
                 ->withErrors(['file' => $message]);

@@ -9,13 +9,13 @@
         <div>
             <h2 class="font-bold text-[#1d2d50]">Tanda tangan</h2>
             <p class="mt-0.5 text-xs text-slate-500">
-                Bubuhkan tanda tangan sebelum mengirim serah terima dinas.
+                Bubuhkan tanda tangan sebelum menyimpan serah terima dinas.
             </p>
         </div>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-2">
-        {{-- Tanda tangan penyerah --}}
+    {{-- Hanya tanda tangan penyerah. Admin tidak perlu menandatangani atau menyetujui. --}}
+    <div class="max-w-xl">
         <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <h3 class="font-bold text-[#1d2d50]">
                 PJL yang menyerahkan dinas
@@ -63,28 +63,6 @@
                 role="alert"
             >
                 Tanda tangan penyerah wajib diisi.
-            </p>
-        </div>
-
-        {{-- Tanda tangan penerima --}}
-        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <h3 class="font-bold text-[#1d2d50]">
-                Admin penerima
-            </h3>
-
-            <p class="mt-1 text-sm text-slate-600">
-                Tanda tangan penerima diberikan setelah admin
-                memeriksa dan mengonfirmasi serah terima.
-            </p>
-
-            <div
-                class="mt-3 flex h-40 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white p-4 text-center text-sm text-slate-400"
-            >
-                Menunggu konfirmasi penerima
-            </div>
-
-            <p class="mt-2 text-xs text-slate-500">
-                Bagian ini diisi pada proses konfirmasi admin.
             </p>
         </div>
     </div>

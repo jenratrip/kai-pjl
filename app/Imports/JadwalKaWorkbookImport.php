@@ -33,6 +33,7 @@ class JadwalKaWorkbookImport
         $headerIndex = null;
         $columnMap = [];
 
+        // Cari header dalam 20 baris pertama.
         foreach (array_slice($matrix, 0, 20, true) as $index => $row) {
             $candidate = [];
 
@@ -98,6 +99,8 @@ class JadwalKaWorkbookImport
         $subRow = $matrix[$dataStart] ?? [];
         $subFound = false;
 
+        // Mendukung header bertingkat seperti:
+        // JURUSAN -> DARI | KE
         foreach ($subRow as $column => $value) {
             $normalized = $this->normalize($value);
 
@@ -214,6 +217,7 @@ class JadwalKaWorkbookImport
             return null;
         }
 
+        // Mendukung format 00.29 atau 00.29.00.
         if (preg_match('/^\d{1,2}\.\d{2}(?:\.\d{2})?$/', $value)) {
             $value = str_replace('.', ':', $value);
         }

@@ -1,700 +1,1711 @@
-﻿
-        /* =====================================================
-           DATA DARI CONTROLLER LARAVEL
-        ===================================================== */
+﻿window.realisasiKaConfig = window.realisasiKaConfig || {};
 
-        let dataKA = window.realisasiKaConfig.data;
+const CONFIG = window.realisasiKaConfig;
+const SETTINGS = CONFIG.settings || {};
 
-        dataKA = dataKA.map((ka, index) => ({
-            no: ka.no ?? index + 1,
-            nomor: ka.nomor ?? '',
-            nama: ka.nama ?? '',
-            jadwal: ka.jadwal ?? '-',
-            aktual: ka.aktual ?? '',
-            status: ['JALAN', 'BATAL', 'BELUM'].includes(ka.status)
-                ? ka.status
-                : 'BELUM',
-            semboyan21: ka.semboyan21 ?? '',
-            genta: ka.genta ?? '',
-            pintu: ka.pintu ?? '',
-            semboyan35: ka.semboyan35 ?? '',
-            keterangan: ka.keterangan ?? '',
-            jadwal_ka_id: ka.jadwal_ka_id ?? null,
+if (!Array.isArray(CONFIG.data)) {
+    CONFIG.data = [];
+}
 
-            // ID realisasi dari database untuk mempertahankan identitas data.
-            realisasi_ka_id: ka.realisasi_ka_id ?? null,
+const ZONA_WAKTU = CONFIG.timeZone || 'Asia/Jakarta';
 
-            is_manual: Boolean(ka.is_manual)
-        }));
+const BATAS_CEPAT_MENIT = 2;
 
-        let manualCheck = {
-            semboyan21: '',
-            genta: '',
-            pintu: '',
-            semboyan35: ''
+const BATAS_TELAT_MENIT = Number(
+    SETTINGS.toleransiKeterlambatanMenit ?? 5
+);
+
+const BATAS_TELAT_TINGGI_MENIT = Number(
+    SETTINGS.peringatanKeterlambatanTinggiMenit ?? 10
+);
+
+const BATAS_AWAS_MENIT = Number(
+    SETTINGS.jarakMinimumAntarKaMenit ?? 0
+);
+
+const BATAS_PENUTUPAN_PALANG_MENIT = Number(
+    SETTINGS.batasPenutupanPalangMenit ?? 0
+);
+
+const WARNING_KETERLAMBATAN_AKTIF =
+    SETTINGS.warningKeterlambatanAktif === true;
+
+const WARNING_KETERLAMBATAN_TINGGI_AKTIF =
+    SETTINGS.warningKeterlambatanTinggiAktif === true;
+
+const WARNING_ANTAR_KA_AKTIF =
+    SETTINGS.warningAntarKaAktif === true;
+
+const WARNING_PENUTUPAN_PALANG_AKTIF =
+    SETTINGS.warningPenutupanPalangAktif === true;
+
+const JEDA_SIMPAN_STATUS = 300;
+const JEDA_SIMPAN_CHECK = 600;
+const JEDA_SIMPAN_KETIK = 800;
+const JEDA_COBA_ULANG = 10000;
+
+const JUMLAH_KOLOM_TABEL = 15;
+const BATAS_KARAKTER_CATATAN = 5000;
+
+/*
+ * BATAS_PENUTUPAN_PALANG_MENIT dan
+ * WARNING_PENUTUPAN_PALANG_AKTIF sudah dibaca dari database.
+ *
+ * Peringatan penutupan palang belum diterapkan karena data
+ * waktu penutupan/pembukaan palang belum tersedia pada objek KA.
+ */
+
+/* =====================================================
+   DATA KA
+===================================================== */
+
+let dataKA = CONFIG.data.map((ka, index) => ({
+    no: ka.no ?? index + 1,
+    nomor: ka.nomor ?? '',
+    nama: ka.nama ?? '',
+    hulu: ka.hulu ?? '',
+    hilir: ka.hilir ?? '',
+    relasi: ka.relasi ?? '',
+    arah: String(ka.arah ?? '').trim().toUpperCase(),
+    jadwal: ka.jadwal ?? '-',
+    aktual: ka.aktual ?? '',
+    status: ['JALAN', 'BATAL', 'BELUM'].includes(ka.status)
+        ? ka.status
+        : 'BELUM',
+    semboyan21: ka.semboyan21 ?? '',
+    genta: ka.genta ?? '',
+    pintu: ka.pintu ?? '',
+    semboyan35: ka.semboyan35 ?? '',
+    keterangan: ka.keterangan ?? '',
+    jadwal_ka_id: ka.jadwal_ka_id ?? null,
+    realisasi_ka_id: ka.realisasi_ka_id ?? null,
+    is_manual: Boolean(ka.is_manual)
+}));
+
+let manualCheck = {
+    semboyan21: '',
+    genta: '',
+    pintu: '',
+    semboyan35: ''
+};
+
+/* =====================================================
+   UTILITAS
+===================================================== */
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function getWIBTime() {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: ZONA_WAKTU,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23'
+    }).formatToParts(new Date());
+
+    const result = {};
+
+    parts.forEach(part => {
+        if (['hour', 'minute', 'second'].includes(part.type)) {
+            result[part.type] = Number(part.value);
+        }
+    });
+
+    return {
+        hour: result.hour ?? 0,
+        minute: result.minute ?? 0,
+        second: result.second ?? 0
+    };
+}
+
+function getCurrentMinutes() {
+    const now = getWIBTime();
+    return now.hour * 60 + now.minute;
+}
+
+function getNowHHMM() {
+    const now = getWIBTime();
+
+    return (
+        String(now.hour).padStart(2, '0') + ':' +
+        String(now.minute).padStart(2, '0')
+    );
+}
+
+function getNowHHMMSS() {
+    const now = getWIBTime();
+
+    return (
+        String(now.hour).padStart(2, '0') + ':' +
+        String(now.minute).padStart(2, '0') + ':' +
+        String(now.second).padStart(2, '0')
+    );
+}
+
+function timeToMinutes(time) {
+    if (!time || time === '-') {
+        return null;
+    }
+
+    const match = String(time).trim().match(
+        /^(\d{1,2}):(\d{2})(?::\d{2})?$/
+    );
+
+    if (!match) {
+        return null;
+    }
+
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+
+    if (
+        !Number.isInteger(hours) ||
+        !Number.isInteger(minutes) ||
+        hours < 0 ||
+        hours > 23 ||
+        minutes < 0 ||
+        minutes > 59
+    ) {
+        return null;
+    }
+
+    return hours * 60 + minutes;
+}
+
+function formatMinutes(totalMinutes) {
+    totalMinutes = ((totalMinutes % 1440) + 1440) % 1440;
+
+    return (
+        String(Math.floor(totalMinutes / 60)).padStart(2, '0') +
+        ':' +
+        String(totalMinutes % 60).padStart(2, '0')
+    );
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/* =====================================================
+   JAM REALTIME DAN RENTANG JAM SAAT INI
+===================================================== */
+
+function getCurrentHourWindowMinutes() {
+    const currentMinutes = getCurrentMinutes();
+    const startMinutes = Math.floor(currentMinutes / 60) * 60;
+    const endMinutes = startMinutes + 60;
+
+    return {
+        startMinutes,
+        endMinutes
+    };
+}
+
+function updateWindowRange() {
+    const clock = document.getElementById('jamSekarang');
+    const range = document.getElementById('windowRange');
+
+    if (clock) {
+        clock.textContent = getNowHHMMSS();
+    }
+
+    const { startMinutes, endMinutes } =
+        getCurrentHourWindowMinutes();
+
+    if (range) {
+        const jamMulai = formatMinutes(startMinutes).replace(':', '.');
+        const jamSelesai = formatMinutes(endMinutes).replace(':', '.');
+
+        range.textContent =
+            `Rentang jadwal ${jamMulai}–${jamSelesai} WIB`;
+    }
+}
+
+/* =====================================================
+   FILTER JADWAL BERDASARKAN JAM SAAT INI
+===================================================== */
+
+function isWithinCurrentHour(ka) {
+    if (ka.is_manual || !ka.jadwal || ka.jadwal === '-') {
+        return true;
+    }
+
+    const jadwalMinutes = timeToMinutes(ka.jadwal);
+
+    if (jadwalMinutes === null) {
+        return false;
+    }
+
+    const { startMinutes, endMinutes } =
+        getCurrentHourWindowMinutes();
+
+    if (endMinutes >= 1440) {
+        return jadwalMinutes >= startMinutes;
+    }
+
+    return (
+        jadwalMinutes >= startMinutes &&
+        jadwalMinutes < endMinutes
+    );
+}
+
+function getVisibleKA() {
+    return dataKA
+        .map((ka, index) => ({ ka, index }))
+        .filter(item => isWithinCurrentHour(item.ka));
+}
+
+function getVisibleIds() {
+    return getVisibleKA()
+        .map(item => item.index)
+        .join(',');
+}
+
+/* =====================================================
+   PERHITUNGAN SELISIH WAKTU
+===================================================== */
+
+function getSelisihMenit(ka) {
+    const jadwal = timeToMinutes(ka.jadwal);
+    const aktual = timeToMinutes(ka.aktual);
+
+    if (jadwal === null || aktual === null) {
+        return null;
+    }
+
+    let diff = aktual - jadwal;
+
+    // Menangani pergantian hari.
+    if (diff > 720) diff -= 1440;
+    if (diff < -720) diff += 1440;
+
+    return diff;
+}
+
+/* =====================================================
+   WARNA STATUS OTOMATIS
+===================================================== */
+
+function getStatusColor(ka) {
+    if (ka.status === 'BATAL') {
+        return 'batal';
+    }
+
+    if (ka.status !== 'JALAN') {
+        return 'belum';
+    }
+
+    const selisih = getSelisihMenit(ka);
+
+    if (selisih === null) {
+        return 'tepat';
+    }
+
+    /*
+     * Peringatan keterlambatan tinggi diperiksa lebih dahulu
+     * agar tidak tertimpa kategori keterlambatan biasa.
+     */
+    if (
+        WARNING_KETERLAMBATAN_TINGGI_AKTIF &&
+        selisih >= BATAS_TELAT_TINGGI_MENIT
+    ) {
+        return 'telat-tinggi';
+    }
+
+    if (
+        WARNING_KETERLAMBATAN_AKTIF &&
+        selisih > BATAS_TELAT_MENIT
+    ) {
+        return 'telat';
+    }
+
+    if (selisih < -BATAS_CEPAT_MENIT) {
+        return 'cepat';
+    }
+
+    return 'tepat';
+}
+
+function getStatusNote(ka, color) {
+    if (color === 'batal') {
+        return 'KA batal';
+    }
+
+    const selisih = getSelisihMenit(ka);
+
+    if (color === 'telat-tinggi') {
+        return `Peringatan keterlambatan tinggi: ${selisih} menit`;
+    }
+
+    if (color === 'telat') {
+        return `Terlambat ${selisih} menit`;
+    }
+
+    if (color === 'cepat') {
+        return `Lebih cepat ${Math.abs(selisih)} menit`;
+    }
+
+    if (color === 'tepat') {
+        if (selisih === null || selisih === 0) {
+            return 'Tepat waktu';
+        }
+
+        return selisih > 0
+            ? `Terlambat ${selisih} menit (dalam toleransi)`
+            : `Lebih cepat ${Math.abs(selisih)} menit (dalam toleransi)`;
+    }
+
+    return '';
+}
+
+/* =====================================================
+   AWAS 2 ARAH
+===================================================== */
+
+function getParitas(ka) {
+    const match = String(ka.nomor ?? '').match(/\d+/);
+
+    if (!match) {
+        return '';
+    }
+
+    return Number(match[0].slice(-1)) % 2 === 0
+        ? 'GENAP'
+        : 'GANJIL';
+}
+
+function getLabelArah(ka) {
+    if (ka.arah === 'HULU' || ka.arah === 'HILIR') {
+        return `dari ${ka.arah.toLowerCase()}`;
+    }
+
+    const paritas = getParitas(ka);
+
+    return paritas
+        ? `nomor ${paritas.toLowerCase()}`
+        : 'arah tidak diketahui';
+}
+
+function isBerlawananArah(a, b) {
+    const arahValid = ['HULU', 'HILIR'];
+
+    if (
+        arahValid.includes(a.arah) &&
+        arahValid.includes(b.arah)
+    ) {
+        return a.arah !== b.arah;
+    }
+
+    const paritasA = getParitas(a);
+    const paritasB = getParitas(b);
+
+    return (
+        paritasA !== '' &&
+        paritasB !== '' &&
+        paritasA !== paritasB
+    );
+}
+
+function getWaktuRujukan(ka) {
+    if (ka.status === 'JALAN' && ka.aktual) {
+        return timeToMinutes(ka.aktual);
+    }
+
+    return timeToMinutes(ka.jadwal);
+}
+
+function cariAwas2Arah() {
+    /*
+     * Peringatan tidak dihitung jika dinonaktifkan oleh Admin
+     * atau jarak minimum belum dikonfigurasi.
+     */
+    if (
+        !WARNING_ANTAR_KA_AKTIF ||
+        !Number.isFinite(BATAS_AWAS_MENIT) ||
+        BATAS_AWAS_MENIT <= 0
+    ) {
+        return {
+            indexSet: new Set(),
+            pairs: []
         };
+    }
 
-        /* ESCAPE HTML */
-        function escapeHtml(value) {
-            return String(value ?? '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        }
+    const kandidat = getVisibleKA()
+        .map(({ ka, index }) => ({
+            ka,
+            index,
+            waktu: getWaktuRujukan(ka)
+        }))
+        .filter(item =>
+            item.ka.status !== 'BATAL' &&
+            item.waktu !== null
+        );
 
-        /* WAKTU WIB */
-        function getWIBTime() {
-            const parts = new Intl.DateTimeFormat('en-GB', {
-                timeZone: 'Asia/Jakarta',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            }).formatToParts(new Date());
+    const indexSet = new Set();
+    const pairs = [];
 
-            const result = {};
+    for (let i = 0; i < kandidat.length; i++) {
+        for (let j = i + 1; j < kandidat.length; j++) {
+            const a = kandidat[i];
+            const b = kandidat[j];
 
-            parts.forEach(part => {
-                if (['hour', 'minute', 'second'].includes(part.type)) {
-                    result[part.type] = Number(part.value);
-                }
-            });
-
-            return result;
-        }
-
-        function getCurrentMinutes() {
-            const now = getWIBTime();
-            return now.hour * 60 + now.minute;
-        }
-
-        function timeToMinutes(time) {
-            if (!time || time === '-') {
-                return null;
+            if (!isBerlawananArah(a.ka, b.ka)) {
+                continue;
             }
-
-            const parts = String(time).split(':');
-
-            if (parts.length < 2) {
-                return null;
-            }
-
-            const hours = Number(parts[0]);
-            const minutes = Number(parts[1]);
-
-            if (
-                !Number.isInteger(hours) ||
-                !Number.isInteger(minutes) ||
-                hours < 0 || hours > 23 ||
-                minutes < 0 || minutes > 59
-            ) {
-                return null;
-            }
-
-            return hours * 60 + minutes;
-        }
-
-        function formatMinutes(totalMinutes) {
-            totalMinutes = (totalMinutes + 1440) % 1440;
-
-            return String(Math.floor(totalMinutes / 60)).padStart(2, '0')
-                + ':'
-                + String(totalMinutes % 60).padStart(2, '0');
-        }
-
-        function updateWindowRange() {
-            const element = document.getElementById('windowRange');
-
-            if (!element) {
-                return;
-            }
-
-            const now = getWIBTime();
-            const currentMinutes = now.hour * 60 + now.minute;
-
-            const currentTime =
-                String(now.hour).padStart(2, '0') + ':' +
-                String(now.minute).padStart(2, '0') + ':' +
-                String(now.second).padStart(2, '0');
-
-            element.textContent =
-                `${currentTime} WIB · Rentang ` +
-                `${formatMinutes(currentMinutes - 60)} – ` +
-                `${formatMinutes(currentMinutes + 60)}`;
-        }
-
-        /*
-         * KA terjadwal tampil jika jadwalnya berjarak maksimal
-         * 60 menit dari waktu sekarang.
-         *
-         * KA manual selalu tampil.
-         *
-         * Filter ini hanya memengaruhi tampilan tabel.
-         * Semua data dalam dataKA tetap dikirim saat disimpan.
-         */
-        function isWithinOneHour(ka) {
-            if (ka.is_manual || !ka.jadwal || ka.jadwal === '-') {
-                return true;
-            }
-
-            const jadwalMinutes = timeToMinutes(ka.jadwal);
-
-            if (jadwalMinutes === null) {
-                return false;
-            }
-
-            let difference = Math.abs(jadwalMinutes - getCurrentMinutes());
-
-            // Menangani pergantian hari, misalnya 23:45 dan 00:15.
-            difference = Math.min(difference, 1440 - difference);
-
-            return difference <= 60;
-        }
-
-        function getVisibleKA() {
-            return dataKA
-                .map((ka, index) => ({ ka, index }))
-                .filter(item => isWithinOneHour(item.ka));
-        }
-
-        /* TOMBOL SEMBOYAN */
-        function createCheckGroup(value, index, field) {
-            const yesClass = value === 'yes' ? 'active-yes' : 'inactive';
-            const noClass = value === 'no' ? 'active-no' : 'inactive';
-
-            return `
-                <div class="check-group">
-                    <button type="button"
-                        class="check ${yesClass}"
-                        onclick="setCheck(this, ${index}, '${field}', 'yes')"
-                        aria-label="Ya"
-                        title="Ya">✓</button>
-
-                    <button type="button"
-                        class="check ${noClass}"
-                        onclick="setCheck(this, ${index}, '${field}', 'no')"
-                        aria-label="Tidak"
-                        title="Tidak">×</button>
-                </div>
-            `;
-        }
-
-        /* STATUS KA */
-        function getStatusClass(status) {
-            if (status === 'JALAN') return 'status-jalan';
-            if (status === 'BATAL') return 'status-batal';
-            return 'status-belum';
-        }
-
-        function createStatus(status, index) {
-            return `
-                <select class="status-select ${getStatusClass(status)}"
-                    onchange="updateStatus(this, ${index})">
-                    <option value="JALAN" ${status === 'JALAN' ? 'selected' : ''}>JALAN</option>
-                    <option value="BATAL" ${status === 'BATAL' ? 'selected' : ''}>BATAL</option>
-                    <option value="BELUM" ${status === 'BELUM' ? 'selected' : ''}>BELUM</option>
-                </select>
-            `;
-        }
-
-        /* RENDER TABEL */
-        function renderTable() {
-            const tbody = document.getElementById('kaTableBody');
-
-            if (!tbody) {
-                return;
-            }
-
-            const visibleKA = getVisibleKA();
-            tbody.innerHTML = '';
-
-            if (visibleKA.length === 0) {
-                const message = dataKA.length === 0
-                    ? 'Belum ada jadwal KA untuk dinas aktif ini.'
-                    : 'Tidak ada KA dalam rentang waktu ±1 jam dari waktu sekarang.';
-
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="11"
-                            style="height:85px;text-align:center;color:#8a93a1">
-                            ${escapeHtml(message)}
-                        </td>
-                    </tr>
-                `;
-
-                updateSummary();
-                updateWindowRange();
-                return;
-            }
-
-            visibleKA.forEach(({ ka, index }, visibleIndex) => {
-                const row = document.createElement('tr');
-                row.dataset.index = index;
-
-                row.innerHTML = `
-                    <td>${visibleIndex + 1}</td>
-
-                    <td>
-                        <strong>${escapeHtml(ka.nomor)}</strong>
-                        ${ka.is_manual
-                            ? '<div style="margin-top:3px;color:#d9923e;font-size:8px">MANUAL</div>'
-                            : ''}
-                    </td>
-
-                    <td>${escapeHtml(ka.nama)}</td>
-                    <td>${escapeHtml(ka.jadwal)}</td>
-
-                    <td>
-                        <input type="time"
-                            class="actual-time"
-                            value="${escapeHtml(ka.aktual)}"
-                            onchange="updateActualTime(${index}, this.value)">
-                    </td>
-
-                    <td>${createStatus(ka.status, index)}</td>
-
-                    <td>${createCheckGroup(ka.semboyan21, index, 'semboyan21')}</td>
-                    <td>${createCheckGroup(ka.genta, index, 'genta')}</td>
-                    <td>${createCheckGroup(ka.pintu, index, 'pintu')}</td>
-                    <td>${createCheckGroup(ka.semboyan35, index, 'semboyan35')}</td>
-
-                    <td>
-                        <input type="text"
-                            class="note-input"
-                            value="${escapeHtml(ka.keterangan)}"
-                            placeholder="Keterangan"
-                            onchange="updateKeterangan(${index}, this.value)">
-                    </td>
-                `;
-
-                tbody.appendChild(row);
-            });
-
-            updateSummary();
-            updateWindowRange();
-        }
-
-        /* UPDATE JAM AKTUAL */
-        function updateActualTime(index, value) {
-            if (!dataKA[index]) {
-                return;
-            }
-
-            dataKA[index].aktual = value;
-        }
-
-        /* UPDATE STATUS */
-        function updateStatus(select, index) {
-            if (!dataKA[index]) {
-                return;
-            }
-
-            const status = select.value;
-            dataKA[index].status = status;
-
-            select.className = `status-select ${getStatusClass(status)}`;
 
             /*
-             * Jika status dibatalkan, semua indikator semboyan
-             * otomatis berubah menjadi tidak (×).
+             * Peringatan ditujukan pada pasangan yang setidaknya
+             * salah satu KA-nya belum diproses.
              */
-            if (status === 'BATAL') {
-                const fields = [
-                    'semboyan21',
-                    'genta',
-                    'pintu',
-                    'semboyan35'
-                ];
-
-                fields.forEach(field => {
-                    dataKA[index][field] = 'no';
-                });
-
-                const row = select.closest('tr');
-
-                if (row) {
-                    row.querySelectorAll('.check-group').forEach(group => {
-                        const buttons = group.querySelectorAll('.check');
-
-                        buttons.forEach(button => {
-                            button.classList.remove('active-yes', 'active-no');
-                            button.classList.add('inactive');
-                        });
-
-                        if (buttons[1]) {
-                            buttons[1].classList.remove('inactive');
-                            buttons[1].classList.add('active-no');
-                        }
-                    });
-                }
+            if (
+                a.ka.status !== 'BELUM' &&
+                b.ka.status !== 'BELUM'
+            ) {
+                continue;
             }
 
-            updateSummary();
-        }
+            let selisih = Math.abs(a.waktu - b.waktu);
+            selisih = Math.min(selisih, 1440 - selisih);
 
-        /* UPDATE SEMBOYAN */
-        function setCheck(button, index, field, value) {
-            if (!dataKA[index]) {
-                return;
+            // Peringatan aktif jika jarak waktu <= batas minimum.
+            if (selisih > BATAS_AWAS_MENIT) {
+                continue;
             }
 
-            const group = button.parentElement;
+            indexSet.add(a.index);
+            indexSet.add(b.index);
 
-            group.querySelectorAll('.check').forEach(item => {
-                item.classList.remove('active-yes', 'active-no');
-                item.classList.add('inactive');
-            });
-
-            button.classList.remove('inactive');
-            button.classList.add(
-                value === 'yes' ? 'active-yes' : 'active-no'
-            );
-
-            dataKA[index][field] = value;
+            pairs.push({ a, b, selisih });
         }
+    }
 
-        /* UPDATE KETERANGAN */
-        function updateKeterangan(index, value) {
-            if (!dataKA[index]) {
-                return;
-            }
+    pairs.sort((a, b) => a.selisih - b.selisih);
 
-            dataKA[index].keterangan = value;
-        }
+    return { indexSet, pairs };
+}
 
-        /* RINGKASAN BERDASARKAN KA YANG TAMPIL */
-        function updateSummary() {
-            const visibleData = getVisibleKA().map(item => item.ka);
+function updateAwasBanner(info) {
+    const banner = document.getElementById('awasBanner');
 
-            const total = visibleData.length;
-            const jalan = visibleData.filter(ka => ka.status === 'JALAN').length;
-            const batal = visibleData.filter(ka => ka.status === 'BATAL').length;
-            const belum = visibleData.filter(ka => ka.status === 'BELUM').length;
+    if (!banner) {
+        return;
+    }
 
-            document.getElementById('totalKA').textContent = total;
-            document.getElementById('jalanKA').textContent = jalan;
-            document.getElementById('batalKA').textContent = batal;
-            document.getElementById('belumKA').textContent = belum;
+    if (!info.pairs.length) {
+        banner.hidden = true;
+        banner.innerHTML = '';
+        return;
+    }
 
-            const selesai = jalan + batal;
-            const progress = total
-                ? Math.round((selesai / total) * 100)
-                : 0;
+    const describe = item =>
+        `KA ${escapeHtml(item.ka.nomor)} ` +
+        `(${escapeHtml(getLabelArah(item.ka))}, ` +
+        `${formatMinutes(item.waktu)})`;
 
-            document.getElementById('progressText').textContent = `${progress}%`;
+    const lines = info.pairs.map(pair => `
+        <li>
+            ${describe(pair.a)} &amp; ${describe(pair.b)}
+            <span class="awas-gap">
+                selisih ${pair.selisih} menit
+            </span>
+        </li>
+    `).join('');
 
-            document.getElementById('progressGreen').style.width =
-                `${total ? (jalan / total) * 100 : 0}%`;
+    banner.innerHTML = `
+        <div class="awas-title">⚠ AWAS 2 ARAH</div>
+        <div class="awas-text">
+            KA dari dua arah akan melintas berdekatan.
+            Tingkatkan kewaspadaan.
+        </div>
+        <ul class="awas-list">${lines}</ul>
+    `;
 
-            document.getElementById('progressRed').style.width =
-                `${total ? (batal / total) * 100 : 0}%`;
+    banner.hidden = false;
+}
 
-            document.getElementById('progressGray').style.width =
-                `${total ? (belum / total) * 100 : 0}%`;
-        }
+/* =====================================================
+   STATUS PENYIMPANAN PER BARIS
+===================================================== */
 
-        /* SIMPAN REALISASI KE DATABASE */
-        async function simpanRealisasi() {
-            const tombol = document.getElementById('simpanBtn');
+let dirtyRows = new Set();
+let savingRows = new Set();
+let savedRows = new Set();
+let rowVersions = new Map();
 
-            if (dataKA.length === 0) {
-                alert('Belum ada data KA untuk disimpan.');
-                return;
-            }
+function getRowVersion(index) {
+    return rowVersions.get(index) || 0;
+}
 
-            tombol.disabled = true;
-            tombol.textContent = 'Menyimpan...';
+function incrementRowVersion(index) {
+    rowVersions.set(index, getRowVersion(index) + 1);
+}
 
-            try {
-                /*
-                 * Seluruh dataKA dikirim, bukan hanya data yang terlihat
-                 * pada filter ±1 jam.
-                 */
-                const response = await fetch(
-                    window.realisasiKaConfig.storeUrl,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector(
-                                'meta[name="csrf-token"]'
-                            ).content
-                        },
-                        body: JSON.stringify({
-                            data: dataKA
-                        })
-                    }
-                );
+function stateBaris(index) {
+    if (savingRows.has(index)) {
+        return 'saving';
+    }
 
-                const contentType = response.headers.get('content-type') || '';
+    if (dirtyRows.has(index)) {
+        return 'dirty';
+    }
 
-                if (!contentType.includes('application/json')) {
-                    if (response.status === 419) {
-                        throw new Error(
-                            'Sesi berakhir atau token CSRF tidak valid. Muat ulang halaman, lalu coba lagi.'
-                        );
-                    }
+    if (
+        savedRows.has(index) ||
+        (dataKA[index] && dataKA[index].realisasi_ka_id)
+    ) {
+        return 'saved';
+    }
 
-                    if (response.status === 401 || response.status === 403) {
-                        throw new Error(
-                            'Akses ditolak. Silakan login kembali dan periksa hak akses akun.'
-                        );
-                    }
+    return 'dirty';
+}
 
-                    throw new Error(
-                        'Server tidak mengembalikan respons JSON. Periksa route dan log Laravel.'
-                    );
-                }
+function refreshRowButtons() {
+    document.querySelectorAll('[data-save-row]').forEach(button => {
+        const index = Number(button.dataset.saveRow);
+        const state = stateBaris(index);
 
-                const result = await response.json();
+        const labels = {
+            dirty: 'Simpan',
+            saving: 'Menyimpan…',
+            saved: '✓ Tersimpan'
+        };
 
-                if (!response.ok) {
-                    const pesanValidasi = result.errors
-                        ? Object.values(result.errors).flat().join('\n')
-                        : result.message;
+        button.className = `row-save-btn ${state}`;
+        button.textContent = labels[state] || 'Simpan';
+        button.disabled = state === 'saving';
+    });
+}
 
-                    throw new Error(
-                        pesanValidasi || 'Gagal menyimpan realisasi KA.'
-                    );
-                }
+function simpanBaris(index) {
+    if (!dataKA[index]) {
+        return;
+    }
 
-                /*
-                 * Backend diharapkan mengembalikan:
-                 * {
-                 *   message: "...",
-                 *   data: [
-                 *     {
-                 *       index: 0,
-                 *       realisasi_ka_id: 123
-                 *     }
-                 *   ]
-                 * }
-                 *
-                 * ID yang dikembalikan disimpan pada dataKA di browser.
-                 * Dengan begitu, penyimpanan berikutnya bisa mengenali
-                 * record realisasi yang sama.
-                 */
-                if (Array.isArray(result.data)) {
-                    result.data.forEach(item => {
-                        const index = Number(item.index);
+    dirtyRows.add(index);
+    isDirty = true;
 
-                        if (
-                            Number.isInteger(index) &&
-                            index >= 0 &&
-                            dataKA[index] &&
-                            item.realisasi_ka_id !== undefined &&
-                            item.realisasi_ka_id !== null
-                        ) {
-                            dataKA[index].realisasi_ka_id =
-                                item.realisasi_ka_id;
-                        }
-                    });
-                }
+    refreshRowButtons();
+    simpanRealisasi({ otomatis: true, index });
+}
 
-                alert(
-                    result.message ||
-                    'Realisasi KA berhasil disimpan ke database.'
-                );
+/* =====================================================
+   KOMPONEN TABEL
+===================================================== */
 
-            } catch (error) {
-                console.error('Gagal menyimpan realisasi:', error);
+function createCheckGroup(value, index, field) {
+    const yesClass = value === 'yes' ? 'active-yes' : 'inactive';
+    const noClass = value === 'no' ? 'active-no' : 'inactive';
 
-                alert(
-                    'Realisasi belum berhasil disimpan.\n\n' +
-                    error.message
-                );
-            } finally {
-                tombol.disabled = false;
-                tombol.textContent = '▣  Simpan Realisasi';
-            }
-        }
+    return `
+        <div class="check-group">
+            <button type="button"
+                class="check ${yesClass}"
+                onclick="setCheck(this, ${index}, '${field}', 'yes')"
+                aria-label="Ya"
+                title="Ya">✓</button>
 
-        /* CETAK DOKUMEN */
-        function cetakDokumen() {
-            window.print();
-        }
+            <button type="button"
+                class="check ${noClass}"
+                onclick="setCheck(this, ${index}, '${field}', 'no')"
+                aria-label="Tidak"
+                title="Tidak">×</button>
+        </div>
+    `;
+}
 
-        /* CHECK MANUAL */
-        function setManualCheck(button) {
-            const group = button.dataset.group;
-            const value = button.dataset.value;
+function createStatus(ka, index) {
+    const color = getStatusColor(ka);
 
-            document.querySelectorAll(`[data-group="${group}"]`).forEach(item => {
-                item.classList.remove('active-yes', 'active-no');
-                item.classList.add('inactive');
-            });
+    const labelMap = {
+        belum: 'BELUM',
+        tepat: 'JALAN',
+        telat: 'TERLAMBAT',
+        'telat-tinggi': 'TELAT TINGGI',
+        cepat: 'LEBIH CEPAT',
+        batal: 'BATAL'
+    };
 
-            button.classList.remove('inactive');
-            button.classList.add(
-                value === 'yes' ? 'active-yes' : 'active-no'
-            );
+    const jalanClassMap = {
+        tepat: 'is-tepat',
+        telat: 'is-telat',
+        'telat-tinggi': 'is-telat',
+        cepat: 'is-cepat'
+    };
 
-            const fieldMap = {
-                manual21: 'semboyan21',
-                manualGenta: 'genta',
-                manualPintu: 'pintu',
-                manual35: 'semboyan35'
-            };
+    const jalanActive = ka.status === 'JALAN'
+        ? (jalanClassMap[color] || 'is-tepat')
+        : '';
 
-            manualCheck[fieldMap[group]] = value;
-        }
+    const batalActive = ka.status === 'BATAL' ? 'is-batal' : '';
+    const note = getStatusNote(ka, color);
 
-        function resetManualChecks() {
-            manualCheck = {
-                semboyan21: '',
-                genta: '',
-                pintu: '',
-                semboyan35: ''
-            };
+    return `
+        <div class="status-badge ${color}">
+            ${labelMap[color] || 'BELUM'}
+        </div>
 
-            document.querySelectorAll('.mini-check').forEach(button => {
-                button.classList.remove('active-yes', 'active-no');
-                button.classList.add('inactive');
-            });
-        }
+        <div class="status-group">
+            <button type="button"
+                class="status-btn btn-jalan ${jalanActive}"
+                onclick="setStatus(${index}, 'JALAN')"
+                aria-pressed="${ka.status === 'JALAN'}">
+                JALAN
+            </button>
 
-        /* TAMBAH KA MANUAL */
-        function tambahKAManual() {
-            const nomor = document.getElementById('manualNomor').value.trim();
-            const nama = document.getElementById('manualNama').value.trim();
-            const aktual = document.getElementById('manualAktual').value;
-            const keterangan = document.getElementById('manualKeterangan').value.trim();
+            <button type="button"
+                class="status-btn btn-batal ${batalActive}"
+                onclick="setStatus(${index}, 'BATAL')"
+                aria-pressed="${ka.status === 'BATAL'}">
+                BATAL
+            </button>
+        </div>
 
-            if (!nomor) {
-                alert('Nomor KA wajib diisi.');
-                document.getElementById('manualNomor').focus();
-                return;
-            }
+        ${note
+            ? `<div class="status-note ${color}">${escapeHtml(note)}</div>`
+            : ''}
+    `;
+}
 
-            if (!nama) {
-                alert('Nama KA wajib diisi.');
-                document.getElementById('manualNama').focus();
-                return;
-            }
+function createRowAction(index) {
+    const state = stateBaris(index);
 
-            if (!aktual) {
-                alert('Jam aktual wajib diisi.');
-                document.getElementById('manualAktual').focus();
-                return;
-            }
+    return `
+        <button type="button"
+            class="row-save-btn ${state}"
+            data-save-row="${index}"
+            onclick="simpanBaris(${index})">
+            ${state === 'saved' ? '✓ Tersimpan' : 'Simpan'}
+        </button>
+    `;
+}
 
-            dataKA.push({
-                no: dataKA.length + 1,
-                nomor,
-                nama,
-                jadwal: '-',
-                aktual,
-                status: 'JALAN',
-                semboyan21: manualCheck.semboyan21,
-                genta: manualCheck.genta,
-                pintu: manualCheck.pintu,
-                semboyan35: manualCheck.semboyan35,
-                keterangan: keterangan || 'KA tambahan',
-                jadwal_ka_id: null,
+function renderTable() {
+    const tbody = document.getElementById('kaTableBody');
 
-                // Record baru belum mempunyai ID realisasi database.
-                realisasi_ka_id: null,
+    if (!tbody) {
+        return;
+    }
 
-                is_manual: true
-            });
+    const awasInfo = cariAwas2Arah();
+    updateAwasBanner(awasInfo);
 
-            renderTable();
+    const visibleKA = getVisibleKA();
 
-            document.getElementById('manualNomor').value = '';
-            document.getElementById('manualNama').value = '';
-            document.getElementById('manualAktual').value = '';
-            document.getElementById('manualKeterangan').value = '';
+    tbody.innerHTML = '';
 
-            resetManualChecks();
+    if (!visibleKA.length) {
+        const message = dataKA.length === 0
+            ? 'Belum ada jadwal KA untuk dinas aktif ini.'
+            : 'Tidak ada KA dalam rentang jam ini.';
 
-            alert(
-                `KA ${nomor} berhasil ditambahkan ke tabel. ` +
-                'Klik "Simpan Realisasi" agar data tersimpan ke database.'
-            );
-        }
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="${JUMLAH_KOLOM_TABEL}"
+                    style="height:85px;text-align:center;color:#8a93a1">
+                    ${escapeHtml(message)}
+                </td>
+            </tr>
+        `;
 
-        /* SIDEBAR */
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-
-            if (sidebar.classList.contains('open')) {
-                closeSidebar();
-                return;
-            }
-
-            sidebar.classList.add('open');
-
-            document.getElementById('sidebarOverlay').classList.add('active');
-            document.body.classList.add('menu-open');
-
-            document.getElementById('hamburgerBtn').setAttribute(
-                'aria-expanded',
-                'true'
-            );
-
-            document.getElementById('hamburgerBtn').setAttribute(
-                'aria-label',
-                'Tutup menu'
-            );
-        }
-
-        function closeSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebarOverlay');
-            const button = document.getElementById('hamburgerBtn');
-
-            if (!sidebar || !overlay || !button) {
-                return;
-            }
-
-            sidebar.classList.remove('open');
-            overlay.classList.remove('active');
-            document.body.classList.remove('menu-open');
-
-            button.setAttribute('aria-expanded', 'false');
-            button.setAttribute('aria-label', 'Buka menu');
-        }
-
-        document.querySelectorAll('.sidebar .menu-item').forEach(item => {
-            item.addEventListener('click', closeSidebar);
-        });
-
-        document.addEventListener('keydown', event => {
-            if (event.key === 'Escape') {
-                closeSidebar();
-            }
-        });
-
-        /* REFRESH FILTER WAKTU */
-        let lastVisibleIds = '';
-
-        function getVisibleIds() {
-            return getVisibleKA()
-                .map(item => item.index)
-                .join(',');
-        }
-
-        function refreshTimeFilter() {
-            updateWindowRange();
-
-            const currentVisibleIds = getVisibleIds();
-
-            if (currentVisibleIds !== lastVisibleIds) {
-                lastVisibleIds = currentVisibleIds;
-                renderTable();
-            }
-        }
-
-        /* MULAI */
-        renderTable();
-        lastVisibleIds = getVisibleIds();
+        updateSummary();
         updateWindowRange();
+        refreshRowButtons();
 
-        // Periksa perubahan waktu setiap detik.
-        setInterval(refreshTimeFilter, 1000);
-    
+        return;
+    }
 
+    visibleKA.forEach(({ ka, index }, visibleIndex) => {
+        const row = document.createElement('tr');
+        row.dataset.index = index;
 
+        if (awasInfo.indexSet.has(index)) {
+            row.classList.add('awas-row');
+        }
+
+        row.innerHTML = `
+            <td>${visibleIndex + 1}</td>
+
+            <td>
+                <strong>${escapeHtml(ka.nomor)}</strong>
+                ${ka.is_manual
+                    ? '<div style="margin-top:3px;color:#d9923e;font-size:8px">MANUAL</div>'
+                    : ''}
+            </td>
+
+            <td>
+                ${escapeHtml(ka.nama)}
+                ${awasInfo.indexSet.has(index)
+                    ? '<div class="awas-badge">⚠ AWAS 2 ARAH</div>'
+                    : ''}
+            </td>
+
+            <td>${escapeHtml(ka.hulu || '-')}</td>
+            <td>${escapeHtml(ka.hilir || '-')}</td>
+            <td>${escapeHtml(ka.relasi || '-')}</td>
+            <td>${escapeHtml(ka.jadwal)}</td>
+
+            <td>
+                <input type="time"
+                    class="actual-time"
+                    value="${escapeHtml(ka.aktual)}"
+                    onchange="updateActualTime(${index}, this.value)">
+            </td>
+
+            <td>${createStatus(ka, index)}</td>
+
+            <td>${createCheckGroup(ka.semboyan21, index, 'semboyan21')}</td>
+            <td>${createCheckGroup(ka.genta, index, 'genta')}</td>
+            <td>${createCheckGroup(ka.pintu, index, 'pintu')}</td>
+            <td>${createCheckGroup(ka.semboyan35, index, 'semboyan35')}</td>
+
+            <td>
+                <input type="text"
+                    class="note-input"
+                    value="${escapeHtml(ka.keterangan)}"
+                    placeholder="Keterangan"
+                    oninput="updateKeterangan(${index}, this.value)">
+            </td>
+
+            <td>${createRowAction(index)}</td>
+        `;
+
+        tbody.appendChild(row);
+    });
+
+    updateSummary();
+    updateWindowRange();
+    refreshRowButtons();
+}
+
+/* =====================================================
+   AKSI STATUS DAN PEMERIKSAAN
+===================================================== */
+
+function setStatus(index, status) {
+    const ka = dataKA[index];
+
+    if (!ka || !['JALAN', 'BATAL'].includes(status)) {
+        return;
+    }
+
+    const fieldSemboyan = [
+        'semboyan21',
+        'genta',
+        'pintu',
+        'semboyan35'
+    ];
+
+    if (ka.status === status) {
+        ka.status = 'BELUM';
+        ka.aktual = '';
+
+        fieldSemboyan.forEach(field => {
+            if (ka[field] === 'no') {
+                ka[field] = '';
+            }
+        });
+    } else if (status === 'JALAN') {
+        const sebelumnya = ka.status;
+
+        ka.status = 'JALAN';
+        ka.aktual = getNowHHMM();
+
+        if (sebelumnya === 'BATAL') {
+            fieldSemboyan.forEach(field => {
+                if (ka[field] === 'no') {
+                    ka[field] = '';
+                }
+            });
+        }
+    } else {
+        ka.status = 'BATAL';
+        ka.aktual = '';
+
+        fieldSemboyan.forEach(field => {
+            ka[field] = 'no';
+        });
+    }
+
+    incrementRowVersion(index);
+    renderTable();
+    tandaiBerubah(JEDA_SIMPAN_STATUS, index);
+}
+
+function updateActualTime(index, value) {
+    if (!dataKA[index]) {
+        return;
+    }
+
+    dataKA[index].aktual = value;
+    incrementRowVersion(index);
+
+    renderTable();
+    tandaiBerubah(JEDA_SIMPAN_STATUS, index);
+}
+
+function setCheck(button, index, field, value) {
+    if (!dataKA[index]) {
+        return;
+    }
+
+    const group = button.parentElement;
+
+    group.querySelectorAll('.check').forEach(item => {
+        item.classList.remove('active-yes', 'active-no');
+        item.classList.add('inactive');
+    });
+
+    button.classList.remove('inactive');
+    button.classList.add(
+        value === 'yes' ? 'active-yes' : 'active-no'
+    );
+
+    dataKA[index][field] = value;
+    incrementRowVersion(index);
+
+    tandaiBerubah(JEDA_SIMPAN_CHECK, index);
+}
+
+function updateKeterangan(index, value) {
+    if (!dataKA[index]) {
+        return;
+    }
+
+    dataKA[index].keterangan = value;
+    incrementRowVersion(index);
+
+    tandaiBerubah(JEDA_SIMPAN_KETIK, index);
+}
+
+/* =====================================================
+   RINGKASAN
+===================================================== */
+
+function updateSummary() {
+    const visibleData = getVisibleKA().map(item => item.ka);
+    const total = visibleData.length;
+
+    let tepat = 0;
+    let telat = 0;
+    let cepat = 0;
+    let batal = 0;
+    let belum = 0;
+
+    visibleData.forEach(ka => {
+        const color = getStatusColor(ka);
+
+        if (color === 'tepat') {
+            tepat++;
+        } else if (
+            color === 'telat' ||
+            color === 'telat-tinggi'
+        ) {
+            telat++;
+        } else if (color === 'cepat') {
+            cepat++;
+        } else if (color === 'batal') {
+            batal++;
+        } else {
+            belum++;
+        }
+    });
+
+    const setText = (id, value) => {
+        const element = document.getElementById(id);
+
+        if (element) {
+            element.textContent = value;
+        }
+    };
+
+    const setWidth = (id, value) => {
+        const element = document.getElementById(id);
+
+        if (element) {
+            element.style.width = value;
+        }
+    };
+
+    setText('totalKA', total);
+    setText('jalanKA', tepat);
+    setText('telatKA', telat);
+    setText('cepatKA', cepat);
+    setText('batalKA', batal);
+    setText('belumKA', belum);
+
+    const selesai = tepat + telat + cepat + batal;
+    const progress = total
+        ? Math.round((selesai / total) * 100)
+        : 0;
+
+    setText('progressText', `${progress}%`);
+
+    const persen = jumlah =>
+        `${total ? (jumlah / total) * 100 : 0}%`;
+
+    setWidth('progressGreen', persen(tepat));
+    setWidth('progressYellow', persen(telat));
+    setWidth('progressBlue', persen(cepat));
+    setWidth('progressRed', persen(batal));
+    setWidth('progressGray', persen(belum));
+}
+
+/* =====================================================
+   PENYIMPANAN OTOMATIS
+===================================================== */
+
+let isSaving = false;
+let isDirty = false;
+let saveQueued = false;
+let queuedManual = false;
+let saveGagal = false;
+
+let autoSaveTimer = null;
+let retryTimer = null;
+
+function setSaveStatus(state, text) {
+    const box = document.getElementById('saveStatus');
+    const label = document.getElementById('saveStatusText');
+
+    if (box) {
+        box.className = `save-status ${state}`;
+    }
+
+    if (label) {
+        label.textContent = text;
+    }
+}
+
+function tandaiBerubah(delay = JEDA_SIMPAN_STATUS, index) {
+    isDirty = true;
+
+    if (index !== undefined && index !== null) {
+        dirtyRows.add(index);
+    }
+
+    setSaveStatus('pending', 'Perubahan belum disimpan…');
+    refreshRowButtons();
+
+    clearTimeout(autoSaveTimer);
+
+    autoSaveTimer = setTimeout(() => {
+        simpanRealisasi({ otomatis: true });
+    }, delay);
+}
+
+function ambilCsrfToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.content : '';
+}
+
+function formatJamStatusSimpan() {
+    const now = getWIBTime();
+
+    return (
+        String(now.hour).padStart(2, '0') + ':' +
+        String(now.minute).padStart(2, '0')
+    );
+}
+
+async function simpanRealisasi(options = {}) {
+    const otomatis = options.otomatis === true;
+    const tombol = document.getElementById('simpanBtn');
+
+    if (dataKA.length === 0) {
+        if (!otomatis) {
+            alert('Belum ada data KA untuk disimpan.');
+        }
+
+        return;
+    }
+
+    if (isSaving) {
+        saveQueued = true;
+
+        if (!otomatis) {
+            queuedManual = true;
+        }
+
+        return;
+    }
+
+    clearTimeout(autoSaveTimer);
+    clearTimeout(retryTimer);
+
+    isSaving = true;
+
+    const versiDikirim = new Map();
+    const barisDikirim = new Set(dirtyRows);
+
+    dataKA.forEach((_, index) => {
+        versiDikirim.set(index, getRowVersion(index));
+    });
+
+    const snapshot = JSON.parse(JSON.stringify(dataKA));
+
+    isDirty = false;
+    savingRows = new Set(barisDikirim);
+    dirtyRows = new Set();
+
+    refreshRowButtons();
+    setSaveStatus('saving', 'Menyimpan…');
+
+    if (!otomatis && tombol) {
+        tombol.disabled = true;
+        tombol.textContent = 'Menyimpan...';
+    }
+
+    try {
+        const response = await fetch(CONFIG.storeUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': ambilCsrfToken()
+            },
+            body: JSON.stringify({ data: snapshot })
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+
+        if (!contentType.includes('application/json')) {
+            let error;
+
+            if (response.status === 419) {
+                error = new Error(
+                    'Sesi berakhir. Muat ulang halaman, lalu coba lagi.'
+                );
+                error.permanen = true;
+            } else if (
+                response.status === 401 ||
+                response.status === 403
+            ) {
+                error = new Error(
+                    'Akses ditolak. Silakan login kembali.'
+                );
+                error.permanen = true;
+            } else {
+                error = new Error(
+                    'Server tidak mengembalikan JSON. Periksa route dan log Laravel.'
+                );
+            }
+
+            throw error;
+        }
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            const pesanValidasi = result.errors
+                ? Object.values(result.errors).flat().join('\n')
+                : result.message;
+
+            const error = new Error(
+                pesanValidasi || 'Gagal menyimpan realisasi KA.'
+            );
+
+            error.permanen = response.status === 422;
+
+            throw error;
+        }
+
+        if (Array.isArray(result.data)) {
+            result.data.forEach(item => {
+                const index = Number(item.index);
+
+                if (
+                    Number.isInteger(index) &&
+                    index >= 0 &&
+                    dataKA[index] &&
+                    item.realisasi_ka_id !== undefined &&
+                    item.realisasi_ka_id !== null
+                ) {
+                    dataKA[index].realisasi_ka_id =
+                        item.realisasi_ka_id;
+                }
+            });
+        }
+
+        barisDikirim.forEach(index => {
+            if (
+                getRowVersion(index) === versiDikirim.get(index)
+            ) {
+                savedRows.add(index);
+                dirtyRows.delete(index);
+            } else {
+                dirtyRows.add(index);
+            }
+        });
+
+        savingRows = new Set();
+        saveGagal = false;
+
+        if (dirtyRows.size > 0 || isDirty) {
+            isDirty = true;
+
+            setSaveStatus(
+                'pending',
+                'Ada perubahan baru yang belum disimpan…'
+            );
+
+            clearTimeout(autoSaveTimer);
+
+            autoSaveTimer = setTimeout(() => {
+                simpanRealisasi({ otomatis: true });
+            }, JEDA_SIMPAN_STATUS);
+        } else {
+            isDirty = false;
+
+            const jam = formatJamStatusSimpan();
+
+            if (result.serah_terima_sinkron === false) {
+                setSaveStatus(
+                    'saved',
+                    `Tersimpan pukul ${jam} (sinkron ke Serah Terima gagal)`
+                );
+            } else {
+                setSaveStatus(
+                    'saved',
+                    otomatis
+                        ? `Tersimpan otomatis pukul ${jam}`
+                        : `Tersimpan pukul ${jam}`
+                );
+            }
+        }
+
+        if (!otomatis) {
+            alert(
+                result.message ||
+                'Realisasi KA berhasil disimpan ke database.'
+            );
+        }
+
+    } catch (error) {
+        console.error('Gagal menyimpan realisasi:', error);
+
+        saveGagal = true;
+        isDirty = true;
+
+        barisDikirim.forEach(index => dirtyRows.add(index));
+        savingRows = new Set();
+
+        if (error.permanen) {
+            setSaveStatus(
+                'error',
+                `Gagal menyimpan: ${error.message}`
+            );
+        } else {
+            setSaveStatus(
+                'error',
+                'Gagal menyimpan. Mencoba lagi otomatis…'
+            );
+
+            clearTimeout(retryTimer);
+
+            retryTimer = setTimeout(() => {
+                if (navigator.onLine && isDirty) {
+                    simpanRealisasi({ otomatis: true });
+                }
+            }, JEDA_COBA_ULANG);
+        }
+
+        if (!otomatis) {
+            alert(
+                'Realisasi belum berhasil disimpan.\n\n' +
+                error.message
+            );
+        }
+    } finally {
+        isSaving = false;
+
+        refreshRowButtons();
+
+        if (tombol) {
+            tombol.disabled = false;
+            tombol.textContent = '▣  Simpan Semua';
+        }
+
+        if (saveQueued) {
+            const manual = queuedManual;
+
+            saveQueued = false;
+            queuedManual = false;
+
+            if (isDirty || manual) {
+                simpanRealisasi({ otomatis: !manual });
+            }
+        }
+    }
+}
+
+async function tungguSimpanSelesai() {
+    while (isSaving) {
+        await sleep(150);
+    }
+
+    if (isDirty) {
+        await simpanRealisasi({ otomatis: true });
+    }
+
+    while (isSaving) {
+        await sleep(150);
+    }
+
+    return !isDirty && !saveGagal;
+}
+
+function kirimSisaPerubahan() {
+    if (!isDirty || isSaving || dataKA.length === 0) {
+        return;
+    }
+
+    fetch(CONFIG.storeUrl, {
+        method: 'POST',
+        keepalive: true,
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': ambilCsrfToken()
+        },
+        body: JSON.stringify({ data: dataKA })
+    }).catch(error => {
+        console.error('Gagal mengirim sisa perubahan:', error);
+    });
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        kirimSisaPerubahan();
+    }
+});
+
+window.addEventListener('pagehide', kirimSisaPerubahan);
+
+window.addEventListener('beforeunload', event => {
+    if (isDirty && saveGagal) {
+        event.preventDefault();
+        event.returnValue = '';
+    }
+});
+
+window.addEventListener('online', () => {
+    if (isDirty) {
+        simpanRealisasi({ otomatis: true });
+    }
+});
+
+window.addEventListener('offline', () => {
+    setSaveStatus(
+        'error',
+        'Tidak ada koneksi. Perubahan akan disimpan saat online.'
+    );
+});
+
+/* =====================================================
+   TOMBOL SELESAI
+===================================================== */
+
+const selesaiLink = document.getElementById('selesaiLink');
+
+if (selesaiLink) {
+    selesaiLink.addEventListener('click', async event => {
+        if (!isDirty && !isSaving && !saveGagal) {
+            return;
+        }
+
+        event.preventDefault();
+
+        const berhasil = await tungguSimpanSelesai();
+
+        if (berhasil) {
+            window.location.href = selesaiLink.href;
+            return;
+        }
+
+        const lanjut = confirm(
+            'Sebagian data belum berhasil tersimpan.\n\n' +
+            'Tetap lanjut ke Serah Terima Dinas?'
+        );
+
+        if (lanjut) {
+            window.location.href = selesaiLink.href;
+        }
+    });
+}
+
+function cetakDokumen() {
+    window.print();
+}
+
+/* =====================================================
+   TAMBAH KA MANUAL
+===================================================== */
+
+function toggleFormTambahKA(forceOpen) {
+    const form = document.getElementById('formTambahKa');
+    const btn = document.getElementById('toggleTambahKa');
+
+    if (!form || !btn) {
+        return;
+    }
+
+    const open = typeof forceOpen === 'boolean'
+        ? forceOpen
+        : form.hidden;
+
+    form.hidden = !open;
+    btn.hidden = open;
+    btn.setAttribute('aria-expanded', String(open));
+
+    if (open) {
+        form.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        });
+
+        document.getElementById('manualNomor')?.focus();
+    } else {
+        resetFormManual();
+        btn.focus();
+    }
+}
+
+function setManualCheck(button) {
+    const group = button.dataset.group;
+    const value = button.dataset.value;
+
+    document.querySelectorAll(`[data-group="${group}"]`).forEach(item => {
+        item.classList.remove('active-yes', 'active-no');
+        item.classList.add('inactive');
+    });
+
+    button.classList.remove('inactive');
+    button.classList.add(
+        value === 'yes' ? 'active-yes' : 'active-no'
+    );
+
+    const fieldMap = {
+        manual21: 'semboyan21',
+        manualGenta: 'genta',
+        manualPintu: 'pintu',
+        manual35: 'semboyan35'
+    };
+
+    if (fieldMap[group]) {
+        manualCheck[fieldMap[group]] = value;
+    }
+}
+
+function resetManualChecks() {
+    manualCheck = {
+        semboyan21: '',
+        genta: '',
+        pintu: '',
+        semboyan35: ''
+    };
+
+    document.querySelectorAll('.mini-check').forEach(button => {
+        button.classList.remove('active-yes', 'active-no');
+        button.classList.add('inactive');
+    });
+}
+
+function resetFormManual() {
+    [
+        'manualNomor',
+        'manualNama',
+        'manualHulu',
+        'manualHilir',
+        'manualRelasi',
+        'manualAktual',
+        'manualKeterangan'
+    ].forEach(id => {
+        const element = document.getElementById(id);
+
+        if (element) {
+            element.value = '';
+        }
+    });
+
+    resetManualChecks();
+}
+
+function ambilNilaiInput(id) {
+    const element = document.getElementById(id);
+    return element ? element.value.trim() : '';
+}
+
+function tambahKAManual() {
+    const nomor = ambilNilaiInput('manualNomor');
+    const nama = ambilNilaiInput('manualNama');
+    const hulu = ambilNilaiInput('manualHulu');
+    const hilir = ambilNilaiInput('manualHilir');
+    const relasi = ambilNilaiInput('manualRelasi');
+    const keterangan = ambilNilaiInput('manualKeterangan');
+    const aktual = ambilNilaiInput('manualAktual') || getNowHHMM();
+
+    if (!nomor) {
+        alert('Nomor KA wajib diisi.');
+        document.getElementById('manualNomor')?.focus();
+        return;
+    }
+
+    if (!nama) {
+        alert('Nama KA wajib diisi.');
+        document.getElementById('manualNama')?.focus();
+        return;
+    }
+
+    const kaBaru = {
+        no: dataKA.length + 1,
+        nomor,
+        nama,
+        hulu,
+        hilir,
+        relasi,
+        arah: '',
+        jadwal: '-',
+        aktual,
+        status: 'JALAN',
+        semboyan21: manualCheck.semboyan21,
+        genta: manualCheck.genta,
+        pintu: manualCheck.pintu,
+        semboyan35: manualCheck.semboyan35,
+        keterangan: keterangan || 'KA tambahan',
+        jadwal_ka_id: null,
+        realisasi_ka_id: null,
+        is_manual: true
+    };
+
+    dataKA.push(kaBaru);
+
+    const indexBaru = dataKA.length - 1;
+
+    incrementRowVersion(indexBaru);
+    dirtyRows.add(indexBaru);
+
+    renderTable();
+    toggleFormTambahKA(false);
+    tandaiBerubah(JEDA_SIMPAN_STATUS, indexBaru);
+}
+
+document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') {
+        return;
+    }
+
+    const form = document.getElementById('formTambahKa');
+
+    if (form && !form.hidden) {
+        toggleFormTambahKA(false);
+    }
+});
+
+/* =====================================================
+   CATATAN DINAS - MODAL
+===================================================== */
+
+function openCatatanModal() {
+    const modal = document.getElementById('catatanModal');
+
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('cdm-lock');
+
+    document.getElementById('cdmCatatan')?.focus();
+}
+
+function closeCatatanModal() {
+    const modal = document.getElementById('catatanModal');
+
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('cdm-lock');
+}
+
+function initCatatanModal() {
+    const modal = document.getElementById('catatanModal');
+
+    if (!modal) {
+        return;
+    }
+
+    const form = document.getElementById('catatanForm');
+    const textarea = document.getElementById('cdmCatatan');
+    const counter = document.getElementById('cdmCounter');
+    const submitBtn = form
+        ? form.querySelector('.cdm-save')
+        : null;
+
+    const labelAwal = submitBtn ? submitBtn.textContent : '';
+    let sedangKirim = false;
+
+    function updateHitung() {
+        if (!counter || !textarea) {
+            return;
+        }
+
+        counter.textContent =
+            `${textarea.value.length.toLocaleString('id-ID')} / ` +
+            `${BATAS_KARAKTER_CATATAN.toLocaleString('id-ID')} karakter`;
+    }
+
+    function setTombol(disabled, text) {
+        if (!submitBtn) {
+            return;
+        }
+
+        submitBtn.disabled = disabled;
+        submitBtn.textContent = text;
+    }
+
+    modal.addEventListener('mousedown', event => {
+        if (event.target === modal) {
+            closeCatatanModal();
+        }
+    });
+
+    document.addEventListener('keydown', event => {
+        if (
+            event.key === 'Escape' &&
+            modal.classList.contains('open')
+        ) {
+            closeCatatanModal();
+        }
+    });
+
+    if (textarea) {
+        textarea.addEventListener('input', updateHitung);
+        updateHitung();
+
+        textarea.addEventListener('keydown', event => {
+            if (
+                (event.ctrlKey || event.metaKey) &&
+                event.key === 'Enter'
+            ) {
+                event.preventDefault();
+
+                if (form && typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                }
+            }
+        });
+    }
+
+    if (form) {
+        form.addEventListener('submit', async event => {
+            if (sedangKirim) {
+                event.preventDefault();
+                return;
+            }
+
+            if (!form.checkValidity()) {
+                return;
+            }
+
+            if (textarea && textarea.value.trim() === '') {
+                event.preventDefault();
+                textarea.focus();
+                return;
+            }
+
+            event.preventDefault();
+
+            sedangKirim = true;
+            setTombol(true, 'Menyimpan...');
+
+            if (isDirty || isSaving || saveGagal) {
+                const berhasil = await tungguSimpanSelesai();
+
+                if (!berhasil) {
+                    const lanjut = confirm(
+                        'Sebagian data realisasi KA belum berhasil tersimpan.\n\n' +
+                        'Tetap simpan catatan dinas?'
+                    );
+
+                    if (!lanjut) {
+                        sedangKirim = false;
+                        setTombol(false, labelAwal);
+                        return;
+                    }
+                }
+            }
+
+            form.submit();
+        });
+    }
+
+    window.addEventListener('pageshow', event => {
+        if (event.persisted) {
+            sedangKirim = false;
+            setTombol(false, labelAwal);
+        }
+    });
+
+    if (modal.dataset.openOnLoad === '1') {
+        openCatatanModal();
+    }
+}
+
+/* =====================================================
+   REFRESH FILTER WAKTU
+===================================================== */
+
+let lastVisibleIds = '';
+
+function refreshTimeFilter() {
+    updateWindowRange();
+
+    const currentVisibleIds = getVisibleIds();
+
+    /*
+     * Render ulang hanya jika daftar KA yang tampil berubah.
+     * Ini mencegah input yang sedang diketik ter-reset setiap detik.
+     */
+    if (currentVisibleIds !== lastVisibleIds) {
+        lastVisibleIds = currentVisibleIds;
+        renderTable();
+    }
+}
+
+/* =====================================================
+   MULAI
+===================================================== */
+
+function initRealisasiKA() {
+    renderTable();
+
+    lastVisibleIds = getVisibleIds();
+
+    updateWindowRange();
+
+    setSaveStatus('idle', 'Penyimpanan otomatis aktif');
+
+    initCatatanModal();
+
+    setInterval(refreshTimeFilter, 1000);
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRealisasiKA, {
+        once: true
+    });
+} else {
+    initRealisasiKA();
+}

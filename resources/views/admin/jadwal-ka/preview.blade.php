@@ -50,6 +50,35 @@
         </div>
     @endif
 
+    {{-- Tanggal berlaku --}}
+    <section class="rounded-xl border border-blue-200 bg-blue-50 p-5">
+        <div class="flex items-start gap-3">
+            <div class="mt-0.5 text-blue-700">
+                <svg class="h-5 w-5" viewBox="0 0 20 20"
+                     fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd"
+                          d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v9a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm10 7H4v6a1 1 0 001 1h10a1 1 0 001-1V9z"
+                          clip-rule="evenodd" />
+                </svg>
+            </div>
+
+            <div>
+                <h2 class="font-semibold text-blue-900">
+                    Tanggal Berlaku Jadwal
+                </h2>
+
+                <p class="mt-1 text-lg font-bold text-blue-900">
+                    {{ \Illuminate\Support\Carbon::parse($tanggalBerlaku)->locale('id')->translatedFormat('l, d F Y') }}
+                </p>
+
+                <p class="mt-1 text-sm leading-6 text-blue-800">
+                    Jadwal yang ditambahkan melalui import ini akan berlaku pada tanggal tersebut.
+                    Pastikan tanggalnya sesuai dengan tanggal operasional pada workbook.
+                </p>
+            </div>
+        </div>
+    </section>
+
     {{-- Ringkasan --}}
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
 
@@ -85,7 +114,7 @@
                 Duplikat
             </p>
             <p class="mt-2 text-3xl font-bold text-amber-600">
-                {{ $duplicateCount ?? 0 }}
+                {{ $duplicateCount }}
             </p>
             <p class="mt-1 text-xs text-gray-500">
                 Akan dilewati saat konfirmasi.
@@ -103,7 +132,6 @@
                 Kesalahan parser atau pencocokan JPL.
             </p>
         </div>
-
     </div>
 
     {{-- Status import --}}
@@ -111,17 +139,11 @@
         <div class="rounded-xl border border-green-200 bg-green-50 p-4">
             <div class="flex items-start gap-3">
                 <div class="mt-0.5 text-green-700">
-                    <svg
-                        class="h-5 w-5"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        aria-hidden="true"
-                    >
-                        <path
-                            fill-rule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                            clip-rule="evenodd"
-                        />
+                    <svg class="h-5 w-5" viewBox="0 0 20 20"
+                         fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                              clip-rule="evenodd" />
                     </svg>
                 </div>
 
@@ -130,8 +152,8 @@
                         Preview Siap Dikonfirmasi
                     </h2>
                     <p class="mt-1 text-sm text-green-800">
-                        Tidak ditemukan kesalahan parser atau ketidakcocokan JPL.
-                        Periksa kembali data sebelum melanjutkan.
+                        Tidak ditemukan kesalahan parser, baris tidak valid, atau ketidakcocokan JPL.
+                        Periksa kembali tanggal dan data sebelum melanjutkan.
                         Baris duplikat akan dilewati.
                     </p>
                 </div>
@@ -141,17 +163,11 @@
         <div class="rounded-xl border border-red-200 bg-red-50 p-4">
             <div class="flex items-start gap-3">
                 <div class="mt-0.5 text-red-700">
-                    <svg
-                        class="h-5 w-5"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        aria-hidden="true"
-                    >
-                        <path
-                            fill-rule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                            clip-rule="evenodd"
-                        />
+                    <svg class="h-5 w-5" viewBox="0 0 20 20"
+                         fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                              clip-rule="evenodd" />
                     </svg>
                 </div>
 
@@ -160,8 +176,8 @@
                         Import Belum Dapat Dikonfirmasi
                     </h2>
                     <p class="mt-1 text-sm text-red-800">
-                        Perbaiki kesalahan yang tercantum di bawah, lalu unggah
-                        ulang workbook Excel. Jadwal belum disimpan ke database.
+                        Perbaiki kesalahan yang tercantum di bawah, lalu unggah ulang workbook Excel.
+                        Jadwal belum disimpan ke database.
                     </p>
                 </div>
             </div>
@@ -172,9 +188,7 @@
     @if (count($importErrors) > 0)
         <section class="overflow-hidden rounded-xl border border-red-200 bg-white shadow-sm">
             <div class="border-b border-red-200 bg-red-50 px-5 py-4">
-                <h2 class="font-semibold text-red-900">
-                    Kesalahan Import
-                </h2>
+                <h2 class="font-semibold text-red-900">Kesalahan Import</h2>
                 <p class="mt-1 text-sm text-red-700">
                     {{ count($importErrors) }} masalah ditemukan.
                 </p>
@@ -195,9 +209,7 @@
     @if (count($warnings) > 0)
         <section class="overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
             <div class="border-b border-amber-200 bg-amber-50 px-5 py-4">
-                <h2 class="font-semibold text-amber-900">
-                    Peringatan
-                </h2>
+                <h2 class="font-semibold text-amber-900">Peringatan</h2>
                 <p class="mt-1 text-sm text-amber-800">
                     Sheet berikut dilewati karena header jadwal tidak terdeteksi.
                     Pastikan sheet tersebut memang bukan bagian dari data jadwal.
@@ -230,21 +242,11 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Nama Sheet
-                        </th>
-                        <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            JPL Database
-                        </th>
-                        <th class="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Jumlah Baris
-                        </th>
-                        <th class="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Kesalahan Baris
-                        </th>
-                        <th class="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Status
-                        </th>
+                        <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Nama Sheet</th>
+                        <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">JPL Database</th>
+                        <th class="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Jumlah Baris</th>
+                        <th class="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Kesalahan Baris</th>
+                        <th class="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
                     </tr>
                 </thead>
 
@@ -254,19 +256,15 @@
                             <td class="whitespace-nowrap px-5 py-4 text-sm font-medium text-gray-900">
                                 {{ $sheet['name'] }}
                             </td>
-
                             <td class="px-5 py-4 text-sm text-gray-600">
                                 {{ $sheet['jpl_name'] ?? 'JPL tidak ditemukan' }}
                             </td>
-
                             <td class="px-5 py-4 text-center text-sm text-gray-700">
                                 {{ $sheet['row_count'] }}
                             </td>
-
                             <td class="px-5 py-4 text-center text-sm {{ ($sheet['error_count'] ?? 0) > 0 ? 'font-semibold text-red-600' : 'text-gray-500' }}">
                                 {{ $sheet['error_count'] ?? 0 }}
                             </td>
-
                             <td class="px-5 py-4 text-center">
                                 @if ($sheet['jpl_found'])
                                     <span class="inline-flex rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
@@ -295,9 +293,7 @@
     <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div class="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <h2 class="font-semibold text-gray-900">
-                    Preview Data Jadwal KA
-                </h2>
+                <h2 class="font-semibold text-gray-900">Preview Data Jadwal KA</h2>
                 <p class="mt-1 text-sm text-gray-500">
                     Periksa nomor KA, waktu lewat, keterangan, dan JPL tujuan.
                 </p>
@@ -312,36 +308,16 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            No.
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Sheet / JPL
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Baris Excel
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Nomor KA
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Nama KA
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Dari
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Ke
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Jam Lewat
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Keterangan
-                        </th>
-                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Status
-                        </th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">No.</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Sheet / JPL</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Baris Excel</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Nomor KA</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Nama KA</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Dari</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Ke</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Jam Lewat</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Keterangan</th>
+                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
                     </tr>
                 </thead>
 
@@ -351,50 +327,38 @@
                             <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
                                 {{ $index + 1 }}
                             </td>
-
                             <td class="whitespace-nowrap px-4 py-3 text-sm">
-                                <div class="font-medium text-gray-900">
-                                    {{ $row['sheet'] }}
-                                </div>
+                                <div class="font-medium text-gray-900">{{ $row['sheet'] }}</div>
                                 <div class="mt-1 text-xs text-gray-500">
                                     {{ $row['jpl_name'] ?? 'JPL tidak ditemukan' }}
                                 </div>
                             </td>
-
                             <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
                                 {{ $row['row'] }}
                             </td>
-
                             <td class="whitespace-nowrap px-4 py-3 text-sm font-semibold text-gray-900">
                                 {{ $row['nomor_ka'] ?: '-' }}
                             </td>
-
                             <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
                                 {{ $row['nama_ka'] ?? '-' }}
                             </td>
-
                             <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
                                 {{ $row['dari'] ?? '-' }}
                             </td>
-
                             <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
                                 {{ $row['ke'] ?? '-' }}
                             </td>
-
                             <td class="whitespace-nowrap px-4 py-3 text-sm font-medium tabular-nums text-gray-900">
                                 {{ $row['jam_lewat'] ?? '-' }}
                             </td>
-
                             <td class="px-4 py-3 text-sm text-gray-700">
                                 {{ $row['keterangan'] ?? '-' }}
                             </td>
-
                             <td class="whitespace-nowrap px-4 py-3 text-center">
                                 @if (!($row['valid'] ?? false))
                                     <span class="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800">
                                         Tidak Valid
                                     </span>
-
                                     @if (!empty($row['error']))
                                         <p class="mt-1 max-w-48 whitespace-normal text-xs text-red-700">
                                             {{ $row['error'] }}
@@ -404,7 +368,6 @@
                                     <span class="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
                                         Duplikat
                                     </span>
-
                                     @if (!empty($row['error']))
                                         <p class="mt-1 max-w-48 whitespace-normal text-xs text-amber-700">
                                             {{ $row['error'] }}
@@ -431,20 +394,19 @@
         <div class="border-t border-gray-200 bg-gray-50 px-5 py-3">
             <p class="text-xs text-gray-500">
                 Baris valid akan diproses untuk ditambahkan. Duplikat akan dilewati.
-                Baris tidak valid memerlukan perbaikan sebelum import dapat dikonfirmasi.
+                Baris tidak valid menghalangi proses import.
             </p>
         </div>
     </section>
 
     {{-- Konfirmasi --}}
     <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 class="font-semibold text-gray-900">
-            Konfirmasi Import
-        </h2>
+        <h2 class="font-semibold text-gray-900">Konfirmasi Import</h2>
 
         <p class="mt-1 text-sm text-gray-500">
-            Jadwal lama tidak akan dihapus. Duplikat sesuai aturan controller
-            akan dilewati, sedangkan kesalahan validasi menghalangi proses import.
+            Jadwal akan disimpan dengan tanggal berlaku
+            <strong>{{ \Illuminate\Support\Carbon::parse($tanggalBerlaku)->format('d-m-Y') }}</strong>.
+            Jadwal lama tidak dihapus.
         </p>
 
         <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -459,15 +421,11 @@
                 <form
                     action="{{ route('admin.jadwal-ka.import.confirm') }}"
                     method="POST"
-                    onsubmit="return confirm('Konfirmasi import jadwal KA? Data yang lolos validasi akan disimpan ke database. Duplikat akan dilewati.');"
+                    onsubmit="return confirm('Konfirmasi import jadwal KA untuk tanggal {{ \Illuminate\Support\Carbon::parse($tanggalBerlaku)->format('d-m-Y') }}? Data yang lolos validasi akan disimpan. Duplikat akan dilewati.');"
                 >
                     @csrf
 
-                    <input
-                        type="hidden"
-                        name="token"
-                        value="{{ $token }}"
-                    >
+                    <input type="hidden" name="token" value="{{ $token }}">
 
                     <button
                         type="submit"

@@ -20,7 +20,7 @@
             </h1>
 
             <p class="mt-1 text-sm text-slate-500">
-                Unggah workbook Excel untuk membaca jadwal dari setiap sheet JPL.
+                Unggah workbook Excel dan tentukan tanggal berlakunya jadwal KA.
             </p>
         </div>
 
@@ -99,7 +99,7 @@
                         Unggah Workbook Excel
                     </h2>
                     <p class="mt-1 text-sm text-slate-500">
-                        Pilih file Excel yang akan diperiksa sebelum diimpor.
+                        Tentukan tanggal jadwal, lalu pilih file Excel untuk diperiksa sebelum diimpor.
                     </p>
                 </div>
 
@@ -112,11 +112,43 @@
                 >
                     @csrf
 
+                    {{-- Tanggal berlaku --}}
+                    <div>
+                        <label for="tanggal_berlaku"
+                               class="mb-2 block text-sm font-semibold text-slate-700">
+                            Tanggal Jadwal KA
+                            <span class="text-red-500">*</span>
+                        </label>
+
+                        <input
+                            id="tanggal_berlaku"
+                            name="tanggal_berlaku"
+                            type="date"
+                            value="{{ old('tanggal_berlaku', now()->format('Y-m-d')) }}"
+                            required
+                            class="block w-full rounded-xl border border-slate-300 bg-white
+                                   px-4 py-3 text-sm text-slate-700 shadow-sm outline-none
+                                   transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100
+                                   @error('tanggal_berlaku') border-red-400 @enderror"
+                        >
+
+                        @error('tanggal_berlaku')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+
+                        <p class="mt-2 text-xs leading-5 text-slate-500">
+                            Pilih tanggal operasional yang sesuai dengan isi workbook.
+                            Semua jadwal yang diimpor melalui formulir ini akan ditujukan
+                            untuk tanggal tersebut.
+                        </p>
+                    </div>
+
                     {{-- Dropzone --}}
                     <div>
                         <label for="file"
                                class="mb-3 block text-sm font-semibold text-slate-700">
                             File workbook Excel
+                            <span class="text-red-500">*</span>
                         </label>
 
                         <div
@@ -240,6 +272,10 @@
                                     yang sudah terdaftar. Sistem tidak membuat data JPL baru
                                     saat import.
                                 </p>
+                                <p class="mt-2 leading-6">
+                                    Periksa kembali tanggal yang dipilih. Jangan menggunakan
+                                    tanggal yang berbeda dari tanggal operasional pada workbook.
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -292,8 +328,8 @@
                                     <code>00:29:00</code>.
                                 </p>
                                 <p class="mt-2">
-                                    Jadwal yang sama (KA, JPL, dan jam identik) akan dilewati,
-                                    bukan digandakan.
+                                    Jadwal dengan KA, JPL, jam, dan tanggal berlaku yang sama
+                                    seharusnya dilewati, bukan digandakan.
                                 </p>
                             </div>
                         </div>
@@ -348,10 +384,10 @@
                         </span>
                         <div>
                             <p class="text-sm font-semibold text-slate-800">
-                                Unggah Excel
+                                Tentukan tanggal
                             </p>
                             <p class="mt-1 text-xs leading-5 text-slate-500">
-                                Pilih workbook yang berisi sheet jadwal JPL.
+                                Pilih tanggal operasional yang berlaku untuk jadwal pada workbook.
                             </p>
                         </div>
                     </li>
@@ -363,10 +399,10 @@
                         </span>
                         <div>
                             <p class="text-sm font-semibold text-slate-800">
-                                Periksa Preview
+                                Unggah Excel
                             </p>
                             <p class="mt-1 text-xs leading-5 text-slate-500">
-                                Periksa hasil pembacaan, data yang valid, dan duplikasi.
+                                Pilih workbook yang berisi sheet jadwal JPL.
                             </p>
                         </div>
                     </li>
@@ -378,10 +414,10 @@
                         </span>
                         <div>
                             <p class="text-sm font-semibold text-slate-800">
-                                Konfirmasi Import
+                                Periksa Preview
                             </p>
                             <p class="mt-1 text-xs leading-5 text-slate-500">
-                                Lanjutkan dari halaman preview untuk menyimpan data.
+                                Periksa hasil pembacaan, data yang valid, dan duplikasi sebelum konfirmasi.
                             </p>
                         </div>
                     </li>
@@ -423,6 +459,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('import-form');
     const input = document.getElementById('file');
+    const dateInput = document.getElementById('tanggal_berlaku');
     const dropzone = document.getElementById('dropzone');
     const placeholder = document.getElementById('upload-placeholder');
     const selectedFile = document.getElementById('selected-file');
@@ -491,7 +528,13 @@ document.addEventListener('DOMContentLoaded', function () {
         placeholder.classList.add('hidden');
         selectedFile.classList.remove('hidden');
 
-        dropzone.classList.remove('border-slate-300', 'bg-slate-50');
+        dropzone.classList.remove(
+            'border-slate-300',
+            'bg-slate-50',
+            'border-red-400',
+            'bg-red-50'
+        );
+
         dropzone.classList.add('border-green-300', 'bg-green-50/50');
 
         return true;
@@ -567,7 +610,10 @@ document.addEventListener('DOMContentLoaded', function () {
             renderFile(input.files[0]);
         } catch (error) {
             resetFile();
-            showError('Browser tidak dapat membaca file yang diseret. Silakan pilih file melalui tombol pemilih.');
+            showError(
+                'Browser tidak dapat membaca file yang diseret. ' +
+                'Silakan pilih file melalui tombol pemilih.'
+            );
         }
     });
 
@@ -583,6 +629,13 @@ document.addEventListener('DOMContentLoaded', function () {
     form.addEventListener('submit', function (event) {
         if (submitting) {
             event.preventDefault();
+            return;
+        }
+
+        if (!dateInput.value) {
+            event.preventDefault();
+            dateInput.focus();
+            dateInput.reportValidity();
             return;
         }
 

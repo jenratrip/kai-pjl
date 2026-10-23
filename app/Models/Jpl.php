@@ -34,21 +34,21 @@ class Jpl extends Model
 
     public function resort(): BelongsTo
     {
-        return $this->belongsTo(Resort::class);
+        return $this->belongsTo(Resort::class, 'resort_id');
     }
 
     public function dinas(): HasMany
     {
-        return $this->hasMany(Dinas::class);
+        return $this->hasMany(Dinas::class, 'jpl_id');
     }
 
     public function jadwalKa(): HasMany
     {
-        return $this->hasMany(JadwalKa::class);
+        return $this->hasMany(JadwalKa::class, 'jpl_id');
     }
 
     public function inventaris(): HasMany
     {
-        return $this->hasMany(Inventaris::class);
+        return $this->hasMany(Inventaris::class, 'jpl_id');
     }
 }
