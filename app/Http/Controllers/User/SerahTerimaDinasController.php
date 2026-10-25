@@ -21,7 +21,7 @@ use Illuminate\Validation\ValidationException;
 class SerahTerimaDinasController extends Controller
 {
     /**
-     * Mendapatkan dinas aktif milik pengguna yang login.
+     * Mendapatkan dinas aktif milik user yang login.
      */
     private function dinasAktif(): ?Dinas
     {
@@ -37,17 +37,134 @@ class SerahTerimaDinasController extends Controller
     }
 
     /**
-     * Menampilkan halaman serah terima dinas.
+     * Mencari akun PJL aktif berdasarkan nama atau NIP.
+     */
+    public function cariPenerima(Request $request)
+    {
+        $keyword = trim((string) $request->query('q', ''));
+
+        if (mb_strlen($keyword) < 2) {
+            return response()->json(['data' => []]);
+        }
+
+        $petugas = User::query()
+            ->where('role_id', 1)
+            ->where('is_active', true)
+            ->where('id', '!=', auth()->id())
+            ->where(function ($query) use ($keyword) {
+                $query->where('name', 'like', "%{$keyword}%")
+                    ->orWhere('nip', 'like', "%{$keyword}%");
+            })
+            ->orderBy('name')
+            ->limit(10)
+            ->get(['id', 'name', 'nip']);
+
+        return response()->json([
+            'data' => $petugas->map(fn (User $user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'nip' => $user->nip,
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * Halaman utama serah terima dinas.
      */
     public function index()
     {
-        $dinasAktif = $this->dinasAktif();
+        return $this->tampilkanHalaman($this->dinasAktif());
+    }
 
-        $admins = User::whereIn('role_id', [2, 3])
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name', 'nip', 'role_id']);
+    /**
+     * Riwayat serah terima milik user yang login.
+     */
+    public function riwayat()
+    {
+        $riwayat = SerahTerima::with([
+            'dinas.jpl',
+            'dinas.shift',
+            'penerima',
+        ])
+            ->milikUser(auth()->id())
+            ->latest('waktu_serah_terima')
+            ->latest('id')
+            ->paginate(10);
 
+        return view(
+            'user.serahterimacatatan.riwayat',
+            compact('riwayat')
+        );
+    }
+
+    /**
+     * Membuka data serah terima untuk diedit.
+     */
+    public function edit($serahTerima)
+    {
+        $data = SerahTerima::with([
+            'dinas.user',
+            'dinas.jpl.resort.wilayah',
+            'dinas.shift',
+            'penerima',
+        ])
+            ->milikUser(auth()->id())
+            ->findOrFail($serahTerima);
+
+        if ($data->isTerkunci()) {
+            return redirect()
+                ->route('user.serah-terima-dinas.riwayat')
+                ->withErrors([
+                    'riwayat' =>
+                        'Data yang sudah disetujui admin terkunci dan tidak dapat diedit.',
+                ]);
+        }
+
+        return $this->tampilkanHalaman(
+            $data->dinas,
+            $data,
+            true
+        );
+    }
+
+    /**
+     * Menampilkan detail serah terima yang sudah disetujui.
+     */
+    public function show($serahTerima)
+    {
+        $data = SerahTerima::with([
+            'dinas.user',
+            'dinas.jpl.resort.wilayah',
+            'dinas.shift',
+            'penerima',
+        ])
+            ->milikUser(auth()->id())
+            ->findOrFail($serahTerima);
+
+        if (!$data->isTerkunci()) {
+            return redirect()->route(
+                'user.serah-terima-dinas.edit',
+                $data
+            );
+        }
+
+        return $this->tampilkanHalaman(
+            $data->dinas,
+            $data,
+            true,
+            true
+        );
+    }
+
+    /**
+     * Menyiapkan data untuk halaman serah terima.
+     */
+    private function tampilkanHalaman(
+        ?Dinas $dinas,
+        ?SerahTerima $serahTerima = null,
+        bool $modeEdit = false,
+        bool $modeLihat = false
+    ) {
         $dataRealisasiKA = collect();
 
         $ringkasanKA = [
@@ -59,48 +176,52 @@ class SerahTerimaDinasController extends Controller
         $catatan = collect();
         $inventaris = collect();
         $realisasi = collect();
-        $serahTerima = null;
 
-        if ($dinasAktif) {
-            $dataRealisasiKA = $this->ambilDataKA($dinasAktif);
-            $ringkasanKA = $this->buatRingkasanKA($dataRealisasiKA);
+        if ($dinas) {
+            $dataRealisasiKA = $this->ambilDataKA($dinas);
+
+            $ringkasanKA = $this->buatRingkasanKA(
+                $dataRealisasiKA
+            );
 
             $catatan = CatatanDinas::with([
                 'attachments',
                 'user',
             ])
-                ->where('dinas_id', $dinasAktif->id)
+                ->where('dinas_id', $dinas->id)
                 ->latest('waktu_catatan')
                 ->get();
 
-            $inventaris = Inventaris::where('is_active', true)
-                ->where('jpl_id', $dinasAktif->jpl_id)
+            $inventaris = Inventaris::query()
+                ->where('is_active', true)
+                ->where('jpl_id', $dinas->jpl_id)
                 ->orderBy('nama_barang')
                 ->get();
 
-            $realisasi = RealisasiInventaris::where(
-                'dinas_id',
-                $dinasAktif->id
-            )
+            $realisasi = RealisasiInventaris::query()
+                ->where('dinas_id', $dinas->id)
                 ->get()
                 ->keyBy('inventaris_id');
 
-            $serahTerima = SerahTerima::with('penerima')
-                ->where('dinas_id', $dinasAktif->id)
-                ->latest('id')
-                ->first();
+            if (!$serahTerima) {
+                $serahTerima = SerahTerima::with('penerima')
+                    ->where('dinas_id', $dinas->id)
+                    ->latest('id')
+                    ->first();
+            }
         }
 
         return view('user.serahterimacatatan.index', [
-            'dinasAktif' => $dinasAktif,
-            'dinas' => $dinasAktif,
-            'admins' => $admins,
+            'dinasAktif' => $dinas,
+            'dinas' => $dinas,
             'catatan' => $catatan,
             'inventaris' => $inventaris,
             'realisasi' => $realisasi,
             'serahTerima' => $serahTerima,
             'dataRealisasiKA' => $dataRealisasiKA,
             'ringkasanKA' => $ringkasanKA,
+            'modeEdit' => $modeEdit,
+            'modeLihat' => $modeLihat,
         ]);
     }
 
@@ -113,22 +234,22 @@ class SerahTerimaDinasController extends Controller
 
         return [
             'batal' => $dataRealisasiKA
-                ->filter(
-                    fn ($ka) => strtoupper($ka['status'] ?? '') === 'BATAL'
+                ->filter(fn ($ka) =>
+                    strtoupper($ka['status'] ?? '') === 'BATAL'
                 )
                 ->values()
                 ->all(),
 
             'berjalan' => $dataRealisasiKA
-                ->filter(
-                    fn ($ka) => strtoupper($ka['status'] ?? '') === 'JALAN'
+                ->filter(fn ($ka) =>
+                    strtoupper($ka['status'] ?? '') === 'JALAN'
                 )
                 ->values()
                 ->all(),
 
             'belum' => $dataRealisasiKA
-                ->filter(
-                    fn ($ka) => strtoupper($ka['status'] ?? '') === 'BELUM'
+                ->filter(fn ($ka) =>
+                    strtoupper($ka['status'] ?? '') === 'BELUM'
                 )
                 ->values()
                 ->all(),
@@ -136,8 +257,7 @@ class SerahTerimaDinasController extends Controller
     }
 
     /**
-     * Mengubah daftar KA menjadi teks.
-     * Hanya menampilkan nomor dan nama KA.
+     * Mengubah daftar KA menjadi teks untuk kompatibilitas.
      */
     private function daftarKAKeTeks(array $daftar): string
     {
@@ -157,7 +277,7 @@ class SerahTerimaDinasController extends Controller
                 }
 
                 if ($nama !== '' && $nama !== '-') {
-                    return $nomor . ' - ' . $nama;
+                    return "{$nomor} - {$nama}";
                 }
 
                 return $nomor;
@@ -167,7 +287,7 @@ class SerahTerimaDinasController extends Controller
     }
 
     /**
-     * Mengambil jadwal KA dan realisasi milik dinas aktif.
+     * Mengambil jadwal KA dan realisasi milik dinas.
      */
     private function ambilDataKA(Dinas $dinas)
     {
@@ -175,7 +295,10 @@ class SerahTerimaDinasController extends Controller
             ->where('jpl_id', $dinas->jpl_id)
             ->where('is_active', true);
 
-        $this->terapkanFilterJadwalBerlaku($jadwalQuery, $dinas);
+        $this->terapkanFilterJadwalBerlaku(
+            $jadwalQuery,
+            $dinas
+        );
 
         $jadwalList = $jadwalQuery
             ->orderByRaw(
@@ -184,11 +307,11 @@ class SerahTerimaDinasController extends Controller
             ->orderBy('jam_lewat')
             ->orderBy('id')
             ->get()
-            ->unique(function ($jadwal) {
-                return ($jadwal->kereta_api_id ?? 'tanpa-ka')
-                    . '|'
-                    . ($jadwal->jam_lewat ?? 'tanpa-jam');
-            })
+            ->unique(fn ($jadwal) =>
+                ($jadwal->kereta_api_id ?? 'tanpa-ka')
+                . '|'
+                . ($jadwal->jam_lewat ?? 'tanpa-jam')
+            )
             ->values();
 
         $realisasiTerjadwal = RealisasiKa::with('keretaApi')
@@ -209,7 +332,9 @@ class SerahTerimaDinasController extends Controller
                 'nomor' => $jadwal->keretaApi?->nomor_ka ?? '-',
                 'nama' => $jadwal->keretaApi?->nama_ka ?? '-',
                 'jadwal' => $this->formatJam($jadwal->jam_lewat),
-                'aktual' => $this->formatJam($realisasiKA?->jam_aktual),
+                'aktual' => $this->formatJam(
+                    $realisasiKA?->jam_aktual
+                ),
                 'status' => $this->formatStatus(
                     $realisasiKA?->status_lewat
                 ),
@@ -231,7 +356,7 @@ class SerahTerimaDinasController extends Controller
             ];
         }
 
-        // KA manual tetap disertakan.
+        // KA manual tetap dimasukkan ke snapshot.
         $manualList = RealisasiKa::with('keretaApi')
             ->where('dinas_id', $dinas->id)
             ->where('is_manual', true)
@@ -244,7 +369,9 @@ class SerahTerimaDinasController extends Controller
                 'nomor' => $realisasiKA->keretaApi?->nomor_ka ?? '-',
                 'nama' => $realisasiKA->keretaApi?->nama_ka ?? '-',
                 'jadwal' => '-',
-                'aktual' => $this->formatJam($realisasiKA->jam_aktual),
+                'aktual' => $this->formatJam(
+                    $realisasiKA->jam_aktual
+                ),
                 'status' => $this->formatStatus(
                     $realisasiKA->status_lewat
                 ),
@@ -288,24 +415,26 @@ class SerahTerimaDinasController extends Controller
             $this->namaHariIndonesia($tanggalDinas)
         );
 
-        $query->where(function ($q) use ($tanggalDinas, $namaHari) {
+        $query->where(function ($q) use (
+            $tanggalDinas,
+            $namaHari
+        ) {
             $q->whereDate(
                 'tanggal_berlaku',
                 $tanggalDinas->toDateString()
-            )
-                ->orWhere(function ($q2) use ($namaHari) {
-                    $q2->whereNull('tanggal_berlaku')
-                        ->where(function ($hariQuery) use ($namaHari) {
-                            $hariQuery
-                                ->whereRaw(
-                                    'LOWER(TRIM(hari_berlaku)) = ?',
-                                    [$namaHari]
-                                )
-                                ->orWhereRaw(
-                                    "LOWER(TRIM(hari_berlaku)) = 'setiap hari'"
-                                );
-                        });
-                });
+            )->orWhere(function ($q2) use ($namaHari) {
+                $q2->whereNull('tanggal_berlaku')
+                    ->where(function ($hariQuery) use ($namaHari) {
+                        $hariQuery
+                            ->whereRaw(
+                                'LOWER(TRIM(hari_berlaku)) = ?',
+                                [$namaHari]
+                            )
+                            ->orWhereRaw(
+                                "LOWER(TRIM(hari_berlaku)) = 'setiap hari'"
+                            );
+                    });
+            });
         });
     }
 
@@ -337,14 +466,22 @@ class SerahTerimaDinasController extends Controller
         $dinas = $this->dinasAktif();
 
         if (!$dinas) {
+            $pesanError =
+                'Tidak ada dinas aktif. Catatan tidak dapat disimpan.';
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => $pesanError,
+                ], 422);
+            }
+
             return back()
-                ->withErrors([
-                    'dinas' => 'Tidak ada dinas aktif. Catatan tidak dapat disimpan.',
-                ])
+                ->withErrors(['dinas' => $pesanError])
                 ->withInput();
         }
 
-        CatatanDinas::create([
+        $catatan = CatatanDinas::create([
             'dinas_id' => $dinas->id,
             'user_id' => auth()->id(),
             'judul' => $validated['judul'],
@@ -355,14 +492,21 @@ class SerahTerimaDinasController extends Controller
             'waktu_catatan' => now(),
         ]);
 
-        return back()->with(
-            'success',
-            'Catatan dinas berhasil disimpan.'
-        );
+        $pesan = 'Catatan dinas berhasil disimpan.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'id' => $catatan->id,
+                'message' => $pesan,
+            ]);
+        }
+
+        return back()->with('success', $pesan);
     }
 
     /**
-     * Menyimpan hasil pemeriksaan inventaris.
+     * Menyimpan pemeriksaan inventaris.
      */
     public function storeInventaris(Request $request)
     {
@@ -392,16 +536,23 @@ class SerahTerimaDinasController extends Controller
         $dinas = $this->dinasAktif();
 
         if (!$dinas) {
+            $pesanError =
+                'Tidak ada dinas aktif untuk pemeriksaan inventaris.';
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => $pesanError,
+                ], 422);
+            }
+
             return back()
-                ->withErrors([
-                    'dinas' => 'Tidak ada dinas aktif untuk pemeriksaan inventaris.',
-                ])
+                ->withErrors(['dinas' => $pesanError])
                 ->withInput();
         }
 
-        $inventaris = Inventaris::whereKey(
-            $validated['inventaris_id']
-        )
+        $inventaris = Inventaris::query()
+            ->whereKey($validated['inventaris_id'])
             ->where('is_active', true)
             ->firstOrFail();
 
@@ -455,77 +606,134 @@ class SerahTerimaDinasController extends Controller
                     $inventaris->dilaporkan_oleh = auth()->id();
                 } else {
                     $inventaris->status_tinjauan =
-                        $inventaris->status_tinjauan ?: 'perlu_tinjauan';
+                        $inventaris->status_tinjauan
+                        ?: 'perlu_tinjauan';
                 }
             }
 
             $inventaris->save();
         });
 
-        return back()->with(
-            'success',
-            $adaMasalah
-                ? 'Pemeriksaan tersimpan. Inventaris memerlukan perhatian dan menunggu tinjauan admin.'
-                : 'Pemeriksaan inventaris berhasil disimpan.'
-        );
+        $pesan = $adaMasalah
+            ? 'Pemeriksaan tersimpan. Inventaris memerlukan perhatian dan menunggu tinjauan admin.'
+            : 'Pemeriksaan inventaris berhasil disimpan.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'inventaris_id' => $inventaris->id,
+                'status' => $adaMasalah ? 'silang' : 'centang',
+                'ada_masalah' => $adaMasalah,
+                'message' => $pesan,
+            ]);
+        }
+
+        return redirect()
+            ->to(route('user.serah-terima-dinas') . '#inventaris')
+            ->with('success', $pesan);
     }
 
     /**
-     * Menyimpan atau memperbarui serah terima dinas.
+     * Membuat atau memperbarui serah terima oleh penyerah.
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'serah_terima_id' => [
+                'nullable',
+                'integer',
+            ],
             'penerima_user_id' => [
                 'required',
                 'integer',
                 Rule::exists('users', 'id')->where(
                     fn ($query) => $query
-                        ->whereIn('role_id', [2, 3])
+                        ->where('role_id', 1)
                         ->where('is_active', true)
                 ),
             ],
-
-            'ringkasan' => ['required', 'string', 'max:10000'],
-            'catatan_penting' => ['nullable', 'string', 'max:10000'],
-            'ppka' => ['nullable', 'string', 'max:255'],
-            'nama_penerima' => ['nullable', 'string', 'max:255'],
-            'nip_penerima' => ['nullable', 'string', 'max:50'],
-            'nip_penyerah' => ['nullable', 'string', 'max:50'],
-
+            'ringkasan' => [
+                'required',
+                'string',
+                'max:500000',
+            ],
+            'catatan_penting' => [
+                'nullable',
+                'string',
+                'max:10000',
+            ],
+            'ppka' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'tanda_tangan_penyerah' => [
                 'nullable',
                 'string',
                 'max:1500000',
                 'required_if:tanda_tangan_penyerah_action,set',
             ],
-
-            'tanda_tangan_penerima' => [
-                'nullable',
-                'string',
-                'max:1500000',
-                'required_if:tanda_tangan_penerima_action,set',
-            ],
-
             'tanda_tangan_penyerah_action' => [
-                'nullable',
-                Rule::in(['keep', 'set', 'clear']),
-            ],
-
-            'tanda_tangan_penerima_action' => [
                 'nullable',
                 Rule::in(['keep', 'set', 'clear']),
             ],
         ]);
 
-        $dinas = $this->dinasAktif();
+        $dariRiwayat = !empty($validated['serah_terima_id']);
+
+        if ($dariRiwayat) {
+            $serahTerimaLama = SerahTerima::with('dinas')
+                ->milikUser(auth()->id())
+                ->findOrFail($validated['serah_terima_id']);
+
+            $dinas = $serahTerimaLama->dinas;
+        } else {
+            $dinas = $this->dinasAktif();
+
+            if (!$dinas) {
+                return back()
+                    ->withErrors([
+                        'dinas' =>
+                            'Tidak ada dinas aktif untuk diserahterimakan.',
+                    ])
+                    ->withInput();
+            }
+
+            $serahTerimaLama = SerahTerima::where(
+                'dinas_id',
+                $dinas->id
+            )
+                ->latest('id')
+                ->first();
+        }
 
         if (!$dinas) {
             return back()
                 ->withErrors([
-                    'dinas' => 'Tidak ada dinas aktif untuk diserahterimakan.',
+                    'dinas' => 'Data dinas tidak ditemukan.',
                 ])
                 ->withInput();
+        }
+
+        if ($serahTerimaLama?->isTerkunci()) {
+            return back()
+                ->withErrors([
+                    'dinas' =>
+                        'Serah terima ini sudah disetujui dan terkunci.',
+                ])
+                ->withInput();
+        }
+
+        $penerima = User::query()
+            ->where('role_id', 1)
+            ->where('is_active', true)
+            ->findOrFail($validated['penerima_user_id']);
+
+        if ((int) $penerima->id === (int) auth()->id()) {
+            throw ValidationException::withMessages([
+                'penerima_user_id' =>
+                    'Penerima harus petugas PJL lain, bukan akun penyerah.',
+            ]);
         }
 
         $ringkasanMasuk = json_decode(
@@ -534,19 +742,42 @@ class SerahTerimaDinasController extends Controller
         );
 
         if (!is_array($ringkasanMasuk)) {
-            return back()
-                ->withErrors([
-                    'ringkasan' => 'Format ringkasan serah terima tidak valid.',
-                ])
-                ->withInput();
+            throw ValidationException::withMessages([
+                'ringkasan' =>
+                    'Format ringkasan serah terima tidak valid.',
+            ]);
         }
 
-        $serahTerimaLama = SerahTerima::where(
-            'dinas_id',
-            $dinas->id
-        )
-            ->latest('id')
-            ->first();
+        /*
+         * Semua inventaris aktif pada JPL harus diperiksa
+         * sebelum serah terima dapat disimpan.
+         */
+        $inventarisAktif = Inventaris::query()
+            ->where('is_active', true)
+            ->where('jpl_id', $dinas->jpl_id)
+            ->orderBy('nama_barang')
+            ->get();
+
+        $idInventarisAktif = $inventarisAktif->pluck('id');
+
+        $realisasiInventaris = RealisasiInventaris::query()
+            ->where('dinas_id', $dinas->id)
+            ->whereIn('inventaris_id', $idInventarisAktif)
+            ->get()
+            ->keyBy('inventaris_id');
+
+        $idSudahDiperiksa = $realisasiInventaris->keys();
+
+        $jumlahBelum = $idInventarisAktif
+            ->diff($idSudahDiperiksa)
+            ->count();
+
+        if ($jumlahBelum > 0) {
+            throw ValidationException::withMessages([
+                'inventaris' =>
+                    "Masih ada {$jumlahBelum} inventaris yang belum diperiksa. Periksa semua inventaris terlebih dahulu.",
+            ]);
+        }
 
         $tandaTanganPenyerahLama =
             $serahTerimaLama?->tanda_tangan_penyerah;
@@ -554,18 +785,30 @@ class SerahTerimaDinasController extends Controller
         $tandaTanganPenerimaLama =
             $serahTerimaLama?->tanda_tangan_penerima;
 
-        $actionPenyerah = $validated['tanda_tangan_penyerah_action']
-            ?? (!empty($validated['tanda_tangan_penyerah'])
-                ? 'set'
-                : 'keep');
+        $actionPenyerah =
+            $validated['tanda_tangan_penyerah_action']
+            ?? (
+                !empty($validated['tanda_tangan_penyerah'])
+                    ? 'set'
+                    : 'keep'
+            );
 
-        $actionPenerima = $validated['tanda_tangan_penerima_action']
-            ?? (!empty($validated['tanda_tangan_penerima'])
-                ? 'set'
-                : 'keep');
+        $akanAdaPenyerah = match ($actionPenyerah) {
+            'clear' => false,
+            'set' => !empty(
+                $validated['tanda_tangan_penyerah']
+            ),
+            default => !empty($tandaTanganPenyerahLama),
+        };
+
+        if (!$akanAdaPenyerah) {
+            throw ValidationException::withMessages([
+                'tanda_tangan_penyerah' =>
+                    'Tanda tangan penyerah wajib diisi sebelum menyimpan serah terima.',
+            ]);
+        }
 
         $signaturePenyerah = null;
-        $signaturePenerima = null;
 
         try {
             if ($actionPenyerah === 'set') {
@@ -575,79 +818,110 @@ class SerahTerimaDinasController extends Controller
                 );
             }
 
-            if ($actionPenerima === 'set') {
-                $signaturePenerima = $this->saveSignature(
-                    $validated['tanda_tangan_penerima'] ?? null,
-                    'penerima'
-                );
-            }
-
-            // Ambil data KA terbaru dari database.
+            /*
+             * Ambil data KA terbaru dari database.
+             */
             $dataKA = $this->ambilDataKA($dinas)->all();
+
             $ringkasanKA = $this->buatRingkasanKA($dataKA);
+
+            /*
+             * Snapshot inventaris untuk serah terima ini.
+             */
+            $snapshotInventaris = $inventarisAktif
+                ->map(function ($item) use ($realisasiInventaris) {
+                    $hasil = $realisasiInventaris->get($item->id);
+
+                    return [
+                        'inventaris_id' => $item->id,
+                        'nama_barang' => $item->nama_barang,
+                        'kategori' => $item->kategori,
+                        'kode_barang' => $item->kode_barang,
+                        'jumlah_master' => $item->jumlah,
+                        'jumlah_aktual' => $hasil?->jumlah_aktual,
+                        'kondisi' => $hasil?->kondisi,
+                        'status' => $hasil?->status,
+                        'catatan' => $hasil?->catatan,
+                        'diperiksa_pada' =>
+                            $hasil?->diperiksa_pada?->toDateTimeString(),
+                        'diperiksa_oleh' => $hasil?->diperiksa_oleh,
+                    ];
+                })
+                ->values()
+                ->all();
+
+            /*
+             * Mendukung nama kunci catatan dari formulir lama.
+             */
+            $catatanSerahTerima =
+                $ringkasanMasuk['catatan_serah_terima']
+                ?? $ringkasanMasuk['catatan']
+                ?? $validated['catatan_penting']
+                ?? '';
+
+            /*
+             * Identitas penyerah dan PPKA berasal dari akun login.
+             * Nilai ppka dari browser tidak digunakan sebagai sumber
+             * identitas agar tidak kosong atau dapat dimanipulasi.
+             */
+            $userPenyerah = auth()->user();
 
             $ringkasan = array_merge(
                 $ringkasanMasuk,
                 [
-                    'ka_batal' => $this->daftarKAKeTeks(
-                        $ringkasanKA['batal']
-                    ),
-                    'ka_berjalan' => $this->daftarKAKeTeks(
-                        $ringkasanKA['berjalan']
-                    ),
-                    'ka_belum_lewat' => $this->daftarKAKeTeks(
-                        $ringkasanKA['belum']
-                    ),
+                    'ka_batal' => $ringkasanKA['batal'],
+                    'ka_berjalan' => $ringkasanKA['berjalan'],
+                    'ka_belum_lewat' => $ringkasanKA['belum'],
+
                     'kereta_api' => $dataKA,
-                    'catatan_penting' => $validated['catatan_penting'] ?? '',
-                    'ppka' => $validated['ppka'] ?? '',
-                    'nama_penerima' => $validated['nama_penerima'] ?? '',
-                    'nip_penerima' => $validated['nip_penerima'] ?? '',
-                    'nip_penyerah' => $validated['nip_penyerah'] ?? '',
+                    'inventaris' => $snapshotInventaris,
+
+                    'catatan_serah_terima' => $catatanSerahTerima,
+                    'catatan_penting' =>
+                        $validated['catatan_penting']
+                        ?? $catatanSerahTerima,
+
+                    // PPKA = akun petugas yang sedang login.
+                    'ppka' => $userPenyerah->name ?? '',
+                    'nama_ppka' => $userPenyerah->name ?? '',
+                    'nip_ppka' => $userPenyerah->nip ?? '',
+
+                    // Identitas penerima.
+                    'nama_penerima' => $penerima->name,
+                    'nip_penerima' => $penerima->nip ?? '',
+
+                    // Identitas penyerah.
+                    'nama_penyerah' => $userPenyerah->name ?? '',
+                    'nip_penyerah' => $userPenyerah->nip ?? '',
                 ]
             );
 
+            $penyerahFinal = match ($actionPenyerah) {
+                'clear' => null,
+                'set' => $signaturePenyerah,
+                default => $tandaTanganPenyerahLama,
+            };
+
             DB::transaction(function () use (
                 $dinas,
-                $validated,
+                $penerima,
                 $ringkasan,
-                $signaturePenyerah,
-                $signaturePenerima,
-                $actionPenyerah,
-                $actionPenerima,
-                $serahTerimaLama,
-                $tandaTanganPenyerahLama,
-                $tandaTanganPenerimaLama
+                $penyerahFinal,
+                $serahTerimaLama
             ) {
-                $penyerahFinal = match ($actionPenyerah) {
-                    'clear' => null,
-                    'set' => $signaturePenyerah,
-                    default => $tandaTanganPenyerahLama,
-                };
-
-                $penerimaFinal = match ($actionPenerima) {
-                    'clear' => null,
-                    'set' => $signaturePenerima,
-                    default => $tandaTanganPenerimaLama,
-                };
-
-                $tandaTanganLengkap =
-                    !empty($penyerahFinal)
-                    && !empty($penerimaFinal);
-
                 $dataSimpan = [
                     'dinas_id' => $dinas->id,
                     'dinas_penerima_id' => null,
-                    'penerima_user_id' => $validated['penerima_user_id'],
+                    'penerima_user_id' => $penerima->id,
                     'waktu_serah_terima' => now(),
                     'ringkasan' => $ringkasan,
                     'tanda_tangan_penyerah' => $penyerahFinal,
-                    'tanda_tangan_penerima' => $penerimaFinal,
-                    'status' => $tandaTanganLengkap
-                        ? 'selesai'
-                        : (!empty($penyerahFinal)
-                            ? 'menunggu_penerima'
-                            : 'draft'),
+                    'tanda_tangan_penerima' => null,
+                    'status' => 'menunggu_penerima',
+                    'status_review' => 'menunggu_review',
+                    'catatan_revisi' => null,
+                    'ditinjau_oleh' => null,
+                    'ditinjau_pada' => null,
                 ];
 
                 if ($serahTerimaLama) {
@@ -656,68 +930,68 @@ class SerahTerimaDinasController extends Controller
                     SerahTerima::create($dataSimpan);
                 }
             });
-
-            // Hapus file tanda tangan lama setelah penyimpanan berhasil.
-            if (
-                $tandaTanganPenyerahLama
-                && (
-                    $actionPenyerah === 'clear'
-                    || (
-                        $actionPenyerah === 'set'
-                        && $signaturePenyerah
-                        && $signaturePenyerah !== $tandaTanganPenyerahLama
-                    )
-                )
-            ) {
-                Storage::disk('public')->delete(
-                    $tandaTanganPenyerahLama
-                );
-            }
-
-            if (
-                $tandaTanganPenerimaLama
-                && (
-                    $actionPenerima === 'clear'
-                    || (
-                        $actionPenerima === 'set'
-                        && $signaturePenerima
-                        && $signaturePenerima !== $tandaTanganPenerimaLama
-                    )
-                )
-            ) {
-                Storage::disk('public')->delete(
-                    $tandaTanganPenerimaLama
-                );
-            }
         } catch (\Throwable $e) {
             if ($signaturePenyerah) {
-                Storage::disk('public')->delete($signaturePenyerah);
-            }
-
-            if ($signaturePenerima) {
-                Storage::disk('public')->delete($signaturePenerima);
+                Storage::disk('public')->delete(
+                    $signaturePenyerah
+                );
             }
 
             throw $e;
         }
 
+        /*
+         * Bersihkan tanda tangan lama setelah penyimpanan berhasil.
+         */
+        if (
+            $tandaTanganPenyerahLama
+            && (
+                $actionPenyerah === 'clear'
+                || (
+                    $actionPenyerah === 'set'
+                    && $signaturePenyerah
+                    && $signaturePenyerah !== $tandaTanganPenyerahLama
+                )
+            )
+        ) {
+            Storage::disk('public')->delete(
+                $tandaTanganPenyerahLama
+            );
+        }
+
+        /*
+         * Tanda tangan penerima lama tidak lagi valid karena
+         * isi serah terima atau penerimanya dapat berubah.
+         */
+        if ($tandaTanganPenerimaLama) {
+            Storage::disk('public')->delete(
+                $tandaTanganPenerimaLama
+            );
+        }
+
         return redirect()
-            ->route('user.serah-terima-dinas')
+            ->route(
+                $dariRiwayat
+                    ? 'user.serah-terima-dinas.riwayat'
+                    : 'user.serah-terima-dinas'
+            )
             ->with(
                 'success',
-                'Data serah terima berhasil disimpan.'
+                'Serah terima berhasil disimpan. Menunggu konfirmasi tanda tangan dari petugas penerima.'
             );
     }
 
     /**
-     * Konfirmasi serah terima oleh admin penerima.
+     * Konfirmasi serah terima oleh akun PJL penerima yang ditunjuk.
      */
-    public function konfirmasi(Request $request, $serahTerima)
-    {
+    public function konfirmasi(
+        Request $request,
+        $serahTerima
+    ) {
         abort_unless(
-            in_array((int) auth()->user()->role_id, [2, 3], true),
+            (int) auth()->user()->role_id === 1,
             403,
-            'Hanya admin atau superadmin yang dapat mengonfirmasi serah terima.'
+            'Hanya petugas PJL yang dapat mengonfirmasi sebagai penerima.'
         );
 
         $validated = $request->validate([
@@ -728,18 +1002,27 @@ class SerahTerimaDinasController extends Controller
             ],
         ]);
 
-        $data = SerahTerima::findOrFail($serahTerima);
+        $data = SerahTerima::with('dinas')
+            ->findOrFail($serahTerima);
 
         abort_unless(
-            (int) $data->penerima_user_id === (int) auth()->id(),
+            $data->penerima_user_id !== null
+                && (int) $data->penerima_user_id
+                    === (int) auth()->id(),
             403,
-            'Pengajuan ini ditujukan kepada akun admin lain.'
+            'Anda bukan petugas penerima yang ditunjuk untuk serah terima ini.'
         );
 
         abort_unless(
             $data->status === 'menunggu_penerima',
             422,
-            'Serah terima ini tidak sedang menunggu konfirmasi.'
+            'Serah terima ini tidak sedang menunggu konfirmasi penerima.'
+        );
+
+        abort_unless(
+            empty($data->tanda_tangan_penerima),
+            422,
+            'Tanda tangan penerima sudah tersedia.'
         );
 
         $signaturePenerima = $this->saveSignature(
@@ -748,10 +1031,33 @@ class SerahTerimaDinasController extends Controller
         );
 
         try {
-            DB::transaction(function () use ($data, $signaturePenerima) {
-                $data->update([
+            DB::transaction(function () use (
+                $data,
+                $signaturePenerima
+            ) {
+                $terkini = SerahTerima::query()
+                    ->lockForUpdate()
+                    ->findOrFail($data->id);
+
+                abort_unless(
+                    $terkini->penerima_user_id !== null
+                        && (int) $terkini->penerima_user_id
+                            === (int) auth()->id(),
+                    403,
+                    'Anda bukan penerima yang ditunjuk.'
+                );
+
+                abort_unless(
+                    $terkini->status === 'menunggu_penerima'
+                        && empty($terkini->tanda_tangan_penerima),
+                    422,
+                    'Serah terima sudah dikonfirmasi atau tidak lagi menunggu penerima.'
+                );
+
+                $terkini->update([
                     'tanda_tangan_penerima' => $signaturePenerima,
                     'status' => 'selesai',
+                    'status_review' => 'menunggu_review',
                 ]);
             });
         } catch (\Throwable $e) {
@@ -762,10 +1068,13 @@ class SerahTerimaDinasController extends Controller
 
         return back()->with(
             'success',
-            'Serah terima berhasil dikonfirmasi.'
+            'Tanda tangan penerima berhasil disimpan. Serah terima menunggu tinjauan admin.'
         );
     }
 
+    /**
+     * Normalisasi status KA untuk tampilan.
+     */
     private function formatStatus(?string $status): string
     {
         return match ($status) {
@@ -775,6 +1084,9 @@ class SerahTerimaDinasController extends Controller
         };
     }
 
+    /**
+     * Normalisasi status pemeriksaan perlengkapan KA.
+     */
     private function checkValue(?string $value): string
     {
         return match ($value) {
@@ -784,6 +1096,9 @@ class SerahTerimaDinasController extends Controller
         };
     }
 
+    /**
+     * Format jam menjadi HH:mm.
+     */
     private function formatJam($jam): string
     {
         if (!$jam) {
@@ -794,7 +1109,7 @@ class SerahTerimaDinasController extends Controller
     }
 
     /**
-     * Memvalidasi dan menyimpan data URL tanda tangan PNG.
+     * Memvalidasi dan menyimpan tanda tangan PNG dari data URL.
      */
     private function saveSignature(
         ?string $dataUrl,
@@ -803,7 +1118,7 @@ class SerahTerimaDinasController extends Controller
         if (empty($dataUrl)) {
             throw ValidationException::withMessages([
                 'tanda_tangan_' . $jenis =>
-                    'Tanda tangan baru belum tersedia. Silakan tanda tangan kembali.',
+                    'Tanda tangan belum tersedia. Silakan tanda tangan kembali.',
             ]);
         }
 

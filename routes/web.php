@@ -1,16 +1,18 @@
-
 <?php
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
-
 use App\Http\Controllers\Auth\LoginController;
 
-// Admin Controllers
-use App\Http\Controllers\Admin\DashboardController;
+// ======================================================
+// ADMIN CONTROLLERS
+// ======================================================
+
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\UserImportController as AdminUserImportController;
 use App\Http\Controllers\Admin\DinasController;
+use App\Http\Controllers\Admin\ShiftController;
 use App\Http\Controllers\Admin\JplController;
 use App\Http\Controllers\Admin\JplImportController;
 use App\Http\Controllers\Admin\ResortController;
@@ -18,15 +20,26 @@ use App\Http\Controllers\Admin\WilayahController;
 use App\Http\Controllers\Admin\WilayahImportController;
 use App\Http\Controllers\Admin\InventarisController as AdminInventarisController;
 use App\Http\Controllers\Admin\SerahTerimaDinasController as AdminSerahTerimaDinasController;
+use App\Http\Controllers\Admin\CatatanDinasController as AdminCatatanDinasController;
+use App\Http\Controllers\Admin\JadwalKaController;
+use App\Http\Controllers\Admin\JadwalKaImportController;
+use App\Http\Controllers\Admin\RealisasiKaSettingController;
+use App\Http\Controllers\Admin\RealisasiKaController as AdminRealisasiKaController;
 
-// User / PJL Controllers
+// ======================================================
+// USER / PJL CONTROLLERS
+// ======================================================
+
 use App\Http\Controllers\User\DashboardController as UserDashboardController;
 use App\Http\Controllers\User\RealisasiKaController;
 use App\Http\Controllers\User\CatatanDinasController;
 use App\Http\Controllers\User\SerahTerimaDinasController;
 use App\Http\Controllers\User\InventarisController as UserInventarisController;
 
-// Superadmin Controllers
+// ======================================================
+// SUPERADMIN CONTROLLERS
+// ======================================================
+
 use App\Http\Controllers\Superadmin\DashboardController as SuperadminDashboardController;
 use App\Http\Controllers\Superadmin\UserController as SuperadminUserController;
 use App\Http\Controllers\Superadmin\UserImportController as SuperadminUserImportController;
@@ -34,11 +47,9 @@ use App\Http\Controllers\Superadmin\ActivityLogController;
 use App\Http\Controllers\Superadmin\SystemMonitoringController;
 use App\Http\Controllers\Superadmin\JplController as SuperadminJplController;
 
-/*
-|--------------------------------------------------------------------------
-| Root
-|--------------------------------------------------------------------------
-*/
+// ======================================================
+// ROOT / HALAMAN UTAMA
+// ======================================================
 
 Route::get('/', function () {
     if (!Auth::check()) {
@@ -55,14 +66,16 @@ Route::get('/', function () {
         return redirect()->route('admin.dashboard');
     }
 
-    return redirect()->route('user.dashboard');
-});
+    if ($user->hasRole('pjl')) {
+        return redirect()->route('user.realisasi-ka');
+    }
 
-/*
-|--------------------------------------------------------------------------
-| Authentication
-|--------------------------------------------------------------------------
-*/
+    abort(403, 'Role pengguna tidak dikenali.');
+})->name('home');
+
+// ======================================================
+// AUTHENTICATION
+// ======================================================
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [
@@ -73,7 +86,7 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [
         LoginController::class,
         'login',
-    ])->name('login.store');
+    ])->middleware('throttle:5,1')->name('login.store');
 });
 
 Route::post('/logout', [
@@ -81,22 +94,24 @@ Route::post('/logout', [
     'logout',
 ])->middleware('auth')->name('logout');
 
-/*
-|--------------------------------------------------------------------------
-| User / PJL
-|--------------------------------------------------------------------------
-*/
+// ======================================================
+// USER / PJL
+// ======================================================
 
 Route::middleware(['auth', 'role:pjl'])
     ->prefix('user')
     ->name('user.')
     ->group(function () {
+
+        // DASHBOARD
+
         Route::get('/dashboard', [
             UserDashboardController::class,
             'index',
         ])->name('dashboard');
 
-        // Realisasi KA
+        // REALISASI KA
+
         Route::get('/realisasi-ka', [
             RealisasiKaController::class,
             'index',
@@ -107,7 +122,8 @@ Route::middleware(['auth', 'role:pjl'])
             'store',
         ])->name('realisasi-ka.store');
 
-        // Catatan Dinas
+        // CATATAN DINAS USER
+
         Route::get('/catatan-dinas', [
             CatatanDinasController::class,
             'index',
@@ -118,28 +134,77 @@ Route::middleware(['auth', 'role:pjl'])
             'store',
         ])->name('catatan-dinas.store');
 
-        // Serah Terima Dinas PJL
+        // SERAH TERIMA DINAS USER
+
         Route::get('/serah-terima-dinas', [
             SerahTerimaDinasController::class,
             'index',
         ])->name('serah-terima-dinas');
+
+        // PENCARIAN PENERIMA BERDASARKAN NAMA / NIP
+
+        Route::get('/serah-terima-dinas/cari-penerima', [
+            SerahTerimaDinasController::class,
+            'cariPenerima',
+        ])->name('serah-terima-dinas.cari-penerima');
+
+        // RIWAYAT SERAH TERIMA
+
+        Route::get('/serah-terima-dinas/riwayat', [
+            SerahTerimaDinasController::class,
+            'riwayat',
+        ])->name('serah-terima-dinas.riwayat');
+
+        Route::get('/serah-terima-dinas/riwayat/{serahTerima}/edit', [
+            SerahTerimaDinasController::class,
+            'edit',
+        ])->whereNumber('serahTerima')
+          ->name('serah-terima-dinas.edit');
+
+        Route::get('/serah-terima-dinas/riwayat/{serahTerima}', [
+            SerahTerimaDinasController::class,
+            'show',
+        ])->whereNumber('serahTerima')
+          ->name('serah-terima-dinas.show');
+
+        // KONFIRMASI SERAH TERIMA OLEH PJL PENERIMA
+
+        Route::post('/serah-terima-dinas/{serahTerima}/konfirmasi', [
+            SerahTerimaDinasController::class,
+            'konfirmasi',
+        ])->whereNumber('serahTerima')
+          ->name('serah-terima-dinas.konfirmasi');
+
+        // SIMPAN CATATAN SERAH TERIMA
 
         Route::post('/serah-terima-dinas/catatan', [
             SerahTerimaDinasController::class,
             'storeCatatan',
         ])->name('serah-terima-dinas.catatan.store');
 
+        // SIMPAN REALISASI INVENTARIS SERAH TERIMA
+
         Route::post('/serah-terima-dinas/inventaris', [
             SerahTerimaDinasController::class,
             'storeInventaris',
         ])->name('serah-terima-dinas.inventaris.store');
+
+        // SIMPAN SERAH TERIMA DINAS
 
         Route::post('/serah-terima-dinas/simpan', [
             SerahTerimaDinasController::class,
             'store',
         ])->name('serah-terima-dinas.store');
 
-        // Pemeriksaan Inventaris oleh PJL
+        // ENDPOINT KOMPATIBILITAS LAMA
+
+        Route::post('/serah-terima-dinas', [
+            SerahTerimaDinasController::class,
+            'store',
+        ]);
+
+        // INVENTARIS PJL
+
         Route::get('/inventaris', [
             UserInventarisController::class,
             'index',
@@ -151,23 +216,44 @@ Route::middleware(['auth', 'role:pjl'])
         ])->name('inventaris.update');
     });
 
-/*
-|--------------------------------------------------------------------------
-| Admin
-|--------------------------------------------------------------------------
-*/
+// ======================================================
+// ADMIN + SUPERADMIN
+// FITUR OPERASIONAL BERSAMA
+// ======================================================
 
 Route::middleware(['auth', 'role:admin,superadmin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
-        // Dashboard Admin
+
+        // DASHBOARD
+
         Route::get('/dashboard', [
-            DashboardController::class,
+            AdminDashboardController::class,
             'index',
         ])->name('dashboard');
 
-        // Manajemen User
+        // PENGATURAN REALISASI KA
+
+        Route::get('/pengaturan-realisasi-ka', [
+            RealisasiKaSettingController::class,
+            'index',
+        ])->name('realisasi-ka-settings.index');
+
+        Route::put('/pengaturan-realisasi-ka', [
+            RealisasiKaSettingController::class,
+            'update',
+        ])->name('realisasi-ka-settings.update');
+
+        // DAFTAR REALISASI KA
+
+        Route::get('/realisasi-ka', [
+            AdminRealisasiKaController::class,
+            'index',
+        ])->name('realisasi-ka.index');
+
+        // MANAJEMEN USER
+
         Route::get('/users', [
             AdminUserController::class,
             'index',
@@ -188,15 +274,15 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'confirm',
         ])->name('users.import.confirm');
 
-        Route::get('/users/{id}', [
-            AdminUserController::class,
-            'show',
-        ])->name('users.show');
-
         Route::get('/users/{id}/edit', [
             AdminUserController::class,
             'edit',
         ])->name('users.edit');
+
+        Route::get('/users/{id}', [
+            AdminUserController::class,
+            'show',
+        ])->name('users.show');
 
         Route::put('/users/{id}', [
             AdminUserController::class,
@@ -208,7 +294,25 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'toggleStatus',
         ])->name('users.toggle-status');
 
-        // Serah Terima Dinas
+        // REVIEW CATATAN DINAS
+
+        Route::get('/catatan-dinas', [
+            AdminCatatanDinasController::class,
+            'index',
+        ])->name('catatan-dinas.index');
+
+        Route::get('/catatan-dinas/{catatanDinas}', [
+            AdminCatatanDinasController::class,
+            'show',
+        ])->name('catatan-dinas.show');
+
+        Route::patch('/catatan-dinas/{catatanDinas}', [
+            AdminCatatanDinasController::class,
+            'update',
+        ])->name('catatan-dinas.update');
+
+        // REVIEW SERAH TERIMA DINAS
+
         Route::get('/serah-terima-dinas/updates', [
             AdminSerahTerimaDinasController::class,
             'updates',
@@ -222,14 +326,25 @@ Route::middleware(['auth', 'role:admin,superadmin'])
         Route::get('/serah-terima-dinas/{serahTerima}', [
             AdminSerahTerimaDinasController::class,
             'show',
-        ])->name('serah-terima-dinas.show');
+        ])->whereNumber('serahTerima')
+          ->name('serah-terima-dinas.show');
 
-        Route::post('/serah-terima-dinas/{serahTerima}/konfirmasi', [
-            SerahTerimaDinasController::class,
-            'konfirmasi',
-        ])->name('serah-terima-dinas.konfirmasi');
+        Route::patch('/serah-terima-dinas/{serahTerima}', [
+            AdminSerahTerimaDinasController::class,
+            'update',
+        ])->whereNumber('serahTerima')
+          ->name('serah-terima-dinas.update');
 
-        // Ekspor dan Impor Jadwal Dinas
+        // Admin dan Superadmin hanya melakukan review.
+        // Tanda tangan penerima dilakukan oleh PJL penerima.
+
+        // MASTER DATA SHIFT
+
+        Route::resource('shift', ShiftController::class)
+            ->except(['create', 'show', 'edit']);
+
+        // JADWAL DINAS PJL
+
         Route::get('/dinas/export', [
             DinasController::class,
             'export',
@@ -245,11 +360,62 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'import',
         ])->name('dinas.import');
 
+        Route::get('/dinas/updates', [
+            DinasController::class,
+            'updates',
+        ])->name('dinas.updates');
+
         Route::resource('dinas', DinasController::class)
-            ->except(['show'])
+            ->except(['create', 'show'])
             ->names('dinas');
 
-        // Import JPL
+        // JADWAL KA
+
+        Route::get('/jadwal-ka', [
+            JadwalKaController::class,
+            'index',
+        ])->name('jadwal-ka.index');
+
+        // IMPORT JADWAL KA
+
+        Route::get('/jadwal-ka/import', [
+            JadwalKaImportController::class,
+            'create',
+        ])->name('jadwal-ka.import');
+
+        Route::post('/jadwal-ka/import/preview', [
+            JadwalKaImportController::class,
+            'preview',
+        ])->name('jadwal-ka.import.preview');
+
+        Route::post('/jadwal-ka/import/confirm', [
+            JadwalKaImportController::class,
+            'confirm',
+        ])->name('jadwal-ka.import.confirm');
+
+        // ARSIP JADWAL KA
+
+        Route::get('/jadwal-ka/arsip', [
+            JadwalKaController::class,
+            'arsip',
+        ])->name('jadwal-ka.arsip');
+
+        Route::get('/jadwal-ka/arsip/{tanggal}', [
+            JadwalKaController::class,
+            'showArsip',
+        ])->where('tanggal', '[0-9]{4}-[0-9]{2}-[0-9]{2}')
+          ->name('jadwal-ka.arsip.show');
+
+        // DETAIL JADWAL KA BERDASARKAN JPL
+
+        Route::get('/jadwal-ka/{jpl}', [
+            JadwalKaController::class,
+            'show',
+        ])->whereNumber('jpl')
+          ->name('jadwal-ka.show');
+
+        // IMPORT JPL
+
         Route::get('/jpl/import', [
             JplImportController::class,
             'create',
@@ -270,10 +436,18 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'confirm',
         ])->name('jpl.import.confirm');
 
-        // Master Data JPL
+        // MASTER DATA JPL
+
+        Route::post('/jpl/{id}/activate', [
+            JplController::class,
+            'activate',
+        ])->whereNumber('id')
+          ->name('jpl.activate');
+
         Route::resource('jpl', JplController::class);
 
-        // Master Data Resort
+        // MASTER DATA RESORT
+
         Route::resource('resort', ResortController::class)
             ->except(['destroy']);
 
@@ -282,7 +456,8 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'toggleStatus',
         ])->name('resort.toggle-status');
 
-        // Master Data Wilayah
+        // IMPORT WILAYAH
+
         Route::get('/wilayah/import/template', [
             WilayahController::class,
             'downloadTemplate',
@@ -303,40 +478,54 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'confirm',
         ])->name('wilayah.import.confirm');
 
-        Route::resource('wilayah', WilayahController::class)
-            ->except(['show', 'destroy']);
+        // MASTER DATA WILAYAH
 
         Route::patch('/wilayah/{wilayah}/toggle-status', [
             WilayahController::class,
             'toggleStatus',
         ])->name('wilayah.toggle-status');
 
-        // Master Inventaris - Khusus Admin
+        Route::resource('wilayah', WilayahController::class)
+            ->except(['show', 'destroy']);
+
+        // INVENTARIS ADMIN
+        // Superadmin tidak dibatasi dari fitur operasional lainnya.
+        // Pengelolaan inventaris dibatasi untuk admin pada konfigurasi ini.
+
         Route::middleware('role:admin')->group(function () {
-            Route::resource(
-                'inventaris',
-                AdminInventarisController::class
-            );
+
+            Route::get('/inventaris/jpl/{jpl}', [
+                AdminInventarisController::class,
+                'showJpl',
+            ])->whereNumber('jpl')
+              ->name('inventaris.jpl.show');
+
+            Route::resource('inventaris', AdminInventarisController::class)
+                ->parameters([
+                    'inventaris' => 'inventaris',
+                ]);
         });
     });
 
-/*
-|--------------------------------------------------------------------------
-| Superadmin
-|--------------------------------------------------------------------------
-*/
+// ======================================================
+// SUPERADMIN
+// FITUR TEKNIS KHUSUS
+// ======================================================
 
-Route::middleware('superadmin')
+Route::middleware(['auth', 'superadmin'])
     ->prefix('superadmin')
     ->name('superadmin.')
     ->group(function () {
-        // Dashboard Superadmin
+
+        // DASHBOARD
+
         Route::get('/dashboard', [
             SuperadminDashboardController::class,
             'index',
         ])->name('dashboard');
 
-        // Manajemen User
+        // MANAJEMEN USER SISTEM
+
         Route::get('/users', [
             SuperadminUserController::class,
             'index',
@@ -360,6 +549,11 @@ Route::middleware('superadmin')
         Route::post('/users/import/preview', [
             SuperadminUserImportController::class,
             'preview',
+        ])->name('users.import.preview.store');
+
+        Route::get('/users/import/preview', [
+            SuperadminUserImportController::class,
+            'showPreview',
         ])->name('users.import.preview');
 
         Route::post('/users/import/confirm', [
@@ -367,15 +561,15 @@ Route::middleware('superadmin')
             'confirm',
         ])->name('users.import.confirm');
 
-        Route::get('/users/{user}', [
-            SuperadminUserController::class,
-            'show',
-        ])->name('users.show');
-
         Route::get('/users/{user}/edit', [
             SuperadminUserController::class,
             'edit',
         ])->name('users.edit');
+
+        Route::get('/users/{user}', [
+            SuperadminUserController::class,
+            'show',
+        ])->name('users.show');
 
         Route::put('/users/{user}', [
             SuperadminUserController::class,
@@ -387,7 +581,8 @@ Route::middleware('superadmin')
             'toggleStatus',
         ])->name('users.toggle-status');
 
-        // Activity Log
+        // ACTIVITY LOG
+
         Route::get('/activities', [
             ActivityLogController::class,
             'index',
@@ -398,13 +593,15 @@ Route::middleware('superadmin')
             'show',
         ])->name('activities.show');
 
-        // System Monitoring
+        // SYSTEM MONITORING
+
         Route::get('/monitoring', [
             SystemMonitoringController::class,
             'index',
         ])->name('monitoring.index');
 
-        // Import JPL
+        // IMPORT JPL SUPERADMIN
+
         Route::get('/jpl/import', [
             JplImportController::class,
             'create',
@@ -425,7 +622,8 @@ Route::middleware('superadmin')
             'confirm',
         ])->name('jpl.import.confirm');
 
-        // Master Data JPL Superadmin
+        // MASTER DATA JPL SUPERADMIN
+
         Route::get('/jpl', [
             SuperadminJplController::class,
             'index',

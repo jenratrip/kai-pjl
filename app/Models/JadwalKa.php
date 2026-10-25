@@ -12,6 +12,8 @@ class JadwalKa extends Model
 
     protected $fillable = [
         'kereta_api_id',
+        'dari',
+        'ke',
         'jpl_id',
         'jam_lewat',
         'hari_berlaku',

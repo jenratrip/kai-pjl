@@ -56,17 +56,11 @@ class Inventaris extends Model
 
     public function pelapor(): BelongsTo
     {
-        return $this->belongsTo(
-            User::class,
-            'dilaporkan_oleh'
-        );
+        return $this->belongsTo(User::class, 'dilaporkan_oleh');
     }
 
     public function peninjau(): BelongsTo
     {
-        return $this->belongsTo(
-            User::class,
-            'ditinjau_oleh'
-        );
+        return $this->belongsTo(User::class, 'ditinjau_oleh');
     }
 }

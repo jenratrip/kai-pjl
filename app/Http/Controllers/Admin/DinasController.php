@@ -24,6 +24,8 @@ class DinasController extends Controller
 
     public function index(Request $request)
     {
+        $this->sinkronkanStatus();
+
         $query = Dinas::with([
             'user',
             'userDigantikan',
@@ -31,24 +33,7 @@ class DinasController extends Controller
             'shift',
         ]);
 
-        if ($request->filled('user_id')) {
-            $query->where('user_id', $request->user_id);
-        }
-
-        if ($request->filled('jpl_id')) {
-            $query->where('jpl_id', $request->jpl_id);
-        }
-
-        if ($request->filled('shift_id')) {
-            $query->where('shift_id', $request->shift_id);
-        }
-
-        if ($request->filled('tanggal_dinas')) {
-            $query->whereDate(
-                'tanggal_dinas',
-                $request->tanggal_dinas
-            );
-        }
+        $this->terapkanFilter($query, $request);
 
         $dinas = $query
             ->orderByDesc('tanggal_dinas')
@@ -80,6 +65,103 @@ class DinasController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | REAL-TIME UPDATES
+    |--------------------------------------------------------------------------
+    |
+    | Dipanggil oleh JavaScript halaman dinas secara berkala.
+    | Filter aktif dan halaman pagination tetap diperhitungkan.
+    |
+    */
+
+    public function updates(Request $request)
+    {
+        $this->sinkronkanStatus();
+
+        $query = Dinas::with([
+            'user',
+            'userDigantikan',
+            'jpl',
+            'shift',
+        ]);
+
+        $this->terapkanFilter($query, $request);
+
+        $dinas = $query
+            ->orderByDesc('tanggal_dinas')
+            ->orderByDesc('jam_mulai')
+            ->paginate(10)
+            ->withQueryString();
+
+        return response()->json([
+            'data' => $dinas,
+            'server_time' => now()->toDateTimeString(),
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | APPLY FILTER
+    |--------------------------------------------------------------------------
+    */
+
+    private function terapkanFilter($query, Request $request): void
+    {
+        if ($request->filled('user_id')) {
+            $query->where('user_id', $request->user_id);
+        }
+
+        if ($request->filled('jpl_id')) {
+            $query->where('jpl_id', $request->jpl_id);
+        }
+
+        if ($request->filled('shift_id')) {
+            $query->where('shift_id', $request->shift_id);
+        }
+
+        if ($request->filled('tanggal_dinas')) {
+            $query->whereDate(
+                'tanggal_dinas',
+                $request->tanggal_dinas
+            );
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SYNCHRONIZE SCHEDULE STATUS
+    |--------------------------------------------------------------------------
+    */
+
+    private function sinkronkanStatus(): void
+    {
+        $now = now();
+
+        // Selesaikan jadwal yang waktu akhirnya telah tercapai.
+        Dinas::whereIn('status', [
+            'dijadwalkan',
+            'berlangsung',
+        ])
+            ->whereNotNull('jam_selesai')
+            ->where('jam_selesai', '<=', $now)
+            ->update([
+                'status' => 'selesai',
+                'updated_at' => $now,
+            ]);
+
+        // Aktifkan jadwal yang sedang berada dalam rentang waktunya.
+        Dinas::where('status', 'dijadwalkan')
+            ->whereNotNull('jam_mulai')
+            ->whereNotNull('jam_selesai')
+            ->where('jam_mulai', '<=', $now)
+            ->where('jam_selesai', '>', $now)
+            ->update([
+                'status' => 'berlangsung',
+                'updated_at' => $now,
+            ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | STORE
     |--------------------------------------------------------------------------
     */
@@ -89,7 +171,7 @@ class DinasController extends Controller
         $validated = $this->validateSchedule($request);
 
         $petugas = $this->findActivePjl(
-            $validated['user_id']
+            (int) $validated['user_id']
         );
 
         $jpl = Jpl::where('is_active', true)
@@ -104,29 +186,46 @@ class DinasController extends Controller
             $shift
         );
 
-        $this->ensureNoConflict(
-            $petugas->id,
+        DB::transaction(function () use (
+            $petugas,
+            $jpl,
+            $shift,
+            $validated,
+            $request,
             $mulai,
             $selesai
-        );
+        ) {
+            $this->ensureNoConflict(
+                $petugas->id,
+                $mulai,
+                $selesai
+            );
 
-        Dinas::create([
-            'user_id' => $petugas->id,
-            'jpl_id' => $jpl->id,
-            'shift_id' => $shift->id,
-            'tanggal_dinas' => $validated['tanggal_dinas'],
-            'jam_mulai' => $mulai,
-            'jam_selesai' => $selesai,
-            'status' => 'berlangsung',
-            'is_pengganti' => $request->boolean(
-                'is_pengganti'
-            ),
-            'user_digantikan_id' => $request->boolean(
-                'is_pengganti'
-            )
-                ? $validated['user_digantikan_id']
-                : null,
-        ]);
+            $status = $this->tentukanStatus(
+                $mulai,
+                $selesai
+            );
+
+            Dinas::create([
+                'user_id' => $petugas->id,
+                'jpl_id' => $jpl->id,
+                'shift_id' => $shift->id,
+                'tanggal_dinas' => $validated['tanggal_dinas'],
+                'jam_mulai' => $mulai,
+                'jam_selesai' => $selesai,
+                'status' => $status,
+
+                'is_pengganti' => $request->boolean(
+                    'is_pengganti'
+                ),
+
+                'user_digantikan_id' => $request->boolean(
+                    'is_pengganti'
+                )
+                    ? $validated['user_digantikan_id']
+                    : null,
+            ]);
+        });
 
         return redirect()
             ->route('admin.dinas.index')
@@ -186,7 +285,7 @@ class DinasController extends Controller
         $validated = $this->validateSchedule($request);
 
         $petugas = $this->findActivePjl(
-            $validated['user_id']
+            (int) $validated['user_id']
         );
 
         $jpl = Jpl::where('is_active', true)
@@ -201,29 +300,49 @@ class DinasController extends Controller
             $shift
         );
 
-        $this->ensureNoConflict(
-            $petugas->id,
+        DB::transaction(function () use (
+            $dina,
+            $petugas,
+            $jpl,
+            $shift,
+            $validated,
+            $request,
             $mulai,
-            $selesai,
-            $dina->id
-        );
+            $selesai
+        ) {
+            $lockedDinas = Dinas::whereKey($dina->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $dina->update([
-            'user_id' => $petugas->id,
-            'jpl_id' => $jpl->id,
-            'shift_id' => $shift->id,
-            'tanggal_dinas' => $validated['tanggal_dinas'],
-            'jam_mulai' => $mulai,
-            'jam_selesai' => $selesai,
-            'is_pengganti' => $request->boolean(
-                'is_pengganti'
-            ),
-            'user_digantikan_id' => $request->boolean(
-                'is_pengganti'
-            )
-                ? $validated['user_digantikan_id']
-                : null,
-        ]);
+            $this->ensureCanModify($lockedDinas);
+
+            $this->ensureNoConflict(
+                $petugas->id,
+                $mulai,
+                $selesai,
+                $lockedDinas->id
+            );
+
+            $lockedDinas->update([
+                'user_id' => $petugas->id,
+                'jpl_id' => $jpl->id,
+                'shift_id' => $shift->id,
+                'tanggal_dinas' => $validated['tanggal_dinas'],
+                'jam_mulai' => $mulai,
+                'jam_selesai' => $selesai,
+
+                // Status tidak diubah langsung oleh proses edit.
+                'is_pengganti' => $request->boolean(
+                    'is_pengganti'
+                ),
+
+                'user_digantikan_id' => $request->boolean(
+                    'is_pengganti'
+                )
+                    ? $validated['user_digantikan_id']
+                    : null,
+            ]);
+        });
 
         return redirect()
             ->route('admin.dinas.index')
@@ -261,6 +380,8 @@ class DinasController extends Controller
 
     public function export()
     {
+        $this->sinkronkanStatus();
+
         $rows = Dinas::with([
             'user',
             'userDigantikan',
@@ -279,14 +400,9 @@ class DinasController extends Controller
             function () use ($rows) {
                 $out = fopen('php://output', 'w');
 
-                // BOM UTF-8 untuk kompatibilitas Excel.
                 fwrite($out, "\xEF\xBB\xBF");
 
-                fputcsv(
-                    $out,
-                    $this->csvHeaders(),
-                    ';'
-                );
+                fputcsv($out, $this->csvHeaders(), ';');
 
                 foreach ($rows as $row) {
                     fputcsv($out, [
@@ -336,13 +452,8 @@ class DinasController extends Controller
 
                 fwrite($out, "\xEF\xBB\xBF");
 
-                fputcsv(
-                    $out,
-                    $this->csvHeaders(),
-                    ';'
-                );
+                fputcsv($out, $this->csvHeaders(), ';');
 
-                // Baris contoh untuk memudahkan pengisian.
                 fputcsv($out, [
                     '',
                     '',
@@ -402,12 +513,15 @@ class DinasController extends Controller
                 );
             }
 
-            // Hilangkan BOM UTF-8 (byte asli maupun yang salah decode).
             $header[0] = (string) $header[0];
 
             foreach (["\xEF\xBB\xBF", "\u{FEFF}", "ï»¿"] as $bom) {
                 if (str_starts_with($header[0], $bom)) {
-                    $header[0] = substr($header[0], strlen($bom));
+                    $header[0] = substr(
+                        $header[0],
+                        strlen($bom)
+                    );
+
                     break;
                 }
             }
@@ -435,7 +549,6 @@ class DinasController extends Controller
             ) {
                 $line++;
 
-                // Lewati baris kosong.
                 if (
                     count(array_filter(
                         $data,
@@ -446,13 +559,10 @@ class DinasController extends Controller
                     continue;
                 }
 
-                if (
-                    count($data) !== count(
-                        $this->csvHeaders()
-                    )
-                ) {
+                if (count($data) !== count($this->csvHeaders())) {
                     $errors[] =
                         "Baris {$line}: jumlah kolom tidak sesuai.";
+
                     continue;
                 }
 
@@ -472,14 +582,13 @@ class DinasController extends Controller
                     $nipDigantikan,
                 ] = $data;
 
-                $tanggal = $this->normalizeDate(
-                    $tanggalRaw
-                );
+                $tanggal = $this->normalizeDate($tanggalRaw);
 
                 if ($tanggal === null) {
                     $errors[] =
                         "Baris {$line}: tanggal harus " .
                         'YYYY-MM-DD atau DD/MM/YYYY.';
+
                     continue;
                 }
 
@@ -493,14 +602,8 @@ class DinasController extends Controller
                     'is_pengganti' => $isPengganti,
                     'nip_digantikan' => $nipDigantikan,
                 ], [
-                    'nip' => [
-                        'required',
-                        'string',
-                    ],
-                    'kode_jpl' => [
-                        'required',
-                        'string',
-                    ],
+                    'nip' => ['required', 'string'],
+                    'kode_jpl' => ['required', 'string'],
                     'shift_id' => [
                         'required',
                         'integer',
@@ -536,6 +639,7 @@ class DinasController extends Controller
                             ' ',
                             $validator->errors()->all()
                         );
+
                     continue;
                 }
 
@@ -543,15 +647,11 @@ class DinasController extends Controller
                     ->where('is_active', true)
                     ->whereHas(
                         'role',
-                        fn ($q) =>
-                            $q->where('name', 'pjl')
+                        fn ($q) => $q->where('name', 'pjl')
                     )
                     ->first();
 
-                $jpl = Jpl::where(
-                    'kode_jpl',
-                    $kodeJpl
-                )
+                $jpl = Jpl::where('kode_jpl', $kodeJpl)
                     ->where('is_active', true)
                     ->first();
 
@@ -562,6 +662,7 @@ class DinasController extends Controller
                         "Baris {$line}: NIP petugas, kode " .
                         'JPL, atau shift tidak ditemukan ' .
                         'atau tidak aktif.';
+
                     continue;
                 }
 
@@ -575,8 +676,7 @@ class DinasController extends Controller
                         ->where('is_active', true)
                         ->whereHas(
                             'role',
-                            fn ($q) =>
-                                $q->where('name', 'pjl')
+                            fn ($q) => $q->where('name', 'pjl')
                         )
                         ->first();
 
@@ -587,37 +687,36 @@ class DinasController extends Controller
                         $errors[] =
                             "Baris {$line}: NIP petugas " .
                             'yang digantikan tidak valid.';
+
                         continue;
                     }
                 } elseif ($nipDigantikan !== '') {
                     $errors[] =
                         "Baris {$line}: nip_digantikan " .
                         'harus kosong jika is_pengganti bernilai 0.';
+
                     continue;
                 }
 
-                [$mulai, $selesai] =
-                    $this->calculateSchedule(
-                        $tanggal,
-                        $shift
-                    );
+                [$mulai, $selesai] = $this->calculateSchedule(
+                    $tanggal,
+                    $shift
+                );
 
-                // Jam pada CSV harus sesuai dengan shift.
                 if (
                     (
                         $jamMulaiCsv !== '' &&
-                        $jamMulaiCsv !==
-                            $mulai->format('H:i:s')
+                        $jamMulaiCsv !== $mulai->format('H:i:s')
                     ) ||
                     (
                         $jamSelesaiCsv !== '' &&
-                        $jamSelesaiCsv !==
-                            $selesai->format('H:i:s')
+                        $jamSelesaiCsv !== $selesai->format('H:i:s')
                     )
                 ) {
                     $errors[] =
                         "Baris {$line}: jam tidak sesuai " .
                         'dengan konfigurasi shift.';
+
                     continue;
                 }
 
@@ -638,6 +737,7 @@ class DinasController extends Controller
                         $previous['jam_selesai']->gt($mulai)
                     ) {
                         $bentrokFile = true;
+
                         break;
                     }
                 }
@@ -646,6 +746,7 @@ class DinasController extends Controller
                     $errors[] =
                         "Baris {$line}: jadwal petugas " .
                         'bentrok dengan jadwal lain.';
+
                     continue;
                 }
 
@@ -656,18 +757,17 @@ class DinasController extends Controller
                     'tanggal_dinas' => $tanggal,
                     'jam_mulai' => $mulai,
                     'jam_selesai' => $selesai,
-                    'status' => 'berlangsung',
+                    'status' => $this->tentukanStatus(
+                        $mulai,
+                        $selesai
+                    ),
                     'is_pengganti' => $isPengganti === '1',
                     'user_digantikan_id' => $digantikan?->id,
                 ];
             }
 
-            // Impor bersifat all-or-nothing.
             if ($errors !== []) {
-                return back()->with(
-                    'import_errors',
-                    $errors
-                );
+                return back()->with('import_errors', $errors);
             }
 
             if ($validRows === []) {
@@ -705,6 +805,29 @@ class DinasController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | DETERMINE INITIAL STATUS
+    |--------------------------------------------------------------------------
+    */
+
+    private function tentukanStatus(
+        Carbon $mulai,
+        Carbon $selesai
+    ): string {
+        $now = now();
+
+        if ($selesai->lessThanOrEqualTo($now)) {
+            return 'selesai';
+        }
+
+        if ($mulai->lessThanOrEqualTo($now)) {
+            return 'berlangsung';
+        }
+
+        return 'dijadwalkan';
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | CSV HEADERS
     |--------------------------------------------------------------------------
     */
@@ -729,18 +852,11 @@ class DinasController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    private function normalizeDate(
-        string $value
-    ): ?string {
+    private function normalizeDate(string $value): ?string
+    {
         $value = trim($value);
 
-        $formats = [
-            'Y-m-d',
-            'd/m/Y',
-            'd-m-Y',
-        ];
-
-        foreach ($formats as $format) {
+        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y'] as $format) {
             try {
                 $date = Carbon::createFromFormat(
                     '!' . $format,
@@ -767,9 +883,8 @@ class DinasController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    private function findActivePjl(
-        int $userId
-    ): User {
+    private function findActivePjl(int $userId): User
+    {
         return User::whereHas(
             'role',
             fn ($q) => $q->where('name', 'pjl')
@@ -784,9 +899,8 @@ class DinasController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    private function validateSchedule(
-        Request $request
-    ): array {
+    private function validateSchedule(Request $request): array
+    {
         $validated = $request->validate([
             'user_id' => [
                 'required',
@@ -861,7 +975,7 @@ class DinasController extends Controller
             $tanggal . ' ' . $shift->jam_selesai
         );
 
-        // Mendukung shift yang melewati tengah malam.
+        // Mendukung shift lintas tengah malam.
         if ($selesai->lessThanOrEqualTo($mulai)) {
             $selesai->addDay();
         }
@@ -904,9 +1018,8 @@ class DinasController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    private function ensureCanModify(
-        Dinas $dina
-    ): void {
+    private function ensureCanModify(Dinas $dina): void
+    {
         if (
             $dina->catatanDinas()->exists() ||
             $dina->serahTerima()->exists() ||

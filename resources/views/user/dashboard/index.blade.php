@@ -268,6 +268,23 @@
             </a>
 
 
+            <!-- ==================================
+                 RIWAYAT SERAH TERIMA
+            ================================== -->
+
+            <a href="{{ route('user.serah-terima-dinas.riwayat') }}" class="menu-card">
+
+                <div class="menu-icon">
+                    ↺
+                </div>
+
+                <div class="menu-text">
+                    Riwayat Serah Terima
+                </div>
+
+            </a>
+
+
         </div>
 
     </main>
