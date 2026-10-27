@@ -82,6 +82,11 @@ let dataKA = CONFIG.data.map((ka, index) => ({
     is_manual: Boolean(ka.is_manual)
 }));
 
+// Status terakhir yang diketahui berhasil tersimpan di server.
+const savedStatuses = new Map(
+    dataKA.map((ka, index) => [index, ka.status])
+);
+
 let manualCheck = {
     semboyan21: '',
     genta: '',
@@ -199,8 +204,7 @@ function sleep(ms) {
 ===================================================== */
 
 function getCurrentHourWindowMinutes() {
-    const currentMinutes = getCurrentMinutes();
-    const startMinutes = Math.floor(currentMinutes / 60) * 60;
+    const startMinutes = getCurrentMinutes();
     const endMinutes = startMinutes + 60;
 
     return {
@@ -233,7 +237,7 @@ function updateWindowRange() {
    FILTER JADWAL BERDASARKAN JAM SAAT INI
 ===================================================== */
 
-function isWithinCurrentHour(ka) {
+function isWithinCurrentHour(ka, index) {
     if (ka.is_manual || !ka.jadwal || ka.jadwal === '-') {
         return true;
     }
@@ -244,23 +248,43 @@ function isWithinCurrentHour(ka) {
         return false;
     }
 
-    const { startMinutes, endMinutes } =
-        getCurrentHourWindowMinutes();
+    const currentMinutes = getCurrentMinutes();
 
-    if (endMinutes >= 1440) {
-        return jadwalMinutes >= startMinutes;
+    // Rentang bergulir: sekarang sampai 60 menit ke depan.
+    const selisihMaju =
+        (jadwalMinutes - currentMinutes + 1440) % 1440;
+
+    if (selisihMaju <= 60) {
+        return true;
     }
 
-    return (
-        jadwalMinutes >= startMinutes &&
-        jadwalMinutes < endMinutes
-    );
+    // Deteksi jadwal yang sudah lewat.
+    // Termasuk jadwal malam sebelumnya jika dinas melintasi tengah malam.
+    const jadwalSudahLewat =
+        jadwalMinutes < currentMinutes ||
+        (
+            currentMinutes < 60 &&
+            jadwalMinutes >= 23 * 60
+        );
+
+    if (!jadwalSudahLewat) {
+        return false;
+    }
+
+    const statusSudahDiproses =
+        ['JALAN', 'BATAL'].includes(ka.status) &&
+        savedStatuses.get(index) === ka.status &&
+        !dirtyRows.has(index) &&
+        !savingRows.has(index);
+
+    // Jadwal yang lewat tetap tampil sampai statusnya tersimpan.
+    return !statusSudahDiproses;
 }
 
 function getVisibleKA() {
     return dataKA
         .map((ka, index) => ({ ka, index }))
-        .filter(item => isWithinCurrentHour(item.ka));
+        .filter(item => isWithinCurrentHour(item.ka, item.index));
 }
 
 function getVisibleIds() {
@@ -593,19 +617,20 @@ function simpanBaris(index) {
     isDirty = true;
 
     refreshRowButtons();
-    simpanRealisasi({ otomatis: true, index });
+    simpanRealisasi({ index });
 }
 
 /* =====================================================
    KOMPONEN TABEL
 ===================================================== */
 
+
 function createCheckGroup(value, index, field) {
     const yesClass = value === 'yes' ? 'active-yes' : 'inactive';
     const noClass = value === 'no' ? 'active-no' : 'inactive';
 
     return `
-        <div class="check-group">
+        <div class="check-group flex items-center justify-center gap-2">
             <button type="button"
                 class="check ${yesClass}"
                 onclick="setCheck(this, ${index}, '${field}', 'yes')"
@@ -621,11 +646,13 @@ function createCheckGroup(value, index, field) {
     `;
 }
 
+
+
+
 function createStatus(ka, index) {
     const color = getStatusColor(ka);
 
     const labelMap = {
-        belum: 'BELUM',
         tepat: 'JALAN',
         telat: 'TERLAMBAT',
         'telat-tinggi': 'TELAT TINGGI',
@@ -633,46 +660,71 @@ function createStatus(ka, index) {
         batal: 'BATAL'
     };
 
-    const jalanClassMap = {
-        tepat: 'is-tepat',
-        telat: 'is-telat',
-        'telat-tinggi': 'is-telat',
-        cepat: 'is-cepat'
+    const badgeStyleMap = {
+        tepat: 'background:#f0fdf4;color:#15803d;border-color:#bbf7d0;',
+        telat: 'background:#fefce8;color:#a16207;border-color:#fde68a;',
+        'telat-tinggi': 'background:#fefce8;color:#a16207;border-color:#fde68a;',
+        cepat: 'background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;',
+        batal: 'background:#fef2f2;color:#b91c1c;border-color:#fecaca;'
     };
 
-    const jalanActive = ka.status === 'JALAN'
-        ? (jalanClassMap[color] || 'is-tepat')
-        : '';
+    const jalanActive = ka.status === 'JALAN';
+    const batalActive = ka.status === 'BATAL';
 
-    const batalActive = ka.status === 'BATAL' ? 'is-batal' : '';
+    const buttonBaseStyle =
+        'flex:1;min-width:0;height:36px;padding:0 8px;' +
+        'border:1px solid #d5dce5;border-radius:9px;' +
+        'box-shadow:none;font-size:12px;font-weight:500;' +
+        'line-height:1.2;white-space:nowrap;cursor:pointer;' +
+        'display:flex;align-items:center;justify-content:center;';
+
+    const jalanStyle = buttonBaseStyle + (
+        jalanActive
+            ? 'background:#f0fdf4;color:#15803d;border-color:#bbf7d0;'
+            : 'background:#f8fafc;color:#64748b;'
+    );
+
+    const batalStyle = buttonBaseStyle + (
+        batalActive
+            ? 'background:#fef2f2;color:#b91c1c;border-color:#fecaca;'
+            : 'background:#f8fafc;color:#64748b;'
+    );
+
     const note = getStatusNote(ka, color);
 
     return `
-        <div class="status-badge ${color}">
-            ${labelMap[color] || 'BELUM'}
-        </div>
 
-        <div class="status-group">
-            <button type="button"
-                class="status-btn btn-jalan ${jalanActive}"
+        <div style="
+            display:flex;
+            width:100%;
+            min-width:0;
+            gap:6px;
+            align-items:center;
+        ">
+            <button
+                type="button"
+                style="${jalanStyle}"
                 onclick="setStatus(${index}, 'JALAN')"
-                aria-pressed="${ka.status === 'JALAN'}">
+                aria-pressed="${jalanActive}">
                 JALAN
             </button>
 
-            <button type="button"
-                class="status-btn btn-batal ${batalActive}"
+            <button
+                type="button"
+                style="${batalStyle}"
                 onclick="setStatus(${index}, 'BATAL')"
-                aria-pressed="${ka.status === 'BATAL'}">
+                aria-pressed="${batalActive}">
                 BATAL
             </button>
         </div>
 
         ${note
-            ? `<div class="status-note ${color}">${escapeHtml(note)}</div>`
+            ? `<div style="margin-top:6px;white-space:normal;overflow-wrap:anywhere;font-size:12px;color:#6b7280;">${escapeHtml(note)}</div>`
             : ''}
     `;
 }
+
+
 
 function createRowAction(index) {
     const state = stateBaris(index);
@@ -687,18 +739,16 @@ function createRowAction(index) {
     `;
 }
 
+
 function renderTable() {
     const tbody = document.getElementById('kaTableBody');
 
-    if (!tbody) {
-        return;
-    }
+    if (!tbody) return;
 
     const awasInfo = cariAwas2Arah();
     updateAwasBanner(awasInfo);
 
     const visibleKA = getVisibleKA();
-
     tbody.innerHTML = '';
 
     if (!visibleKA.length) {
@@ -709,7 +759,7 @@ function renderTable() {
         tbody.innerHTML = `
             <tr>
                 <td colspan="${JUMLAH_KOLOM_TABEL}"
-                    style="height:85px;text-align:center;color:#8a93a1">
+                    class="px-4 py-8 text-center text-sm text-gray-500">
                     ${escapeHtml(message)}
                 </td>
             </tr>
@@ -718,63 +768,93 @@ function renderTable() {
         updateSummary();
         updateWindowRange();
         refreshRowButtons();
-
         return;
     }
 
     visibleKA.forEach(({ ka, index }, visibleIndex) => {
         const row = document.createElement('tr');
         row.dataset.index = index;
+        row.className = 'border-b border-gray-200 hover:bg-gray-50';
 
         if (awasInfo.indexSet.has(index)) {
             row.classList.add('awas-row');
         }
 
         row.innerHTML = `
-            <td>${visibleIndex + 1}</td>
+            <td class="whitespace-nowrap px-3 py-3 text-center text-sm text-gray-600">
+                ${visibleIndex + 1}
+            </td>
 
-            <td>
-                <strong>${escapeHtml(ka.nomor)}</strong>
+            <td class="whitespace-nowrap px-3 py-3 text-sm font-semibold text-gray-800">
+                ${escapeHtml(ka.nomor)}
                 ${ka.is_manual
-                    ? '<div style="margin-top:3px;color:#d9923e;font-size:8px">MANUAL</div>'
+                    ? '<div class="mt-1 text-xs font-medium text-amber-600">MANUAL</div>'
                     : ''}
             </td>
 
-            <td>
+            <td class="min-w-36 px-3 py-3 text-sm text-gray-800">
                 ${escapeHtml(ka.nama)}
                 ${awasInfo.indexSet.has(index)
                     ? '<div class="awas-badge">⚠ AWAS 2 ARAH</div>'
                     : ''}
             </td>
 
-            <td>${escapeHtml(ka.hulu || '-')}</td>
-            <td>${escapeHtml(ka.hilir || '-')}</td>
-            <td>${escapeHtml(ka.relasi || '-')}</td>
-            <td>${escapeHtml(ka.jadwal)}</td>
+            <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">
+                ${escapeHtml(ka.hulu || '-')}
+            </td>
 
-            <td>
-                <input type="time"
-                    class="actual-time"
+            <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">
+                ${escapeHtml(ka.hilir || '-')}
+            </td>
+
+            <td class="min-w-28 px-3 py-3 text-sm text-gray-600">
+                ${escapeHtml(ka.relasi || '-')}
+            </td>
+
+            <td class="whitespace-nowrap px-3 py-3 text-center text-sm font-medium text-gray-700">
+                ${escapeHtml(ka.jadwal)}
+            </td>
+
+            <td class="min-w-32 px-3 py-3">
+                <input
+                    type="time"
+                    class="actual-time w-full min-w-24 rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     value="${escapeHtml(ka.aktual)}"
                     onchange="updateActualTime(${index}, this.value)">
             </td>
 
-            <td>${createStatus(ka, index)}</td>
+            <td class="min-w-28 px-3 py-3 text-center">
+                ${createStatus(ka, index)}
+            </td>
 
-            <td>${createCheckGroup(ka.semboyan21, index, 'semboyan21')}</td>
-            <td>${createCheckGroup(ka.genta, index, 'genta')}</td>
-            <td>${createCheckGroup(ka.pintu, index, 'pintu')}</td>
-            <td>${createCheckGroup(ka.semboyan35, index, 'semboyan35')}</td>
+            <td class="min-w-28 px-3 py-3 text-center">
+                ${createCheckGroup(ka.semboyan21, index, 'semboyan21')}
+            </td>
 
-            <td>
-                <input type="text"
-                    class="note-input"
+            <td class="min-w-24 px-3 py-3 text-center">
+                ${createCheckGroup(ka.genta, index, 'genta')}
+            </td>
+
+            <td class="min-w-36 px-3 py-3 text-center">
+                ${createCheckGroup(ka.pintu, index, 'pintu')}
+            </td>
+
+            <td class="min-w-28 px-3 py-3 text-center">
+                ${createCheckGroup(ka.semboyan35, index, 'semboyan35')}
+            </td>
+
+            <td class="min-w-44 px-3 py-3">
+                <input
+                    type="text"
+                    class="note-input w-full min-w-36 rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     value="${escapeHtml(ka.keterangan)}"
                     placeholder="Keterangan"
                     oninput="updateKeterangan(${index}, this.value)">
             </td>
 
-            <td>${createRowAction(index)}</td>
+            <td class="whitespace-nowrap px-3 py-3 text-center">
+                ${createRowAction(index)}
+            </td>
         `;
 
         tbody.appendChild(row);
@@ -784,6 +864,7 @@ function renderTable() {
     updateWindowRange();
     refreshRowButtons();
 }
+
 
 /* =====================================================
    AKSI STATUS DAN PEMERIKSAAN
@@ -813,18 +894,12 @@ function setStatus(index, status) {
             }
         });
     } else if (status === 'JALAN') {
-        const sebelumnya = ka.status;
-
         ka.status = 'JALAN';
         ka.aktual = getNowHHMM();
 
-        if (sebelumnya === 'BATAL') {
-            fieldSemboyan.forEach(field => {
-                if (ka[field] === 'no') {
-                    ka[field] = '';
-                }
-            });
-        }
+        fieldSemboyan.forEach(field => {
+            ka[field] = 'yes';
+        });
     } else {
         ka.status = 'BATAL';
         ka.aktual = '';
@@ -995,10 +1070,6 @@ function tandaiBerubah(delay = JEDA_SIMPAN_STATUS, index) {
     refreshRowButtons();
 
     clearTimeout(autoSaveTimer);
-
-    autoSaveTimer = setTimeout(() => {
-        simpanRealisasi({ otomatis: true });
-    }, delay);
 }
 
 function ambilCsrfToken() {
@@ -1139,6 +1210,7 @@ async function simpanRealisasi(options = {}) {
                 getRowVersion(index) === versiDikirim.get(index)
             ) {
                 savedRows.add(index);
+                savedStatuses.set(index, dataKA[index].status);
                 dirtyRows.delete(index);
             } else {
                 dirtyRows.add(index);
@@ -1147,7 +1219,7 @@ async function simpanRealisasi(options = {}) {
 
         savingRows = new Set();
         saveGagal = false;
-
+        renderTable();
         if (dirtyRows.size > 0 || isDirty) {
             isDirty = true;
 
@@ -1155,12 +1227,6 @@ async function simpanRealisasi(options = {}) {
                 'pending',
                 'Ada perubahan baru yang belum disimpan…'
             );
-
-            clearTimeout(autoSaveTimer);
-
-            autoSaveTimer = setTimeout(() => {
-                simpanRealisasi({ otomatis: true });
-            }, JEDA_SIMPAN_STATUS);
         } else {
             isDirty = false;
 
@@ -1182,10 +1248,7 @@ async function simpanRealisasi(options = {}) {
         }
 
         if (!otomatis) {
-            alert(
-                result.message ||
-                'Realisasi KA berhasil disimpan ke database.'
-            );
+            alert('Berhasil disimpan!');
         }
 
     } catch (error) {
@@ -1205,16 +1268,8 @@ async function simpanRealisasi(options = {}) {
         } else {
             setSaveStatus(
                 'error',
-                'Gagal menyimpan. Mencoba lagi otomatis…'
+                'Gagal menyimpan. Silakan klik Simpan untuk mencoba lagi.'
             );
-
-            clearTimeout(retryTimer);
-
-            retryTimer = setTimeout(() => {
-                if (navigator.onLine && isDirty) {
-                    simpanRealisasi({ otomatis: true });
-                }
-            }, JEDA_COBA_ULANG);
         }
 
         if (!otomatis) {
@@ -1239,8 +1294,8 @@ async function simpanRealisasi(options = {}) {
             saveQueued = false;
             queuedManual = false;
 
-            if (isDirty || manual) {
-                simpanRealisasi({ otomatis: !manual });
+            if (manual && (isDirty || dirtyRows.size > 0)) {
+                simpanRealisasi();
             }
         }
     }
@@ -1251,61 +1306,20 @@ async function tungguSimpanSelesai() {
         await sleep(150);
     }
 
-    if (isDirty) {
-        await simpanRealisasi({ otomatis: true });
-    }
-
-    while (isSaving) {
-        await sleep(150);
-    }
-
     return !isDirty && !saveGagal;
 }
 
-function kirimSisaPerubahan() {
-    if (!isDirty || isSaving || dataKA.length === 0) {
-        return;
-    }
-
-    fetch(CONFIG.storeUrl, {
-        method: 'POST',
-        keepalive: true,
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': ambilCsrfToken()
-        },
-        body: JSON.stringify({ data: dataKA })
-    }).catch(error => {
-        console.error('Gagal mengirim sisa perubahan:', error);
-    });
-}
-
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-        kirimSisaPerubahan();
-    }
-});
-
-window.addEventListener('pagehide', kirimSisaPerubahan);
-
 window.addEventListener('beforeunload', event => {
-    if (isDirty && saveGagal) {
+    if (isDirty) {
         event.preventDefault();
         event.returnValue = '';
-    }
-});
-
-window.addEventListener('online', () => {
-    if (isDirty) {
-        simpanRealisasi({ otomatis: true });
     }
 });
 
 window.addEventListener('offline', () => {
     setSaveStatus(
         'error',
-        'Tidak ada koneksi. Perubahan akan disimpan saat online.'
+        'Tidak ada koneksi internet.'
     );
 });
 

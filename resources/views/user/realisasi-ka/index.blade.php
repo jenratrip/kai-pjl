@@ -190,29 +190,31 @@
             </div>
 
             {{-- TABEL REALISASI KA --}}
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>NO</th>
-                            <th>NOMOR KA</th>
-                            <th>NAMA KA</th>
-                            <th>HULU</th>
-                            <th>HILIR</th>
-                            <th>RELASI</th>
-                            <th>JAM JADWAL</th>
-                            <th>JAM AKTUAL</th>
-                            <th>STATUS</th>
-                            <th>SEMBOYAN 21</th>
-                            <th>GENTA</th>
-                            <th>PINTU PERLINTASAN</th>
-                            <th>SEMBOYAN 35</th>
-                            <th>KETERANGAN</th>
-                            <th>AKSI</th>
-                        </tr>
-                    </thead>
-                    <tbody id="kaTableBody"></tbody>
-                </table>
+            <div class="table-wrapper w-full min-w-0 max-w-full overflow-hidden">
+                <div class="w-full max-w-full overflow-x-auto">
+                    <table class="w-max min-w-full border-collapse text-left">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="whitespace-nowrap px-3 py-3 text-center">NO</th>
+                                <th class="whitespace-nowrap px-3 py-3">NOMOR KA</th>
+                                <th class="whitespace-nowrap px-3 py-3">NAMA KA</th>
+                                <th class="whitespace-nowrap px-3 py-3">HULU</th>
+                                <th class="whitespace-nowrap px-3 py-3">HILIR</th>
+                                <th class="whitespace-nowrap px-3 py-3">RELASI</th>
+                                <th class="whitespace-nowrap px-3 py-3 text-center">JAM JADWAL</th>
+                                <th class="whitespace-nowrap px-3 py-3 text-center">JAM AKTUAL</th>
+                                <th class="whitespace-nowrap px-3 py-3 text-center">STATUS</th>
+                                <th class="min-w-32 whitespace-nowrap px-4 py-3 text-center">SEMBOYAN 21</th>
+                                <th class="min-w-28 whitespace-nowrap px-4 py-3 text-center">GENTA</th>
+                                <th class="min-w-40 whitespace-nowrap px-4 py-3 text-center">PINTU PERLINTASAN</th>
+                                <th class="min-w-36 whitespace-nowrap px-4 py-3 text-center">SEMBOYAN 35</th>
+                                <th class="min-w-44 whitespace-nowrap px-3 py-3">KETERANGAN</th>
+                                <th class="whitespace-nowrap px-3 py-3 text-center">AKSI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="kaTableBody"></tbody>
+                    </table>
+                </div>
             </div>
 
             {{-- TAMBAH KA MANUAL --}}
@@ -399,7 +401,7 @@
                         role="status"
                         aria-live="polite">
                         <span class="save-dot"></span>
-                        <span id="saveStatusText">Penyimpanan otomatis aktif</span>
+                        <span id="saveStatusText">Perubahan belum disimpan</span>
                     </div>
                 </div>
 

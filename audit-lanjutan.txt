@@ -1,0 +1,618 @@
+]633;E;{     echo "===== GIT STATUS ====="\x3b     git status --short 2>&1\x3b      echo ""\x3b     echo "===== ROUTES WEB ====="\x3b     sed -n '1,320p' routes/web.php\x3b      echo ""\x3b     echo "===== ROLE MIDDLEWARE ====="\x3b     sed -n '1,240p' app/Http/Middleware/RoleMiddleware.php\x3b      echo ""\x3b     echo "===== SUPERADMIN MIDDLEWARE ====="\x3b     sed -n '1,240p' app/Http/Middleware/SuperadminMiddleware.php\x3b      echo ""\x3b     echo "===== USER DASHBOARD CONTROLLER ====="\x3b     sed -n '1,240p' app/Http/Controllers/User/DashboardController.php\x3b      echo ""\x3b     echo "===== PEMETAAN LAYOUT DAN ASET ====="\x3b     grep -RInE "@extends|@vite|asset\\(['\\"](css|js)/|@push\\(['\\"](styles|scripts)|@section\\(['\\"](styles|scripts)"         resources/views/user         resources/views/admin         resources/views/superadmin         resources/views/layouts 2>/dev/null\x3b } > audit-lanjutan.txt;391412d5-349d-4111-acec-4df089364660]633;C===== GIT STATUS =====
+A  app/Exports/JadwalKaTemplateExport.php
+ M app/Http/Controllers/Admin/JadwalKaController.php
+ M app/Http/Controllers/Auth/LoginController.php
+M  app/Http/Controllers/User/RealisasiKaController.php
+A  app/Imports/JadwalKaImport.php
+M  app/Models/Dinas.php
+M  app/Models/JadwalKa.php
+A  database/migrations/2026_10_18_222754_convert_hari_berlaku_jadwal_ka_to_json.php
+ M public/js/user/realisasi-ka.js
+A  resources/views/admin/jadwal-ka/_form.blade.php
+AM resources/views/admin/jadwal-ka/edit.blade.php
+ M resources/views/admin/jadwal-ka/show.blade.php
+M  resources/views/components/admin/sidebar.blade.php
+ M resources/views/user/catatan-dinas/index.blade.php
+ M resources/views/user/realisasi-ka/index.blade.php
+M  routes/web.php
+?? audit-lanjutan.txt
+?? routes-audit.txt
+?? struktur-project.txt
+
+===== ROUTES WEB =====
+<?php
+
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Auth\LoginController;
+
+// ======================================================
+// ADMIN CONTROLLERS
+// ======================================================
+
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\UserImportController as AdminUserImportController;
+use App\Http\Controllers\Admin\DinasController;
+use App\Http\Controllers\Admin\ShiftController;
+use App\Http\Controllers\Admin\JplController;
+use App\Http\Controllers\Admin\JplImportController;
+use App\Http\Controllers\Admin\ResortController;
+use App\Http\Controllers\Admin\WilayahController;
+use App\Http\Controllers\Admin\WilayahImportController;
+use App\Http\Controllers\Admin\InventarisController as AdminInventarisController;
+use App\Http\Controllers\Admin\SerahTerimaDinasController as AdminSerahTerimaDinasController;
+use App\Http\Controllers\Admin\CatatanDinasController as AdminCatatanDinasController;
+use App\Http\Controllers\Admin\JadwalKaController;
+use App\Http\Controllers\Admin\JadwalKaImportController;
+use App\Http\Controllers\Admin\RealisasiKaSettingController;
+use App\Http\Controllers\Admin\RealisasiKaController as AdminRealisasiKaController;
+
+// ======================================================
+// USER / PJL CONTROLLERS
+// ======================================================
+
+use App\Http\Controllers\User\DashboardController as UserDashboardController;
+use App\Http\Controllers\User\RealisasiKaController;
+use App\Http\Controllers\User\CatatanDinasController;
+use App\Http\Controllers\User\SerahTerimaDinasController;
+use App\Http\Controllers\User\InventarisController as UserInventarisController;
+
+// ======================================================
+// SUPERADMIN CONTROLLERS
+// ======================================================
+
+use App\Http\Controllers\Superadmin\DashboardController as SuperadminDashboardController;
+use App\Http\Controllers\Superadmin\UserController as SuperadminUserController;
+use App\Http\Controllers\Superadmin\UserImportController as SuperadminUserImportController;
+use App\Http\Controllers\Superadmin\ActivityLogController;
+use App\Http\Controllers\Superadmin\SystemMonitoringController;
+use App\Http\Controllers\Superadmin\JplController as SuperadminJplController;
+
+// ======================================================
+// ROOT / HALAMAN UTAMA
+// ======================================================
+
+Route::get('/', function () {
+    if (!Auth::check()) {
+        return redirect()->route('login');
+    }
+
+    $user = Auth::user();
+
+    if ($user->isSuperadmin()) {
+        return redirect()->route('superadmin.dashboard');
+    }
+
+    if ($user->hasRole('admin')) {
+        return redirect()->route('admin.dashboard');
+    }
+
+    if ($user->hasRole('pjl')) {
+        return redirect()->route('user.realisasi-ka');
+    }
+
+    abort(403, 'Role pengguna tidak dikenali.');
+})->name('home');
+
+// ======================================================
+// AUTHENTICATION
+// ======================================================
+
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [
+        LoginController::class,
+        'showLoginForm',
+    ])->name('login');
+
+    Route::post('/login', [
+        LoginController::class,
+        'login',
+    ])->middleware('throttle:5,1')->name('login.store');
+});
+
+Route::post('/logout', [
+    LoginController::class,
+    'logout',
+])->middleware('auth')->name('logout');
+
+// ======================================================
+// USER / PJL
+// ======================================================
+
+Route::middleware(['auth', 'role:pjl'])
+    ->prefix('user')
+    ->name('user.')
+    ->group(function () {
+
+        // DASHBOARD
+
+        Route::get('/dashboard', [
+            UserDashboardController::class,
+            'index',
+        ])->name('dashboard');
+
+        // REALISASI KA
+
+        Route::get('/realisasi-ka', [
+            RealisasiKaController::class,
+            'index',
+        ])->name('realisasi-ka');
+
+        Route::post('/realisasi-ka', [
+            RealisasiKaController::class,
+            'store',
+        ])->name('realisasi-ka.store');
+
+        // CATATAN DINAS USER
+
+        Route::get('/catatan-dinas', [
+            CatatanDinasController::class,
+            'index',
+        ])->name('catatan-dinas');
+
+        Route::post('/catatan-dinas', [
+            CatatanDinasController::class,
+            'store',
+        ])->name('catatan-dinas.store');
+
+        // SERAH TERIMA DINAS USER
+
+        Route::get('/serah-terima-dinas', [
+            SerahTerimaDinasController::class,
+            'index',
+        ])->name('serah-terima-dinas');
+
+        // PENCARIAN PENERIMA BERDASARKAN NAMA / NIP
+
+        Route::get('/serah-terima-dinas/cari-penerima', [
+            SerahTerimaDinasController::class,
+            'cariPenerima',
+        ])->name('serah-terima-dinas.cari-penerima');
+
+        // RIWAYAT SERAH TERIMA
+
+        Route::get('/serah-terima-dinas/riwayat', [
+            SerahTerimaDinasController::class,
+            'riwayat',
+        ])->name('serah-terima-dinas.riwayat');
+
+        Route::get('/serah-terima-dinas/riwayat/{serahTerima}/edit', [
+            SerahTerimaDinasController::class,
+            'edit',
+        ])->whereNumber('serahTerima')
+          ->name('serah-terima-dinas.edit');
+
+        Route::get('/serah-terima-dinas/riwayat/{serahTerima}', [
+            SerahTerimaDinasController::class,
+            'show',
+        ])->whereNumber('serahTerima')
+          ->name('serah-terima-dinas.show');
+
+        // KONFIRMASI SERAH TERIMA OLEH PJL PENERIMA
+
+        Route::post('/serah-terima-dinas/{serahTerima}/konfirmasi', [
+            SerahTerimaDinasController::class,
+            'konfirmasi',
+        ])->whereNumber('serahTerima')
+          ->name('serah-terima-dinas.konfirmasi');
+
+        // SIMPAN CATATAN SERAH TERIMA
+
+        Route::post('/serah-terima-dinas/catatan', [
+            SerahTerimaDinasController::class,
+            'storeCatatan',
+        ])->name('serah-terima-dinas.catatan.store');
+
+        // SIMPAN REALISASI INVENTARIS SERAH TERIMA
+
+        Route::post('/serah-terima-dinas/inventaris', [
+            SerahTerimaDinasController::class,
+            'storeInventaris',
+        ])->name('serah-terima-dinas.inventaris.store');
+
+        // SIMPAN SERAH TERIMA DINAS
+
+        Route::post('/serah-terima-dinas/simpan', [
+            SerahTerimaDinasController::class,
+            'store',
+        ])->name('serah-terima-dinas.store');
+
+        // ENDPOINT KOMPATIBILITAS LAMA
+
+        Route::post('/serah-terima-dinas', [
+            SerahTerimaDinasController::class,
+            'store',
+        ]);
+
+        // INVENTARIS PJL
+
+        Route::get('/inventaris', [
+            UserInventarisController::class,
+            'index',
+        ])->name('inventaris.index');
+
+        Route::patch('/inventaris/{inventaris}', [
+            UserInventarisController::class,
+            'update',
+        ])->name('inventaris.update');
+    });
+
+// ======================================================
+// ADMIN + SUPERADMIN
+// FITUR OPERASIONAL BERSAMA
+// ======================================================
+
+Route::middleware(['auth', 'role:admin,superadmin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+
+        // DASHBOARD
+
+        Route::get('/dashboard', [
+            AdminDashboardController::class,
+            'index',
+        ])->name('dashboard');
+
+        // PENGATURAN REALISASI KA
+
+        Route::get('/pengaturan-realisasi-ka', [
+            RealisasiKaSettingController::class,
+            'index',
+        ])->name('realisasi-ka-settings.index');
+
+        Route::put('/pengaturan-realisasi-ka', [
+            RealisasiKaSettingController::class,
+            'update',
+        ])->name('realisasi-ka-settings.update');
+
+        // DAFTAR REALISASI KA
+
+        Route::get('/realisasi-ka', [
+            AdminRealisasiKaController::class,
+            'index',
+        ])->name('realisasi-ka.index');
+
+        // MANAJEMEN USER
+
+        Route::get('/users', [
+            AdminUserController::class,
+            'index',
+        ])->name('users.index');
+
+        Route::get('/users/import/template', [
+            AdminUserImportController::class,
+            'downloadTemplate',
+        ])->name('users.import.template');
+
+        Route::post('/users/import/preview', [
+            AdminUserImportController::class,
+            'preview',
+        ])->name('users.import.preview');
+
+        Route::post('/users/import/confirm', [
+            AdminUserImportController::class,
+            'confirm',
+        ])->name('users.import.confirm');
+
+        Route::get('/users/{id}/edit', [
+            AdminUserController::class,
+            'edit',
+        ])->name('users.edit');
+
+        Route::get('/users/{id}', [
+            AdminUserController::class,
+            'show',
+        ])->name('users.show');
+
+        Route::put('/users/{id}', [
+            AdminUserController::class,
+            'update',
+        ])->name('users.update');
+
+        Route::patch('/users/{id}/status', [
+            AdminUserController::class,
+            'toggleStatus',
+        ])->name('users.toggle-status');
+
+        // REVIEW CATATAN DINAS
+
+        Route::get('/catatan-dinas', [
+            AdminCatatanDinasController::class,
+            'index',
+        ])->name('catatan-dinas.index');
+
+        Route::get('/catatan-dinas/{catatanDinas}', [
+            AdminCatatanDinasController::class,
+            'show',
+        ])->name('catatan-dinas.show');
+
+        Route::patch('/catatan-dinas/{catatanDinas}', [
+            AdminCatatanDinasController::class,
+            'update',
+        ])->name('catatan-dinas.update');
+
+        // REVIEW SERAH TERIMA DINAS
+
+        Route::get('/serah-terima-dinas/updates', [
+            AdminSerahTerimaDinasController::class,
+            'updates',
+        ])->name('serah-terima-dinas.updates');
+
+
+===== ROLE MIDDLEWARE =====
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+class RoleMiddleware
+{
+    /**
+     * Handle an incoming request.
+     */
+    public function handle(
+        Request $request,
+        Closure $next,
+        string ...$roles
+    ): Response {
+        if (! $request->user()) {
+            return redirect()->route('login');
+        }
+
+        $userRole = $request->user()->role?->name;
+
+        if (! in_array($userRole, $roles, true)) {
+            abort(403, 'Anda tidak memiliki akses ke halaman ini.');
+        }
+
+        return $next($request);
+    }
+}
+===== SUPERADMIN MIDDLEWARE =====
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+class SuperadminMiddleware
+{
+    /**
+     * Handle an incoming request.
+     */
+    public function handle(Request $request, Closure $next): Response
+    {
+        if (! $request->user()) {
+            return redirect()->route('login');
+        }
+
+        if ($request->user()->role?->name !== 'superadmin') {
+            abort(403, 'Anda tidak memiliki akses ke halaman Superadmin.');
+        }
+
+        return $next($request);
+    }
+}
+===== USER DASHBOARD CONTROLLER =====
+<?php
+
+namespace App\Http\Controllers\User;
+
+use App\Http\Controllers\Controller;
+use App\Models\Dinas;
+use Carbon\Carbon;
+
+class DashboardController extends Controller
+{
+    /**
+     * Menampilkan dashboard petugas PJL.
+     */
+    public function index()
+    {
+        $user = auth()->user();
+
+        // Ambil dinas aktif milik petugas yang sedang login.
+        $dinasAktif = Dinas::with([
+            'user',
+            'jpl',
+            'shift',
+            'catatanDinas',
+        ])
+            ->where('user_id', $user->id)
+            ->where('status', 'berlangsung')
+            ->latest('id')
+            ->first();
+
+        // Default jika petugas belum memiliki dinas aktif.
+        $lokasiDinas = '-';
+        $namaShift = '-';
+        $jamDinas = '-';
+        $tanggalTugas = '-';
+        $catatanAktif = null;
+
+        if ($dinasAktif) {
+            // Informasi lokasi PJL.
+            $lokasiDinas =
+                $dinasAktif->jpl?->nama_jpl
+                ?? $dinasAktif->jpl?->kode_jpl
+                ?? $dinasAktif->jpl?->lokasi
+                ?? '-';
+
+            // Informasi shift.
+            $namaShift = $dinasAktif->shift?->nama_shift ?? '-';
+
+            $jamMulai = $this->formatJam(
+                $dinasAktif->jam_mulai
+                ?? $dinasAktif->shift?->jam_mulai
+            );
+
+            $jamSelesai = $this->formatJam(
+                $dinasAktif->jam_selesai
+                ?? $dinasAktif->shift?->jam_selesai
+            );
+
+            if ($jamMulai !== '-' && $jamSelesai !== '-') {
+                $jamDinas = "{$jamMulai} - {$jamSelesai}";
+            } elseif ($jamMulai !== '-') {
+                $jamDinas = $jamMulai;
+            } elseif ($jamSelesai !== '-') {
+                $jamDinas = $jamSelesai;
+            }
+
+            // Format tanggal tugas dalam bahasa Indonesia.
+            if ($dinasAktif->tanggal_dinas) {
+                $tanggal = Carbon::parse(
+                    $dinasAktif->tanggal_dinas
+                );
+
+                $hari = [
+                    1 => 'Senin',
+                    2 => 'Selasa',
+                    3 => 'Rabu',
+                    4 => 'Kamis',
+                    5 => 'Jumat',
+                    6 => 'Sabtu',
+                    7 => 'Minggu',
+                ];
+
+                $bulan = [
+                    1 => 'Januari',
+                    2 => 'Februari',
+                    3 => 'Maret',
+                    4 => 'April',
+                    5 => 'Mei',
+                    6 => 'Juni',
+                    7 => 'Juli',
+                    8 => 'Agustus',
+                    9 => 'September',
+                    10 => 'Oktober',
+                    11 => 'November',
+                    12 => 'Desember',
+                ];
+
+                $tanggalTugas =
+                    $hari[$tanggal->dayOfWeekIso]
+                    . ', '
+                    . $tanggal->day
+                    . ' '
+                    . $bulan[$tanggal->month]
+                    . ' '
+                    . $tanggal->year;
+            }
+
+            // Ambil catatan terbaru yang terkait dengan dinas aktif.
+            $catatanAktif = $dinasAktif->catatanDinas()
+                ->orderByDesc('waktu_catatan')
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        return view('user.dashboard.index', [
+            'user' => $user,
+            'dinasAktif' => $dinasAktif,
+            'lokasiDinas' => $lokasiDinas,
+            'namaShift' => $namaShift,
+            'jamDinas' => $jamDinas,
+            'tanggalTugas' => $tanggalTugas,
+            'catatanAktif' => $catatanAktif,
+        ]);
+    }
+
+    /**
+     * Format jam menjadi HH:MM.
+     */
+    private function formatJam($jam): string
+    {
+        if (!$jam) {
+            return '-';
+        }
+
+        return substr((string) $jam, 0, 5);
+    }
+}
+===== PEMETAAN LAYOUT DAN ASET =====
+resources/views/user/catatan-dinas/index.blade.php:1:@extends('layouts.user-operasional')
+resources/views/user/catatan-dinas/index.blade.php:5:@push('styles')
+resources/views/user/catatan-dinas/index.blade.php:6:    <link rel="stylesheet" href="{{ asset('css/user/catatan-dinas.css') }}">
+resources/views/user/catatan-dinas/index.blade.php:17:@push('scripts')
+resources/views/user/dashboard/index.blade.php:10:    <link rel="stylesheet" href="{{ asset('css/user/dashboard.css') }}">
+resources/views/user/realisasi-ka/index.blade.php:1:﻿ @extends('layouts.user-operasional')
+resources/views/user/realisasi-ka/index.blade.php:5:@push('styles')
+resources/views/user/realisasi-ka/index.blade.php:6:    <link rel="stylesheet" href="{{ asset('css/user/realisasi-ka.css') }}">
+resources/views/user/realisasi-ka/index.blade.php:591:@push('scripts')
+resources/views/user/realisasi-ka/index.blade.php:617:    <script src="{{ asset('js/user/realisasi-ka.js') }}" defer></script>
+resources/views/user/serahterimacatatan/index.blade.php:1:@extends('layouts.user-operasional')
+resources/views/user/serahterimacatatan/index.blade.php:15:@push('styles')
+resources/views/user/serahterimacatatan/index.blade.php:16:    @vite(['resources/css/app.css', 'resources/js/app.js'])
+resources/views/user/serahterimacatatan/index.blade.php:17:    <link rel="stylesheet" href="{{ asset('css/user/serah-terima.css') }}">
+resources/views/user/serahterimacatatan/riwayat.blade.php:1:@extends('layouts.user-operasional')
+resources/views/user/serahterimacatatan/riwayat.blade.php:5:@push('styles')
+resources/views/user/serahterimacatatan/riwayat.blade.php:6:    @vite(['resources/css/app.css', 'resources/js/app.js'])
+resources/views/user/serahterimacatatan/riwayat.blade.php:7:    <link rel="stylesheet" href="{{ asset('css/user/serah-terima.css') }}">
+resources/views/admin/catatan-dinas/index.blade.php:1:@extends('layouts.admin')
+resources/views/admin/catatan-dinas/show.blade.php:1:@extends('layouts.admin')
+resources/views/admin/dashboard/index.blade.php:1:@extends('layouts.admin')
+resources/views/admin/dinas/edit.blade.php:2:@extends('layouts.admin')
+resources/views/admin/dinas/index.blade.php:1:@extends('layouts.admin')
+resources/views/admin/inventaris/create.blade.php:7:    @vite(['resources/css/app.css', 'resources/js/app.js'])
+resources/views/admin/inventaris/edit.blade.php:7:    @vite(['resources/css/app.css', 'resources/js/app.js'])
+resources/views/admin/inventaris/index.blade.php:1:@extends('layouts.admin')
+resources/views/admin/inventaris/show-jpl.blade.php:1:@extends('layouts.admin')
+resources/views/admin/inventaris/show.blade.php:1:@extends('layouts.admin')
+resources/views/admin/jadwal-ka/arsip.blade.php:1:@extends('layouts.admin')
+resources/views/admin/jadwal-ka/edit.blade.php:1:@extends('layouts.admin')
+resources/views/admin/jadwal-ka/import.blade.php:1:@extends('layouts.admin')
+resources/views/admin/jadwal-ka/index.blade.php:1:@extends('layouts.admin')
+resources/views/admin/jadwal-ka/preview.blade.php:1:@extends('layouts.admin')
+resources/views/admin/jadwal-ka/show.blade.php:1:@extends('layouts.admin')
+resources/views/admin/jadwal-ka/showarsip.blade.php:1:@extends('layouts.admin')
+resources/views/admin/jpl/edit.blade.php:1:@extends('layouts.admin')
+resources/views/admin/jpl/import-preview.blade.php:1:@extends('layouts.admin')
+resources/views/admin/jpl/import.blade.php:1:@extends('layouts.admin')
+resources/views/admin/jpl/index.blade.php:1:@extends('layouts.admin')
+resources/views/admin/jpl/show.blade.php:1:@extends('layouts.admin')
+resources/views/admin/realisasi-ka/index.blade.php:1:@extends('layouts.admin')
+resources/views/admin/realisasi-ka-settings/index.blade.php:1:@extends('layouts.admin')
+resources/views/admin/resort/create.blade.php:1:@extends('layouts.admin')
+resources/views/admin/resort/edit.blade.php:1:@extends('layouts.admin')
+resources/views/admin/resort/index.blade.php:1:@extends('layouts.admin')
+resources/views/admin/resort/show.blade.php:1:@extends('layouts.admin')
+resources/views/admin/serah-terima-dinas/index.blade.php:1:@extends('layouts.admin')
+resources/views/admin/serah-terima-dinas/index.blade.php:186:@push('scripts')
+resources/views/admin/serah-terima-dinas/show.blade.php:1:@extends('layouts.admin')
+resources/views/admin/serah-terima-dinas/show.blade.php:1237:    @push('scripts')
+resources/views/admin/shift/index.blade.php:1:@extends('layouts.admin')
+resources/views/admin/users/edit.blade.php:1:@extends('layouts.admin')
+resources/views/admin/users/import-preview.blade.php:1:@extends('layouts.admin')
+resources/views/admin/users/index.blade.php:1:@extends('layouts.admin')
+resources/views/admin/users/show.blade.php:1:@extends('layouts.admin')
+resources/views/admin/wilayah/create.blade.php:1:@extends('layouts.admin')
+resources/views/admin/wilayah/edit.blade.php:1:@extends('layouts.admin')
+resources/views/admin/wilayah/import-preview.blade.php:1:@extends('layouts.admin')
+resources/views/admin/wilayah/index.blade.php:1:@extends('layouts.admin')
+resources/views/superadmin/activities/index.blade.php:1:@extends('layouts.superadmin')
+resources/views/superadmin/activities/show.blade.php:1:@extends('layouts.superadmin')
+resources/views/superadmin/dashboard.blade.php:1:@extends('layouts.superadmin')
+resources/views/superadmin/jpl/import-preview.blade.php:1:@extends('layouts.superadmin')
+resources/views/superadmin/jpl/import.blade.php:1:@extends('layouts.superadmin')
+resources/views/superadmin/jpl/index.blade.php:1:@extends('layouts.superadmin')
+resources/views/superadmin/monitoring/index.blade.php:1:@extends('layouts.superadmin')
+resources/views/superadmin/users/create.blade.php:1:@extends('layouts.superadmin')
+resources/views/superadmin/users/edit.blade.php:1:@extends('layouts.superadmin')
+resources/views/superadmin/users/index.blade.php:1:@extends('layouts.superadmin')
+resources/views/superadmin/users/index.blade.php:1299:@push('scripts')
+resources/views/superadmin/users/show.blade.php:1:@extends('layouts.superadmin')
+resources/views/layouts/admin.blade.php:22:    @vite([
+resources/views/layouts/superadmin.blade.php:23:    @vite([
+resources/views/layouts/user-operasional.blade.php:11:    <link rel="stylesheet" href="{{ asset('css/user-operasional/layout.css') }}">
+resources/views/layouts/user-operasional.blade.php:49:    <script src="{{ asset('js/user-operasional/layout.js') }}"></script>
+resources/views/layouts/user.blade.php:12:    @vite([
+resources/views/layouts/user.blade.php:20:        href="{{ asset('css/user/layout-user.css') }}"
+resources/views/layouts/user.blade.php:49:        src="{{ asset('js/user/layout.js') }}"

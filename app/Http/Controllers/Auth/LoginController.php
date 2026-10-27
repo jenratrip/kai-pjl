@@ -280,12 +280,23 @@ class LoginController extends Controller
                         ->value('user_id');
                 }
 
+                $jamMulai = now();
+
+                $jamSelesai = \Carbon\Carbon::parse(
+                    $tanggal . ' ' . $shift->jam_selesai
+                );
+
+                if ($jamSelesai->lte($jamMulai)) {
+                    $jamSelesai->addDay();
+                }
+
                 $dinas = Dinas::create([
                     'user_id'            => $user->id,
                     'jpl_id'             => $jpl->id,
                     'shift_id'           => $shift->id,
                     'tanggal_dinas'      => $tanggal,
-                    'jam_mulai'          => now(),
+                    'jam_mulai'          => $jamMulai,
+                    'jam_selesai'        => $jamSelesai,
                     'status'             => 'berlangsung',
                     'is_pengganti'       => $isWakilan,
                     'user_digantikan_id' => $digantikan,

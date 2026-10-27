@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\JadwalKa;
+use App\Models\KeretaApi;
 use App\Models\Jpl;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -85,34 +86,28 @@ class JadwalKaController extends Controller
     /**
      * Detail jadwal KA berdasarkan JPL.
      *
-     * Jadwal yang sudah lewat tidak ditampilkan pada
-     * daftar operasional hari ini.
+     * Admin dapat melihat jadwal aktif maupun nonaktif
+     * yang berlaku hari ini, termasuk jadwal yang jamnya sudah lewat.
      */
     public function show(Request $request, Jpl $jpl): View
     {
         $sekarang = Carbon::now();
         $tanggalHariIni = $sekarang->toDateString();
-        $jamSekarang = $sekarang->format('H:i:s');
         $namaHari = $this->namaHariIndonesia($sekarang);
 
         $jadwal = JadwalKa::query()
             ->with(['keretaApi', 'jpl'])
             ->where('jpl_id', $jpl->id)
-            ->where('jam_lewat', '>=', $jamSekarang)
 
-            // Filter status yang diminta pengguna.
-            ->when($request->filled('status'), function ($query) use ($request) {
-                $status = $request->input('status');
-
-                if ($status === 'aktif') {
-                    $query->where('is_active', true);
-                } elseif ($status === 'nonaktif') {
-                    $query->where('is_active', false);
-                }
-            }, function ($query) {
-                // Default hanya jadwal aktif.
-                $query->where('is_active', true);
-            })
+            // Filter status jadwal.
+            ->when(
+                $request->input('status') === 'aktif',
+                fn ($query) => $query->where('is_active', true)
+            )
+            ->when(
+                $request->input('status') === 'nonaktif',
+                fn ($query) => $query->where('is_active', false)
+            )
 
             // Pencarian nomor atau nama KA.
             ->when($request->filled('q'), function ($query) use ($request) {
@@ -128,24 +123,17 @@ class JadwalKaController extends Controller
             })
 
             // Hanya jadwal yang berlaku hari ini.
-            ->where(function ($query) use (
-                $tanggalHariIni,
-                $namaHari
-            ) {
-                $query->whereDate(
-                    'tanggal_berlaku',
-                    $tanggalHariIni
-                )
-
-                ->orWhere(function ($rutin) use ($namaHari) {
-                    $rutin
-                        ->whereNull('tanggal_berlaku')
-                        ->whereNotNull('hari_berlaku')
-                        ->whereRaw(
-                            'LOWER(hari_berlaku) LIKE ?',
-                            ['%' . mb_strtolower($namaHari) . '%']
-                        );
-                });
+            ->where(function ($query) use ($tanggalHariIni, $namaHari) {
+                $query->whereDate('tanggal_berlaku', $tanggalHariIni)
+                    ->orWhere(function ($rutin) use ($namaHari) {
+                        $rutin
+                            ->whereNull('tanggal_berlaku')
+                            ->whereNotNull('hari_berlaku')
+                            ->whereRaw(
+                                'LOWER(hari_berlaku) LIKE ?',
+                                ['%' . mb_strtolower($namaHari) . '%']
+                            );
+                    });
             })
             ->orderBy('jam_lewat')
             ->paginate(25)
@@ -156,6 +144,81 @@ class JadwalKaController extends Controller
             'jadwal',
             'tanggalHariIni'
         ));
+    }
+    
+    /**
+     * Menampilkan form edit jadwal KA.
+     */
+    public function edit(JadwalKa $jadwal_ka): View
+    {
+        $jadwalKa = $jadwal_ka;
+
+        $keretaApi = KeretaApi::orderBy('nomor_ka')->get();
+        $jpls = Jpl::orderBy('kode_jpl')->get();
+
+        return view('admin.jadwal-ka.edit', compact(
+            'jadwalKa',
+            'keretaApi',
+            'jpls'
+        ));
+    }
+
+    /**
+     * Memperbarui jadwal KA.
+     */
+    public function update(Request $request, JadwalKa $jadwal_ka)
+    {
+        $validated = $request->validate([
+            'kereta_api_id' => [
+                'required',
+                'integer',
+                'exists:kereta_api,id',
+            ],
+            'jpl_id' => [
+                'required',
+                'integer',
+                'exists:jpl,id',
+            ],
+            'jam_lewat' => [
+                'required',
+                'date_format:H:i',
+            ],
+            'hari_berlaku' => [
+                'nullable',
+                'array',
+            ],
+            'hari_berlaku.*' => [
+                'required',
+                'in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu,Minggu',
+            ],
+            'tanggal_berlaku' => [
+                'nullable',
+                'date_format:Y-m-d',
+            ],
+            'keterangan' => [
+                'nullable',
+                'string',
+                'max:1000',
+            ],
+            'is_active' => [
+                'required',
+                'boolean',
+            ],
+        ]);
+
+        $validated['hari_berlaku'] =
+            $validated['hari_berlaku'] ?? [];
+
+        $validated['tanggal_berlaku'] =
+            $validated['tanggal_berlaku'] ?? null;
+
+        $jadwal_ka->update($validated);
+
+        return redirect()
+            ->route('admin.jadwal-ka.show', [
+                'jpl' => $jadwal_ka->jpl_id,
+            ])
+            ->with('success', 'Jadwal KA berhasil diperbarui.');
     }
 
     /**

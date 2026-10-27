@@ -333,6 +333,7 @@
                         ? 'bg-orange-500/10 text-orange-400'
                         : 'text-gray-400 hover:bg-white/5 hover:text-white' }}"
                 >
+
                     <svg
                         class="h-4 w-4 shrink-0"
                         fill="none"

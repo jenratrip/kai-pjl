@@ -505,6 +505,25 @@ Route::middleware(['auth', 'role:admin,superadmin'])
                     'inventaris' => 'inventaris',
                 ]);
         });
+
+        // Manajemen Jadwal KA
+        Route::resource('jadwal-ka', JadwalKaController::class)
+            ->except(['show']);
+
+        Route::patch('/jadwal-ka/{jadwalKa}/toggle-status', [
+            JadwalKaController::class,
+            'toggleStatus',
+        ])->name('jadwal-ka.toggle-status');
+
+        Route::get('/jadwal-ka/template', [
+            JadwalKaController::class,
+            'downloadTemplate',
+        ])->name('jadwal-ka.template');
+
+        Route::post('/jadwal-ka/import', [
+            JadwalKaController::class,
+            'importExcel',
+        ])->name('jadwal-ka.import');
     });
 
 // ======================================================

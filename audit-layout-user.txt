@@ -1,0 +1,160 @@
+]633;E;{   echo "===== LAYOUT USER ====="\x3b   sed -n '1,240p' resources/views/layouts/user.blade.php\x3b    echo\x3b   echo "===== LAYOUT USER OPERASIONAL ====="\x3b   sed -n '1,240p' resources/views/layouts/user-operasional.blade.php\x3b    echo\x3b   echo "===== VITE CONFIG ====="\x3b   cat vite.config.js\x3b    echo\x3b   echo "===== APP CSS ====="\x3b   sed -n '1,200p' resources/css/app.css\x3b    echo\x3b   echo "===== APP JS ====="\x3b   sed -n '1,200p' resources/js/app.js\x3b    echo\x3b   echo "===== LAYOUT ADMIN ====="\x3b   find resources/views/layouts -maxdepth 1 -type f -iname '*admin*' -print\x3b } > audit-layout-user.txt;391412d5-349d-4111-acec-4df089364660]633;C===== LAYOUT USER =====
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <title>@yield('title', 'Sistem PJL')</title>
+
+    {{-- CSS utama aplikasi --}}
+    @vite([
+        'resources/css/app.css',
+        'resources/js/app.js'
+    ])
+
+    {{-- CSS header, sidebar, dan layout --}}
+    <link
+        rel="stylesheet"
+        href="{{ asset('css/user/layout-user.css') }}"
+    >
+
+    {{-- CSS khusus setiap halaman --}}
+    @stack('styles')
+</head>
+
+<body class="min-h-screen bg-[#f5f6f8] text-[#1d2d50]">
+
+    {{-- HEADER --}}
+    @include('components.user.header')
+
+    {{-- SIDEBAR --}}
+    @include('components.user.sidebar')
+
+    {{-- OVERLAY SIDEBAR MOBILE --}}
+    <div
+        class="sidebar-overlay"
+        id="sidebarOverlay"
+        onclick="closeSidebar()"
+    ></div>
+
+    {{-- KONTEN HALAMAN --}}
+    <main class="main">
+        @yield('content')
+    </main>
+
+    {{-- JAVASCRIPT LAYOUT --}}
+    <script
+        src="{{ asset('js/user/layout.js') }}"
+        defer
+    ></script>
+
+    {{-- JAVASCRIPT KHUSUS SETIAP HALAMAN --}}
+    @stack('scripts')
+
+</body>
+</html>
+===== LAYOUT USER OPERASIONAL =====
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <title>@yield('title', 'Sistem PJL')</title>
+
+    {{-- CSS utama layout operasional --}}
+    <link rel="stylesheet" href="{{ asset('css/user-operasional/layout.css') }}">
+
+    {{-- CSS tambahan: mendukung @section dan @push --}}
+    @yield('styles')
+    @stack('styles')
+</head>
+<body>
+    {{--
+        Dinas aktif petugas yang sedang login.
+        Dipakai header untuk menampilkan jenis petugas (Reguler / Wakilan)
+        sesuai pilihan saat login (disimpan di dinas.is_pengganti).
+    --}}
+    @php
+        $dinasHeader = auth()->check()
+            ? \App\Models\Dinas::where('user_id', auth()->id())
+                ->where('status', 'berlangsung')
+                ->latest('id')
+                ->first()
+            : null;
+
+        $jenisPetugas = $dinasHeader?->is_pengganti ? 'wakilan' : 'reguler';
+    @endphp
+
+    {{-- Header operasional --}}
+    @include('components.user-operasional.header', [
+        'dinasHeader'  => $dinasHeader,
+        'jenisPetugas' => $jenisPetugas,
+    ])
+
+    {{-- Sidebar operasional --}}
+    @include('components.user-operasional.sidebar')
+
+    {{-- Konten halaman --}}
+    <main class="operasional-content">
+        @yield('content')
+    </main>
+
+    {{-- JavaScript utama layout operasional --}}
+    <script src="{{ asset('js/user-operasional/layout.js') }}"></script>
+
+    {{-- JavaScript tambahan: mendukung @section dan @push --}}
+    @yield('scripts')
+    @stack('scripts')
+</body>
+</html>
+===== VITE CONFIG =====
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import { bunny } from 'laravel-vite-plugin/fonts';
+import tailwindcss from '@tailwindcss/vite';
+
+export default defineConfig({
+    plugins: [
+        laravel({
+            input: ['resources/css/app.css', 'resources/js/app.js'],
+            refresh: true,
+            fonts: [
+                bunny('Instrument Sans', {
+                    weights: [400, 500, 600],
+                }),
+            ],
+        }),
+        tailwindcss(),
+    ],
+    server: {
+        watch: {
+            ignored: ['**/storage/framework/views/**'],
+        },
+    },
+});
+
+===== APP CSS =====
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+===== APP JS =====
+import Alpine from 'alpinejs';
+
+window.Alpine = Alpine;
+
+Alpine.start();
+===== LAYOUT ADMIN =====
+resources/views/layouts/admin.blade.php
+resources/views/layouts/superadmin.blade.php

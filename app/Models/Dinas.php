@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\RealisasiKa;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -95,5 +97,10 @@ class Dinas extends Model
             RealisasiInventaris::class,
             'dinas_id'
         );
+    }
+
+    public function realisasiKa(): HasMany
+    {
+        return $this->hasMany(RealisasiKa::class, 'dinas_id');
     }
 }

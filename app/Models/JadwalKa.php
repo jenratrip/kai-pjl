@@ -23,10 +23,14 @@ class JadwalKa extends Model
         'batch_import',
     ];
 
-    protected $casts = [
-        'tanggal_berlaku' => 'date',
-        'is_active' => 'boolean',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'hari_berlaku' => 'array',
+            'tanggal_berlaku' => 'date',
+            'is_active' => 'boolean',
+        ];
+    }
 
     public function keretaApi(): BelongsTo
     {

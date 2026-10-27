@@ -1,0 +1,768 @@
+===== STATUS GIT =====
+A  app/Exports/JadwalKaTemplateExport.php
+ M app/Http/Controllers/Admin/JadwalKaController.php
+ M app/Http/Controllers/Auth/LoginController.php
+M  app/Http/Controllers/User/RealisasiKaController.php
+A  app/Imports/JadwalKaImport.php
+M  app/Models/Dinas.php
+M  app/Models/JadwalKa.php
+A  database/migrations/2026_10_18_222754_convert_hari_berlaku_jadwal_ka_to_json.php
+ M public/js/user/realisasi-ka.js
+A  resources/views/admin/jadwal-ka/_form.blade.php
+AM resources/views/admin/jadwal-ka/edit.blade.php
+ M resources/views/admin/jadwal-ka/show.blade.php
+M  resources/views/components/admin/sidebar.blade.php
+ M resources/views/user/catatan-dinas/index.blade.php
+ M resources/views/user/realisasi-ka/index.blade.php
+M  routes/web.php
+?? audit-lanjutan.txt
+?? audit-refactor-awal.txt
+?? routes-audit.txt
+?? struktur-project.txt
+
+===== FILE LAYOUT DAN KOMPONEN =====
+
+===== resources/views/layouts/user.blade.php =====
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <title>@yield('title', 'Sistem PJL')</title>
+
+    {{-- CSS utama aplikasi --}}
+    @vite([
+        'resources/css/app.css',
+        'resources/js/app.js'
+    ])
+
+    {{-- CSS header, sidebar, dan layout --}}
+    <link
+        rel="stylesheet"
+        href="{{ asset('css/user/layout-user.css') }}"
+    >
+
+    {{-- CSS khusus setiap halaman --}}
+    @stack('styles')
+</head>
+
+<body class="min-h-screen bg-[#f5f6f8] text-[#1d2d50]">
+
+    {{-- HEADER --}}
+    @include('components.user.header')
+
+    {{-- SIDEBAR --}}
+    @include('components.user.sidebar')
+
+    {{-- OVERLAY SIDEBAR MOBILE --}}
+    <div
+        class="sidebar-overlay"
+        id="sidebarOverlay"
+        onclick="closeSidebar()"
+    ></div>
+
+    {{-- KONTEN HALAMAN --}}
+    <main class="main">
+        @yield('content')
+    </main>
+
+    {{-- JAVASCRIPT LAYOUT --}}
+    <script
+        src="{{ asset('js/user/layout.js') }}"
+        defer
+    ></script>
+
+    {{-- JAVASCRIPT KHUSUS SETIAP HALAMAN --}}
+    @stack('scripts')
+
+</body>
+</html>
+===== resources/views/layouts/user-operasional.blade.php =====
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <title>@yield('title', 'Sistem PJL')</title>
+
+    {{-- CSS utama layout operasional --}}
+    <link rel="stylesheet" href="{{ asset('css/user-operasional/layout.css') }}">
+
+    {{-- CSS tambahan: mendukung @section dan @push --}}
+    @yield('styles')
+    @stack('styles')
+</head>
+<body>
+    {{--
+        Dinas aktif petugas yang sedang login.
+        Dipakai header untuk menampilkan jenis petugas (Reguler / Wakilan)
+        sesuai pilihan saat login (disimpan di dinas.is_pengganti).
+    --}}
+    @php
+        $dinasHeader = auth()->check()
+            ? \App\Models\Dinas::where('user_id', auth()->id())
+                ->where('status', 'berlangsung')
+                ->latest('id')
+                ->first()
+            : null;
+
+        $jenisPetugas = $dinasHeader?->is_pengganti ? 'wakilan' : 'reguler';
+    @endphp
+
+    {{-- Header operasional --}}
+    @include('components.user-operasional.header', [
+        'dinasHeader'  => $dinasHeader,
+        'jenisPetugas' => $jenisPetugas,
+    ])
+
+    {{-- Sidebar operasional --}}
+    @include('components.user-operasional.sidebar')
+
+    {{-- Konten halaman --}}
+    <main class="operasional-content">
+        @yield('content')
+    </main>
+
+    {{-- JavaScript utama layout operasional --}}
+    <script src="{{ asset('js/user-operasional/layout.js') }}"></script>
+
+    {{-- JavaScript tambahan: mendukung @section dan @push --}}
+    @yield('scripts')
+    @stack('scripts')
+</body>
+</html>
+===== resources/views/user/dashboard/index.blade.php =====
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>PJL Dashboard</title>
+
+    <link rel="stylesheet" href="{{ asset('css/user/dashboard.css') }}">
+</head>
+
+<body>
+
+
+    <!-- ========================================
+         HEADER
+    ======================================== -->
+
+    <header class="topbar">
+
+
+        <!-- LOGO + BRAND -->
+
+        <div class="brand">
+
+            <div class="kai-logo">
+
+                <img
+                    src="{{ asset('images/logo-kai.jpg') }}"
+                    alt="Logo KAI"
+                >
+
+            </div>
+
+
+            <div class="brand-text">
+
+                <div class="brand-title">
+                    Sistem PJL
+                </div>
+
+                <div class="brand-subtitle">
+                    PT. KERETA API INDONESIA
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- HEADER RIGHT -->
+
+        <div class="header-right">
+
+            <div class="pjl-info">
+                <div class="pjl-name">
+                    {{ $lokasiDinas }}
+                </div>
+
+                <div class="shift">
+                    @if ($namaShift !== '-')
+                        {{ $namaShift }}
+                        @if ($jamDinas !== '-')
+                            ({{ $jamDinas }})
+                        @endif
+                    @else
+                        Shift belum ditentukan
+                    @endif
+                </div>
+            </div>
+
+
+            <!-- LOGOUT -->
+            <form action="{{ route('logout') }}" method="POST" class="logout-form">
+                @csrf
+
+                <button type="submit" class="logout-btn">
+                    <span>↪</span>
+                    <span>Keluar</span>
+                </button>
+            </form>
+
+        </div>
+    </header>
+
+
+
+    <!-- ========================================
+         MAIN CONTENT
+    ======================================== -->
+
+    <main class="content">
+
+
+        <!-- ====================================
+             INFORMASI PETUGAS
+        ==================================== -->
+
+        <section class="user-card">
+
+
+            <!-- AVATAR -->
+
+            <div class="employee">
+                <div class="employee-label">
+                    Petugas Jaga Jalan Lintasan (PJL)
+                </div>
+
+                <div class="employee-name">
+                    {{ $user->name ?? '-' }}
+                    (NIP: {{ $user->nip ?? '-' }})
+                </div>
+            </div>
+
+
+
+            <!-- INFORMASI DINAS -->
+
+            <div class="employee-info">
+
+
+                <!-- LOKASI DINAS -->
+
+                <div class="info-item">
+
+                    <div class="info-label">
+                        LOKASI DINAS
+                    </div>
+
+                <div class="info-value">
+                    {{ $lokasiDinas ?? '-' }}
+                </div>
+
+                </div>
+
+
+                <!-- SHIFT DINAS -->
+
+                <div class="info-item">
+
+                    <div class="info-label">
+                        SHIFT DINAS
+                    </div>
+
+                    <div class="info-value">
+                        @if (($namaShift ?? '-') !== '-')
+                            {{ $namaShift }}
+                            @if (($jamDinas ?? '-') !== '-')
+                                ({{ $jamDinas }})
+                            @endif
+                        @else
+                            Shift belum ditentukan
+                        @endif
+                    </div>
+
+                </div>
+
+
+                <!-- TANGGAL TUGAS -->
+
+                <div class="info-item">
+
+                    <div class="info-label">
+                        TANGGAL TUGAS
+                    </div>
+
+                    <div class="info-value">
+                        {{ $tanggalTugas }}
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ====================================
+             CATATAN DINAS AKTIF
+        ==================================== -->
+
+        <div class="alert">
+
+            <span class="alert-icon">
+                ▤
+            </span>
+
+            <span>
+                <strong>
+                    Catatan Dinas Aktif:
+                </strong>
+
+                @if ($catatanAktif)
+                    {{ $catatanAktif->judul ?? 'Catatan Dinas' }}
+
+                    @if (!empty($catatanAktif->isi_catatan))
+                        — {{ $catatanAktif->isi_catatan }}
+                    @endif
+                @else
+                    Belum ada catatan untuk dinas aktif.
+                @endif
+            </span>
+
+        </div>
+
+
+        <!-- ====================================
+             MENU OPERASIONAL
+        ==================================== -->
+
+        <h2 class="menu-title">
+            Menu Operasional PJL
+        </h2>
+
+
+        <div class="menu-grid">
+
+
+            <!-- ==================================
+
+===== resources/views/components/user/header.blade.php =====
+<header class="topbar">
+    <div class="brand">
+        <div class="kai-logo">
+            <img
+                src="{{ asset('images/logo-kai.jpg') }}"
+                alt="Logo KAI"
+            >
+        </div>
+
+        <div class="brand-text">
+            <div class="brand-title">Sistem PJL</div>
+            <div class="brand-subtitle">
+                PT. KERETA API INDONESIA
+            </div>
+        </div>
+    </div>
+
+    <div class="header-right">
+        <div class="pjl-info">
+            <div class="pjl-name">
+                {{ $lokasiDinas ?? ($dinasAktif->jpl->nama_jpl ?? 'PJL') }}
+            </div>
+
+            <div class="shift">
+                @if (!empty($namaShift) && $namaShift !== '-')
+                    {{ $namaShift }}
+                    @if (!empty($jamDinas) && $jamDinas !== '-')
+                        ({{ $jamDinas }})
+                    @endif
+                @elseif (isset($dinasAktif) && $dinasAktif)
+                    {{ $dinasAktif->shift->nama_shift ?? 'Shift belum ditentukan' }}
+                @else
+                    Shift belum ditentukan
+                @endif
+            </div>
+        </div>
+
+        <form
+            action="{{ route('logout') }}"
+            method="POST"
+            class="logout-form"
+        >
+            @csrf
+
+            <button type="submit" class="logout-btn">
+                <span>↪</span>
+                <span>Keluar</span>
+            </button>
+        </form>
+    </div>
+</header>
+===== resources/views/components/user/sidebar.blade.php =====
+<div
+    class="sidebar-overlay"
+    id="sidebarOverlay"
+    onclick="closeSidebar()"
+    aria-hidden="true"
+></div>
+
+<aside class="sidebar" id="sidebar">
+    <!-- SIDEBAR -->
+    <nav
+        class="mobile-menu"
+        id="mobileMenu"
+        aria-label="Menu navigasi"
+        aria-hidden="true"
+        inert
+    >
+        <div class="side-brand">
+            <div>
+                <div class="side-brand-title">KAI OPERASIONAL</div>
+                <div class="side-brand-subtitle">SISTEM DIGITAL PJL</div>
+            </div>
+        </div>
+
+        <a href="{{ url('/user/dashboard') }}">
+            <span class="menu-icon">⌂</span>
+            Dashboard
+        </a>
+
+        <a href="{{ url('/user/realisasi-ka') }}">
+            <span class="menu-icon">▣</span>
+            Jadwal KA
+        </a>
+
+        <a href="{{ route('user.serah-terima-dinas') }}">
+            <span class="menu-icon">⇄</span>
+            Serah Terima Dinas
+        </a>
+
+        <a
+            href="{{ url('/user/catatan-dinas') }}"
+            class="active"
+            aria-current="page"
+        >
+            <span class="menu-icon">◧</span>
+            Catatan Dinas
+        </a>
+
+        <div class="side-bottom">
+            <div class="active-user">
+                <div class="active-user-label">PJL AKTIF</div>
+
+                <div class="active-user-name">
+                    {{ auth()->user()->name ?? 'Pengguna' }}
+                </div>
+
+                <div class="active-user-info">
+                    NIP: {{ auth()->user()->nip ?? '-' }}
+                </div>
+            </div>
+
+            <form
+                action="{{ route('logout') }}"
+                method="POST"
+                class="logout-form"
+            >
+                @csrf
+
+                <button type="submit" class="logout-btn">
+                    <span class="logout-icon">↪</span>
+                    <span>Keluar</span>
+                </button>
+            </form>
+        </div>
+    </nav>
+</aside>
+===== resources/views/components/user-operasional/header.blade.php =====
+@php
+    $petugas = auth()->user();
+
+    $namaPetugas = $petugas->name ?? 'Petugas';
+
+    // Dinas aktif: pakai yang dikirim layout ($dinasHeader) supaya tidak
+    // query dua kali. Jika header dipakai tanpa layout, cari sendiri.
+    $dinasSaatIni = $dinasHeader
+        ?? \App\Models\Dinas::with(['jpl', 'shift'])
+            ->where('user_id', $petugas?->id)
+            ->where('status', 'berlangsung')
+            ->latest('id')
+            ->first();
+
+    $nomorPjl = $dinasSaatIni?->jpl?->nomor_jpl
+        ?? $petugas?->nomor_jpl
+        ?? $petugas?->nip
+        ?? '-';
+
+    // Jenis petugas mengikuti pilihan saat login (dinas.is_pengganti).
+    // Urutan: nilai dari layout -> dinas aktif -> data akun.
+    if (isset($jenisPetugas)) {
+        $jenisFinal = $jenisPetugas;
+    } elseif ($dinasSaatIni) {
+        $jenisFinal = $dinasSaatIni->is_pengganti ? 'wakilan' : 'reguler';
+    } else {
+        $jenisFinal = $petugas?->status_petugas
+            ?? $petugas?->jenis_petugas
+            ?? 'reguler';
+    }
+
+    $statusPetugas = strtolower((string) $jenisFinal) === 'wakilan'
+        ? 'WAKILAN'
+        : 'REGULER';
+@endphp
+
+<header class="op-header">
+    <div class="op-header-left">
+        <button
+            type="button"
+            class="op-menu-button"
+            id="opMenuButton"
+            aria-label="Buka atau tutup sidebar"
+            aria-controls="opSidebar"
+            aria-expanded="false"
+        >
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+
+        <a href="{{ url('/user/dashboard') }}" class="op-brand">
+            <div class="op-brand-logo">
+                <img
+                    src="{{ asset('images/logo-kai.jpg') }}"
+                    alt="Logo KAI"
+                >
+            </div>
+
+            <div class="op-brand-text">
+                <div class="op-brand-title">KAI OPERASIONAL</div>
+                <div class="op-brand-subtitle">SISTEM DIGITAL PJL</div>
+            </div>
+        </a>
+    </div>
+
+    <div class="op-header-right">
+        <div class="op-user-info">
+            <div class="op-user-name">
+                {{ $namaPetugas }}
+            </div>
+
+            <div class="op-user-details">
+                <span class="op-user-duty">
+                    {{ $nomorPjl }}
+                </span>
+
+                <span class="op-user-status {{ $statusPetugas === 'WAKILAN' ? 'is-wakilan' : 'is-reguler' }}">
+                    {{ $statusPetugas }}
+                </span>
+            </div>
+        </div>
+    </div>
+</header>
+===== resources/views/components/user-operasional/sidebar.blade.php =====
+<div
+    class="op-sidebar-overlay"
+    id="opSidebarOverlay"
+    aria-hidden="true"
+></div>
+
+<aside
+    class="op-sidebar"
+    id="opSidebar"
+    aria-hidden="true"
+>
+    <div class="op-sidebar-brand">
+        <div class="op-sidebar-brand-title">MENU OPERASIONAL</div>
+        <div class="op-sidebar-brand-subtitle">
+            SISTEM PENCATATAN PJL
+        </div>
+    </div>
+
+    <nav class="op-sidebar-nav" aria-label="Navigasi operasional">
+        @php
+            $halamanRiwayat = request()->is('user/serah-terima-dinas/riwayat*');
+
+            $menuAktif = [
+                'dashboard' => request()->is('user/dashboard*'),
+                'realisasi' => request()->is('user/realisasi-ka*'),
+                // Menyala di halaman serah terima, kecuali sedang di riwayat.
+                'serahTerima' => request()->is('user/serah-terima-dinas*')
+                    && !$halamanRiwayat,
+                'riwayat' => $halamanRiwayat,
+                'catatan' => request()->is('user/catatan-dinas*'),
+            ];
+        @endphp
+
+        <a
+            href="{{ url('/user/dashboard') }}"
+            class="op-nav-link {{ $menuAktif['dashboard'] ? 'active' : '' }}"
+            @if ($menuAktif['dashboard']) aria-current="page" @endif
+        >
+            <span class="op-nav-icon">⌂</span>
+            <span>Dashboard</span>
+        </a>
+
+        <a
+            href="{{ url('/user/realisasi-ka') }}"
+            class="op-nav-link {{ $menuAktif['realisasi'] ? 'active' : '' }}"
+            @if ($menuAktif['realisasi']) aria-current="page" @endif
+        >
+            <span class="op-nav-icon">▤</span>
+            <span>Realisasi KA</span>
+        </a>
+
+        <a
+            href="{{ route('user.serah-terima-dinas') }}"
+            class="op-nav-link {{ $menuAktif['serahTerima'] ? 'active' : '' }}"
+            @if ($menuAktif['serahTerima']) aria-current="page" @endif
+        >
+            <span class="op-nav-icon">⇄</span>
+            <span>Serah Terima Dinas</span>
+        </a>
+
+        <a
+            href="{{ route('user.serah-terima-dinas.riwayat') }}"
+            class="op-nav-link {{ $menuAktif['riwayat'] ? 'active' : '' }}"
+            @if ($menuAktif['riwayat']) aria-current="page" @endif
+        >
+            <span class="op-nav-icon">↺</span>
+            <span>Riwayat Serah Terima</span>
+        </a>
+
+        <a
+            href="{{ route('user.catatan-dinas') }}"
+            class="op-nav-link {{ $menuAktif['catatan'] ? 'active' : '' }}"
+            @if ($menuAktif['catatan']) aria-current="page" @endif
+        >
+            <span class="op-nav-icon">▧</span>
+            <span>Catatan Dinas</span>
+        </a>
+    </nav>
+
+    <div class="op-sidebar-bottom">
+        <div class="op-active-user">
+            <div class="op-active-user-label">PETUGAS AKTIF</div>
+
+            <div class="op-active-user-name">
+                {{ auth()->user()->name ?? 'Pengguna' }}
+            </div>
+
+            <div class="op-active-user-info">
+                NIP: {{ auth()->user()->nip ?? '-' }}
+            </div>
+        </div>
+
+        <form
+            action="{{ route('logout') }}"
+            method="POST"
+            class="op-logout-form"
+        >
+            @csrf
+
+            <button type="submit" class="op-logout-button">
+                <span>⇥</span>
+                <span>Keluar</span>
+            </button>
+        </form>
+    </div>
+</aside>
+===== vite.config.js =====
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import { bunny } from 'laravel-vite-plugin/fonts';
+import tailwindcss from '@tailwindcss/vite';
+
+export default defineConfig({
+    plugins: [
+        laravel({
+            input: ['resources/css/app.css', 'resources/js/app.js'],
+            refresh: true,
+            fonts: [
+                bunny('Instrument Sans', {
+                    weights: [400, 500, 600],
+                }),
+            ],
+        }),
+        tailwindcss(),
+    ],
+    server: {
+        watch: {
+            ignored: ['**/storage/framework/views/**'],
+        },
+    },
+});
+
+===== package.json =====
+{
+    "$schema": "https://www.schemastore.org/package.json",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "vite build",
+        "dev": "vite"
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "^4.0.0",
+        "concurrently": "^10.0.3",
+        "laravel-vite-plugin": "^3.1",
+        "tailwindcss": "^4.0.0",
+        "vite": "^8.0.0"
+    },
+    "optionalDependencies": {
+        "@laravel/multiplex": "^0.4.1"
+    },
+    "dependencies": {
+        "alpinejs": "^3.17.4"
+    }
+}
+
+===== FILE CSS DAN JS TERKAIT USER =====
+public/css/user/catatan-dinas.css
+public/css/user/dashboard.css
+public/css/user/layout.css
+public/css/user/realisasi-ka.css
+public/css/user/serah-terima.css
+public/css/user-operasional/layout.css
+public/js/user/catatan-dinas.js
+public/js/user/layout.js
+public/js/user/realisasi-ka.js
+public/js/user-operasional/layout.js
+resources/css/app.css
+resources/js/app.js
+
+===== REFERENSI ASSET DAN VITE DI VIEW USER =====
+resources/views/layouts/user.blade.php:12:    @vite([
+resources/views/layouts/user.blade.php:20:        href="{{ asset('css/user/layout-user.css') }}"
+resources/views/layouts/user.blade.php:49:        src="{{ asset('js/user/layout.js') }}"
+resources/views/layouts/user-operasional.blade.php:11:    <link rel="stylesheet" href="{{ asset('css/user-operasional/layout.css') }}">
+resources/views/layouts/user-operasional.blade.php:49:    <script src="{{ asset('js/user-operasional/layout.js') }}"></script>
+resources/views/user/dashboard/index.blade.php:10:    <link rel="stylesheet" href="{{ asset('css/user/dashboard.css') }}">
+resources/views/user/catatan-dinas/index.blade.php:1:@extends('layouts.user-operasional')
+resources/views/user/catatan-dinas/index.blade.php:5:@push('styles')
+resources/views/user/catatan-dinas/index.blade.php:6:    <link rel="stylesheet" href="{{ asset('css/user/catatan-dinas.css') }}">
+resources/views/user/catatan-dinas/index.blade.php:17:@push('scripts')
+resources/views/user/realisasi-ka/index.blade.php:1:﻿ @extends('layouts.user-operasional')
+resources/views/user/realisasi-ka/index.blade.php:5:@push('styles')
+resources/views/user/realisasi-ka/index.blade.php:6:    <link rel="stylesheet" href="{{ asset('css/user/realisasi-ka.css') }}">
+resources/views/user/realisasi-ka/index.blade.php:591:@push('scripts')
+resources/views/user/realisasi-ka/index.blade.php:617:    <script src="{{ asset('js/user/realisasi-ka.js') }}" defer></script>
+resources/views/user/serahterimacatatan/index.blade.php:1:@extends('layouts.user-operasional')
+resources/views/user/serahterimacatatan/index.blade.php:15:@push('styles')
+resources/views/user/serahterimacatatan/index.blade.php:16:    @vite(['resources/css/app.css', 'resources/js/app.js'])
+resources/views/user/serahterimacatatan/index.blade.php:17:    <link rel="stylesheet" href="{{ asset('css/user/serah-terima.css') }}">
+resources/views/user/serahterimacatatan/riwayat.blade.php:1:@extends('layouts.user-operasional')
+resources/views/user/serahterimacatatan/riwayat.blade.php:5:@push('styles')
+resources/views/user/serahterimacatatan/riwayat.blade.php:6:    @vite(['resources/css/app.css', 'resources/js/app.js'])
+resources/views/user/serahterimacatatan/riwayat.blade.php:7:    <link rel="stylesheet" href="{{ asset('css/user/serah-terima.css') }}">
