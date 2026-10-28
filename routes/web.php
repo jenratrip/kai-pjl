@@ -30,7 +30,6 @@ use App\Http\Controllers\Admin\RealisasiKaController as AdminRealisasiKaControll
 // USER / PJL CONTROLLERS
 // ======================================================
 
-use App\Http\Controllers\User\DashboardController as UserDashboardController;
 use App\Http\Controllers\User\RealisasiKaController;
 use App\Http\Controllers\User\CatatanDinasController;
 use App\Http\Controllers\User\SerahTerimaDinasController;
@@ -102,13 +101,6 @@ Route::middleware(['auth', 'role:pjl'])
     ->prefix('user')
     ->name('user.')
     ->group(function () {
-
-        // DASHBOARD
-
-        Route::get('/dashboard', [
-            UserDashboardController::class,
-            'index',
-        ])->name('dashboard');
 
         // REALISASI KA
 

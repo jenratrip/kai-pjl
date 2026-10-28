@@ -1,4 +1,4 @@
-﻿ @extends('layouts.user-operasional')
+﻿ @extends('layouts.user')
 
 @section('title', 'Realisasi KA - Sistem PJL')
 
@@ -7,17 +7,17 @@
 @endpush
 
 @section('content')
-    <main class="main">
-        <section class="page-card">
+    <div class="w-full min-w-0 px-2 py-6 sm:px-5 lg:px-8 lg:py-7">
+        <section class="mx-auto w-full max-w-[1700px] rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-6 lg:p-8">
 
             {{-- INFORMASI DINAS --}}
-            <div class="filter-grid">
+            <div class="mb-7 grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[1fr_1fr_1.1fr_0.7fr]">
                 <div>
-                    <label for="tanggal" class="field-label">HARI / TANGGAL</label>
+                    <label for="tanggal" class="field-label mb-2 block text-sm font-semibold text-slate-700">HARI / TANGGAL</label>
                     <input
                         type="text"
                         id="tanggal"
-                        class="field-input"
+                        class="field-input min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20"
                         value="{{ ($dinasAktif ?? null)
                             ? \Carbon\Carbon::parse($dinasAktif->tanggal_dinas)->locale('id')->translatedFormat('l, d F Y')
                             : \Carbon\Carbon::now('Asia/Jakarta')->locale('id')->translatedFormat('l, d F Y') }}"
@@ -25,41 +25,43 @@
                 </div>
 
                 <div>
-                    <label for="nomorJpl" class="field-label">NOMOR JPL</label>
+                    <label for="nomorJpl" class="field-label mb-2 block text-sm font-semibold text-slate-700">NOMOR JPL</label>
                     <input
                         id="nomorJpl"
                         type="text"
-                        class="field-input"
+                        class="field-input min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20"
                         value="{{ ($dinasAktif ?? null) ? ($dinasAktif->jpl?->kode_jpl ?? '-') : '-' }}"
                         readonly>
                 </div>
 
                 <div>
-                    <label for="stasiunRegional" class="field-label">STASIUN / REGIONAL</label>
+                    <label for="stasiunRegional" class="field-label mb-2 block text-sm font-semibold text-slate-700">STASIUN / REGIONAL</label>
                     <input
                         id="stasiunRegional"
                         type="text"
-                        class="field-input"
+                        class="field-input min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20"
                         value="{{ ($dinasAktif ?? null) ? ($dinasAktif->jpl?->nama_jpl ?? '-') : '-' }}"
                         readonly>
                 </div>
 
                 <div>
-                    <label for="shift" class="field-label">SHIFT</label>
+                    <label for="shift" class="field-label mb-2 block text-sm font-semibold text-slate-700">SHIFT</label>
                     <input
                         id="shift"
                         type="text"
-                        class="field-input"
+                        class="field-input min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20"
                         value="{{ ($dinasAktif ?? null) ? ($dinasAktif->shift?->nama_shift ?? '-') : '-' }}"
                         readonly>
                 </div>
             </div>
 
             {{-- DAFTAR KA --}}
-            <div class="section-title">Daftar KA Terjadwal</div>
+            <div class="mb-4 border-b border-slate-200 pb-3 text-base font-bold text-[#1d2d50] sm:text-lg">
+                Daftar KA Terjadwal
+            </div>
 
             {{-- JAM SEKARANG DAN RENTANG FILTER --}}
-            <div class="time-window-info">
+            <div class="mb-4 flex flex-col gap-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
                 <span>
                     Filter jadwal: <strong>±1 jam dari waktu sekarang</strong>.
                     KA manual tetap ditampilkan.
@@ -78,15 +80,15 @@
             {{-- PERINGATAN AWAS 2 ARAH --}}
             <div
                 id="awasBanner"
-                class="awas-banner"
+                class="mb-4 hidden rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
                 role="alert"
                 aria-live="assertive"
-                hidden>
-            </div>
+                hidden
+            ></div>
 
             {{-- RINGKASAN REALISASI --}}
             <div
-                class="summary-compact"
+                class="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4"
                 role="group"
                 aria-label="Ringkasan realisasi shift"
                 title="Progress dihitung dari KA yang sudah berstatus JALAN atau BATAL berdasarkan KA yang tampil pada tabel.">
@@ -143,7 +145,7 @@
             </div>
 
             {{-- KETERANGAN WARNA --}}
-            <div class="color-legend" role="group" aria-label="Keterangan warna">
+            <div class="mb-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-600" role="group" aria-label="Keterangan warna">
                 <div class="legend-title">Keterangan Warna</div>
 
                 <div class="legend-list">
@@ -190,26 +192,26 @@
             </div>
 
             {{-- TABEL REALISASI KA --}}
-            <div class="table-wrapper w-full min-w-0 max-w-full overflow-hidden">
+            <div class="table-wrapper w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-200">
                 <div class="w-full max-w-full overflow-x-auto">
-                    <table class="w-max min-w-full border-collapse text-left">
-                        <thead class="bg-gray-100">
+                    <table class="w-max min-w-full border-collapse text-center text-sm">
+                        <thead class="bg-[#1d2d50] text-white">
                             <tr>
-                                <th class="whitespace-nowrap px-3 py-3 text-center">NO</th>
-                                <th class="whitespace-nowrap px-3 py-3">NOMOR KA</th>
-                                <th class="whitespace-nowrap px-3 py-3">NAMA KA</th>
-                                <th class="whitespace-nowrap px-3 py-3">HULU</th>
-                                <th class="whitespace-nowrap px-3 py-3">HILIR</th>
-                                <th class="whitespace-nowrap px-3 py-3">RELASI</th>
-                                <th class="whitespace-nowrap px-3 py-3 text-center">JAM JADWAL</th>
-                                <th class="whitespace-nowrap px-3 py-3 text-center">JAM AKTUAL</th>
-                                <th class="whitespace-nowrap px-3 py-3 text-center">STATUS</th>
-                                <th class="min-w-32 whitespace-nowrap px-4 py-3 text-center">SEMBOYAN 21</th>
-                                <th class="min-w-28 whitespace-nowrap px-4 py-3 text-center">GENTA</th>
-                                <th class="min-w-40 whitespace-nowrap px-4 py-3 text-center">PINTU PERLINTASAN</th>
-                                <th class="min-w-36 whitespace-nowrap px-4 py-3 text-center">SEMBOYAN 35</th>
-                                <th class="min-w-44 whitespace-nowrap px-3 py-3">KETERANGAN</th>
-                                <th class="whitespace-nowrap px-3 py-3 text-center">AKSI</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">NO</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">NOMOR KA</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">NAMA KA</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">HULU</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">HILIR</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">RELASI</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">JAM JADWAL</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">JAM AKTUAL</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">STATUS</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">SEMBOYAN 21</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">GENTA</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">PINTU PERLINTASAN</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">SEMBOYAN 35</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">KETERANGAN</th>
+                                <th class="border-0 px-4 py-3 !text-center align-middle font-semibold whitespace-nowrap">AKSI</th>
                             </tr>
                         </thead>
                         <tbody id="kaTableBody"></tbody>
@@ -218,7 +220,7 @@
             </div>
 
             {{-- TAMBAH KA MANUAL --}}
-            <section class="add-section">
+            <section class="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#1d2d50] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#263e6a] focus:outline-none focus:ring-2 focus:ring-[#55769a]/40">
                 <button
                     type="button"
                     id="toggleTambahKa"
@@ -229,65 +231,65 @@
                     + Tambah KA
                 </button>
 
-                <div class="add-box" id="formTambahKa" hidden>
-                    <div class="add-heading">Tambah KA Manual</div>
+                <div class="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5" id="formTambahKa" hidden>
+                    <div class="mb-5 text-base font-bold text-[#1d2d50]">Tambah KA Manual</div>
 
-                    <div class="add-grid">
-                        <div class="small-field">
-                            <label for="manualNomor">NOMOR KA</label>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        <div class="min-w-0">
+                            <label for="manualNomor" class="mb-2 block text-sm font-semibold text-slate-700">NOMOR KA</label>
                             <input
                                 id="manualNomor"
                                 type="text"
-                                class="small-input"
+                                class="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20"
                                 placeholder="Nomor KA">
                         </div>
 
-                        <div class="small-field">
-                            <label for="manualNama">NAMA KA</label>
+                        <div class="min-w-0">
+                            <label for="manualNama" class="mb-2 block text-sm font-semibold text-slate-700">NAMA KA</label>
                             <input
                                 id="manualNama"
                                 type="text"
-                                class="small-input"
+                                class="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20"
                                 placeholder="Nama KA">
                         </div>
 
-                        <div class="small-field">
-                            <label for="manualHulu">HULU</label>
+                        <div class="min-w-0">
+                            <label for="manualHulu" class="mb-2 block text-sm font-semibold text-slate-700  ">HULU</label>
                             <input
                                 id="manualHulu"
                                 type="text"
-                                class="small-input"
+                                class="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20"
                                 placeholder="Hulu">
                         </div>
 
-                        <div class="small-field">
-                            <label for="manualHilir">HILIR</label>
+                        <div class="min-w-0">
+                            <label for="manualHilir" class="mb-2 block text-sm font-semibold text-slate-700">HILIR</label>
                             <input
                                 id="manualHilir"
                                 type="text"
-                                class="small-input"
+                                class="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20"
                                 placeholder="Hilir">
                         </div>
 
-                        <div class="small-field">
-                            <label for="manualRelasi">RELASI</label>
+                        <div class="min-w-0">
+                            <label for="manualRelasi" class="mb-2 block text-sm font-semibold text-slate-700">RELASI</label>
                             <input
                                 id="manualRelasi"
                                 type="text"
-                                class="small-input"
+                                class="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20"
                                 placeholder="Contoh: YK - SBI">
                         </div>
 
-                        <div class="small-field">
-                            <label for="manualAktual">JAM AKTUAL</label>
+                        <div class="min-w-0">
+                            <label for="manualAktual" class="mb-2 block text-sm font-semibold text-slate-700">JAM AKTUAL</label>
                             <input
                                 id="manualAktual"
                                 type="time"
-                                class="small-input">
+                                class="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20">
                         </div>
 
-                        <div class="small-field">
-                            <label>SEMBOYAN 21</label>
+                        <div class="min-w-0">
+                            <label for="manualSemboyan21" class="mb-2 block text-sm font-semibold text-slate-700">SEMBOYAN 21</label>
                             <div class="mini-checks">
                                 <button
                                     type="button"
@@ -305,8 +307,8 @@
                             </div>
                         </div>
 
-                        <div class="small-field">
-                            <label>GENTA</label>
+                        <div class="min-w-0">
+                            <label for="manualGenta" class="mb-2 block text-sm font-semibold text-slate-700">GENTA</label>
                             <div class="mini-checks">
                                 <button
                                     type="button"
@@ -324,8 +326,8 @@
                             </div>
                         </div>
 
-                        <div class="small-field">
-                            <label>PINTU PERLINTASAN</label>
+                        <div class="min-w-0">
+                            <label for="manualPintu" class="mb-2 block text-sm font-semibold text-slate-700">PINTU PERLINTASAN</label>
                             <div class="mini-checks">
                                 <button
                                     type="button"
@@ -343,8 +345,8 @@
                             </div>
                         </div>
 
-                        <div class="small-field">
-                            <label>SEMBOYAN 35</label>
+                        <div class="min-w-0">
+                            <label for="manualSemboyan35" class="mb-2 block text-sm font-semibold text-slate-700">SEMBOYAN 35</label>
                             <div class="mini-checks">
                                 <button
                                     type="button"
@@ -362,12 +364,12 @@
                             </div>
                         </div>
 
-                        <div class="small-field">
-                            <label for="manualKeterangan">KETERANGAN</label>
+                        <div class="min-w-0">
+                            <label for="manualKeterangan" class="mb-2 block text-sm font-semibold text-slate-700">KETERANGAN</label>
                             <input
                                 id="manualKeterangan"
                                 type="text"
-                                class="small-input"
+                                class="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20"
                                 placeholder="Keterangan">
                         </div>
                     </div>
@@ -391,7 +393,7 @@
             </section>
 
             {{-- AKSI REALISASI --}}
-            <div class="bottom-row">
+            <div class="mt-6 flex flex-col gap-4 border-t border-slate-200 pt-5 lg:flex-row lg:items-center lg:justify-between">
                 <div class="digital-note">
                     Formulir realisasi digital untuk pencatatan dinas PJL.
 
@@ -432,7 +434,7 @@
         </section>
 
         {{-- CATATAN DINAS --}}
-        <section class="page-card cd-quick" id="catatanDinasQuick">
+        <section class="mt-6 w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6" id="catatanDinasQuick">
             <div class="cd-quick-header">
                 <div>
                     <div class="section-title">Catatan Dinas</div>
@@ -477,25 +479,25 @@
 
             {{-- MODAL TAMBAH CATATAN --}}
             <div
-                class="cdm-overlay"
+                class="cdm-overlay fixed inset-0 z-[1000] items-center justify-center overflow-y-auto bg-slate-900/55 p-3 backdrop-blur-sm sm:p-5"
                 id="catatanModal"
                 aria-hidden="true"
                 data-open-on-load="{{ $errors->any() ? '1' : '0' }}">
 
                 <div
-                    class="cdm-modal"
+                    class="cdm-modal my-auto max-h-[calc(100vh-2rem)] w-full max-w-[600px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-8"
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="catatanModalTitle">
 
-                    <div class="cdm-header">
-                        <h2 class="cdm-title" id="catatanModalTitle">
+                    <div class="cdm-header mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-5">
+                        <h2 class="cdm-title m-0 text-xl font-extrabold text-[#1d2d50] sm:text-2xl" id="catatanModalTitle">
                             Tambah Catatan Dinas
                         </h2>
 
                         <button
                             type="button"
-                            class="cdm-close"
+                            class="cdm-close inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-2xl leading-none text-slate-500 transition hover:bg-slate-100"
                             aria-label="Tutup"
                             onclick="closeCatatanModal()">
                             ×
@@ -510,11 +512,11 @@
 
                         <input type="hidden" name="redirect_to" value="realisasi-ka">
 
-                        <div class="cdm-group">
-                            <label class="cdm-label" for="cdmTanggal">Tanggal</label>
+                        <div class="cdm-group mb-5">
+                            <label class="cdm-label mb-2 block text-sm font-bold text-slate-800" for="cdmTanggal">Tanggal</label>
                             <input
                                 type="date"
-                                class="cdm-input"
+                                class="cdm-input block h-[52px] w-full rounded-xl border border-slate-200 bg-white px-4 text-[15px] text-slate-700 outline-none transition focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/15 read-only:bg-slate-50 read-only:text-slate-500"
                                 id="cdmTanggal"
                                 name="tanggal"
                                 value="{{ $tanggalCatatan }}"
@@ -522,18 +524,18 @@
                                 required>
                         </div>
 
-                        <div class="cdm-group">
-                            <label class="cdm-label" for="cdmPjl">PJL</label>
+                        <div class="cdm-group mb-5">
+                            <label class="cdm-label mb-2 block text-sm font-bold text-slate-800" for="cdmPjl">PJL</label>
                             <input
                                 type="text"
-                                class="cdm-input"
+                                class="cdm-input block h-[52px] w-full rounded-xl border border-slate-200 bg-white px-4 text-[15px] text-slate-700 outline-none transition focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/15 read-only:bg-slate-50 read-only:text-slate-500"
                                 id="cdmPjl"
                                 value="{{ auth()->user()->name ?? '' }}"
                                 readonly>
                         </div>
 
-                        <div class="cdm-group">
-                            <label class="cdm-label" for="cdmShift">Shift</label>
+                        <div class="cdm-group mb-5">
+                            <label class="cdm-label mb-2 block text-sm font-bold text-slate-800" for="cdmShift">Shift</label>
                             <select
                                 class="cdm-input cdm-select"
                                 id="cdmShift"
@@ -546,38 +548,38 @@
                             </select>
                         </div>
 
-                        <div class="cdm-group">
-                            <label class="cdm-label" for="cdmCatatan">Catatan</label>
+                        <div class="cdm-group mb-5">
+                            <label class="cdm-label mb-2 block text-sm font-bold text-slate-800" for="cdmCatatan">Catatan</label>
                             <textarea
-                                class="cdm-input cdm-textarea"
+                                class="cdm-textarea block min-h-[150px] w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-[15px] leading-relaxed text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/15"
                                 id="cdmCatatan"
                                 name="catatan"
                                 maxlength="5000"
                                 required
                                 placeholder="Tuliskan catatan selama pelaksanaan dinas...">{{ old('catatan') }}</textarea>
 
-                            <div class="cdm-help" id="cdmCounter">
+                            <div class="cdm-help mt-2 text-xs text-slate-500" id="cdmCounter">
                                 Maksimal 5.000 karakter.
                             </div>
                         </div>
 
                         @if ($errors->any())
-                            <div class="cdm-error" role="alert">
+                            <div class="cdm-error mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold leading-relaxed text-red-900" role="alert">
                                 @foreach ($errors->all() as $error)
                                     <div>{{ $error }}</div>
                                 @endforeach
                             </div>
                         @endif
 
-                        <div class="cdm-footer">
+                        <div class="cdm-error mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold leading-relaxed text-red-900">
                             <button
                                 type="button"
-                                class="cdm-btn cdm-cancel"
+                                class="cdm-btn cdm-cancel min-h-[48px] min-w-[88px] rounded-xl border border-slate-200 bg-white px-6 text-sm font-bold text-slate-700 transition hover:bg-slate-50 max-sm:w-full"
                                 onclick="closeCatatanModal()">
                                 Batal
                             </button>
 
-                            <button type="submit" class="cdm-btn cdm-save">
+                            <button type="submit" class="cdm-btn cdm-save min-h-[48px] min-w-[88px] rounded-xl border border-[#1d2d50] bg-[#1d2d50] px-6 text-sm font-bold text-white transition hover:bg-[#263e6a] max-sm:w-full">
                                 Simpan Catatan
                             </button>
                         </div>
@@ -585,7 +587,7 @@
                 </div>
             </div>
         @endif
-    </main>
+</div>
 @endsection
 
 @push('scripts')
