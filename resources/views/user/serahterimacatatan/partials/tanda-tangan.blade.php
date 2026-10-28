@@ -1,3 +1,13 @@
+@php
+    $modeLihat = !empty($modeLihat);
+    $serahTerima = $serahTerima ?? null;
+
+    $ttdLama = $serahTerima?->tanda_tangan_penyerah;
+    $urlTtdLama = $ttdLama
+        ? \Illuminate\Support\Facades\Storage::disk('public')->url($ttdLama)
+        : null;
+@endphp
+
 <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
     <div class="mb-4 flex items-center gap-3">
         <span
@@ -9,12 +19,18 @@
         <div>
             <h2 class="font-bold text-[#1d2d50]">Tanda tangan</h2>
             <p class="mt-0.5 text-xs text-slate-500">
-                Bubuhkan tanda tangan sebelum menyimpan serah terima dinas.
+                @if ($modeLihat)
+                    Tanda tangan yang tersimpan pada serah terima ini.
+                @elseif ($urlTtdLama)
+                    Tanda tangan sudah tersimpan. Klik Ganti jika ingin membuat yang baru.
+                @else
+                    Bubuhkan tanda tangan sebelum menyimpan serah terima dinas.
+                @endif
             </p>
         </div>
     </div>
 
-    {{-- Hanya tanda tangan penyerah. Admin tidak perlu menandatangani atau menyetujui. --}}
+    {{-- Hanya tanda tangan penyerah. Admin tidak perlu menandatangani. --}}
     <div class="max-w-xl">
         <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <h3 class="font-bold text-[#1d2d50]">
@@ -22,59 +38,109 @@
             </h3>
 
             <p class="mt-1 text-sm text-slate-600">
-                {{ auth()->user()->name }}
+                {{ data_get($serahTerima, 'ringkasan.nama_penyerah') ?: auth()->user()->name }}
             </p>
 
             <p class="text-xs text-slate-500">
-                NIP: {{ auth()->user()->nip ?: '-' }}
+                NIP: {{ data_get($serahTerima, 'ringkasan.nip_penyerah') ?: (auth()->user()->nip ?: '-') }}
             </p>
 
-            <canvas
-                id="signatureCanvas"
-                aria-label="Area tanda tangan penyerah"
-                class="mt-3 block h-40 w-full touch-none rounded-lg border border-slate-300 bg-white"
-            ></canvas>
+            {{-- 1) Tanda tangan tersimpan --}}
+            @if ($urlTtdLama)
+                <div id="signatureSavedBox" class="mt-3">
+                    <img
+                        src="{{ $urlTtdLama }}"
+                        alt="Tanda tangan penyerah tersimpan"
+                        class="h-40 w-full rounded-lg border border-slate-300 bg-white object-contain"
+                    >
 
-            <div class="mt-2 flex justify-end">
-                <button
-                    type="button"
-                    id="clearSignature"
-                    class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                    @unless ($modeLihat)
+                        <div class="mt-2 flex justify-end">
+                            <button
+                                type="button"
+                                id="changeSignature"
+                                class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                            >
+                                Ganti tanda tangan
+                            </button>
+                        </div>
+                    @endunless
+                </div>
+            @elseif ($modeLihat)
+                <p class="mt-3 text-sm text-slate-500">
+                    Tanda tangan penyerah belum tersedia.
+                </p>
+            @endif
+
+            {{-- 2) Area menggambar: tersembunyi jika sudah ada tanda tangan --}}
+            @unless ($modeLihat)
+                <div
+                    id="signatureDrawArea"
+                    class="{{ $urlTtdLama ? 'hidden' : '' }}"
                 >
-                    Hapus tanda tangan
-                </button>
-            </div>
+                    <canvas
+                        id="signatureCanvas"
+                        aria-label="Area tanda tangan penyerah"
+                        class="mt-3 block h-40 w-full touch-none rounded-lg border border-slate-300 bg-white"
+                    ></canvas>
 
-            {{-- Input ini dibaca JavaScript actions.blade.php --}}
-            <input
-                type="hidden"
-                id="signatureData"
-                value=""
-            >
+                    <div class="mt-2 flex flex-wrap justify-end gap-2">
+                        @if ($urlTtdLama)
+                            <button
+                                type="button"
+                                id="cancelChangeSignature"
+                                class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                            >
+                                Batal, pakai yang lama
+                            </button>
+                        @endif
 
-            <p class="mt-2 text-xs leading-relaxed text-slate-500">
-                Tanda tangani area putih menggunakan mouse, touchpad,
-                atau sentuhan layar.
-            </p>
+                        <button
+                            type="button"
+                            id="clearSignature"
+                            class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                        >
+                            Hapus tanda tangan
+                        </button>
+                    </div>
 
-            <p
-                id="signatureError"
-                class="mt-2 hidden text-xs font-medium text-red-600"
-                role="alert"
-            >
-                Tanda tangan penyerah wajib diisi.
-            </p>
+                    <p class="mt-2 text-xs leading-relaxed text-slate-500">
+                        Tanda tangani area putih menggunakan mouse, touchpad,
+                        atau sentuhan layar.
+                    </p>
+                </div>
+
+                {{-- Input ini dibaca JavaScript di actions.blade.php --}}
+                <input
+                    type="hidden"
+                    id="signatureData"
+                    value=""
+                >
+
+                <p
+                    id="signatureError"
+                    class="mt-2 hidden text-xs font-medium text-red-600"
+                    role="alert"
+                >
+                    Tanda tangan penyerah wajib diisi.
+                </p>
+            @endunless
         </div>
     </div>
 </section>
 
+@unless ($modeLihat)
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const canvas = document.getElementById('signatureCanvas');
     const hidden = document.getElementById('signatureData');
     const clearButton = document.getElementById('clearSignature');
     const errorMessage = document.getElementById('signatureError');
-    const submitForm = document.getElementById('serahTerimaSubmitForm');
+
+    const savedBox = document.getElementById('signatureSavedBox');
+    const drawArea = document.getElementById('signatureDrawArea');
+    const changeButton = document.getElementById('changeSignature');
+    const cancelButton = document.getElementById('cancelChangeSignature');
 
     if (!canvas || !hidden || !clearButton) {
         return;
@@ -92,6 +158,7 @@ document.addEventListener('DOMContentLoaded', function () {
         context.lineCap = 'round';
         context.lineJoin = 'round';
         context.strokeStyle = '#1d2d50';
+        context.fillStyle = '#1d2d50';
     }
 
     function point(event) {
@@ -112,6 +179,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function resizeCanvas() {
         const rect = canvas.getBoundingClientRect();
 
+        // Canvas tersembunyi (ukuran 0): lewati, dihitung ulang saat tampil.
         if (!rect.width || !rect.height) {
             return;
         }
@@ -133,14 +201,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const image = new Image();
 
             image.onload = function () {
-                context.drawImage(
-                    image,
-                    0,
-                    0,
-                    rect.width,
-                    rect.height
-                );
-
+                context.drawImage(image, 0, 0, rect.width, rect.height);
                 saveSignature();
             };
 
@@ -169,7 +230,6 @@ document.addEventListener('DOMContentLoaded', function () {
             0,
             Math.PI * 2
         );
-        context.fillStyle = '#1d2d50';
         context.fill();
 
         hasSignature = true;
@@ -208,7 +268,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function clearSignature() {
+        context.save();
+        context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, canvas.width, canvas.height);
+        context.restore();
 
         hasSignature = false;
         drawing = false;
@@ -218,6 +281,20 @@ document.addEventListener('DOMContentLoaded', function () {
         errorMessage?.classList.add('hidden');
     }
 
+    // Ganti: sembunyikan gambar lama, tampilkan canvas.
+    function showDrawArea() {
+        savedBox?.classList.add('hidden');
+        drawArea?.classList.remove('hidden');
+        resizeCanvas();
+    }
+
+    // Batal: hapus coretan baru, kembali ke tanda tangan lama (action "keep").
+    function showSavedBox() {
+        clearSignature();
+        drawArea?.classList.add('hidden');
+        savedBox?.classList.remove('hidden');
+    }
+
     canvas.addEventListener('pointerdown', startDrawing);
     canvas.addEventListener('pointermove', draw);
     canvas.addEventListener('pointerup', stopDrawing);
@@ -225,34 +302,18 @@ document.addEventListener('DOMContentLoaded', function () {
     canvas.addEventListener('lostpointercapture', stopDrawing);
 
     clearButton.addEventListener('click', clearSignature);
+    changeButton?.addEventListener('click', showDrawArea);
+    cancelButton?.addEventListener('click', showSavedBox);
 
-    // Validasi sisi tampilan; controller tetap wajib memvalidasi.
-    if (submitForm) {
-        submitForm.addEventListener('submit', function (event) {
-            saveSignature();
-
-            if (!hasSignature || !hidden.value) {
-                event.preventDefault();
-
-                errorMessage?.classList.remove('hidden');
-                canvas.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'center',
-                });
-
-                return;
-            }
-
-            errorMessage?.classList.add('hidden');
-        });
-    }
+    // Validasi saat submit dilakukan di actions.blade.php.
+    // Tidak ada listener submit di sini agar tidak bentrok.
 
     resizeCanvas();
 
     window.addEventListener('resize', function () {
         window.clearTimeout(resizeTimer);
-
         resizeTimer = window.setTimeout(resizeCanvas, 150);
     });
 });
 </script>
+@endunless

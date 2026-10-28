@@ -10,6 +10,8 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
+        [hidden] { display: none !important; }
+
         body {
             font-family: Arial, Helvetica, sans-serif;
             background: #1E3157;
@@ -22,7 +24,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 40px 20px;
+            padding: 24px 20px;
         }
 
         .login-card {
@@ -30,7 +32,7 @@
             max-width: 100%;
             background: #FFFFFF;
             border-radius: 10px;
-            padding: 30px 34px 25px;
+            padding: 24px 30px 20px;
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.16);
         }
 
@@ -64,113 +66,7 @@
         .divider {
             border: 0;
             border-top: 1px solid #E5E7EB;
-            margin: 22px 0 23px;
-        }
-
-        /* ========== TAB PILIHAN AKSES (BARU) ========== */
-
-        .login-tabs {
-            display: flex;
-            gap: 4px;
-            padding: 4px;
-            margin-bottom: 20px;
-            background: #F3F4F6;
-            border-radius: 9px;
-        }
-
-        .login-tab {
-            flex: 1;
-            height: 38px;
-            border: none;
-            border-radius: 7px;
-            background: transparent;
-            color: #6B7280;
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .login-tab.active {
-            background: #FFFFFF;
-            color: #1F3157;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-        }
-
-        /* fieldset dipakai agar input di panel tersembunyi
-           otomatis tidak ikut tervalidasi & tidak terkirim */
-        .login-panel {
-            border: 0;
-            min-width: 0;
-        }
-
-        .login-panel[hidden] { display: none; }
-
-        /* ========== PILIHAN REGULER / WAKILAN (BARU) ========== */
-
-        .jenis-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .jenis-option { flex: 1 1 90px; position: relative; }
-
-        .dinasan-empty { color: #B91C1C; font-size: 12px; }
-
-        /* susun atas-bawah (dipakai Jenis Petugas) */
-        .jenis-group--stack { flex-direction: column; flex-wrap: nowrap; gap: 8px; }
-        .jenis-group--stack .jenis-option { flex: none; }
-
-        /* ========== VERSI RINGKAS (panel Petugas PJL) ========== */
-
-        .login-container { padding: 24px 20px; }
-        .login-card { padding: 24px 30px 20px; }
-        .divider { margin: 16px 0 16px; }
-        .login-tabs { margin-bottom: 14px; }
-        .login-tab { height: 34px; }
-
-        #panelPetugas .form-group { margin-bottom: 12px; }
-        #panelPetugas .form-label { margin-bottom: 5px; font-size: 13px; }
-        #panelPetugas .form-input { height: 42px; font-size: 13px; padding-left: 42px; }
-        #panelPetugas .input-icon { left: 13px; width: 18px; height: 18px; }
-        #panelPetugas .password-toggle { right: 11px; }
-        #panelPetugas .password-toggle svg { width: 18px; height: 18px; }
-        #panelPetugas .jenis-group { gap: 8px; }
-        #panelPetugas .jenis-group--stack { gap: 6px; }
-        #panelPetugas .jenis-option label { height: 36px; font-size: 13px; }
-        .login-button { height: 44px; margin-top: 2px; }
-        .login-info { margin-top: 12px; }
-
-        .jenis-option input {
-            position: absolute;
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .jenis-option label {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 44px;
-            border: 1px solid #DDE1E7;
-            border-radius: 8px;
-            color: #6B7280;
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .jenis-option input:checked + label {
-            border-color: #E3943D;
-            background: #FFF7ED;
-            color: #B45F0F;
-        }
-
-        .jenis-option input:focus-visible + label {
-            box-shadow: 0 0 0 3px rgba(227, 148, 61, 0.25);
+            margin: 16px 0;
         }
 
         .error-message {
@@ -184,13 +80,15 @@
             line-height: 1.5;
         }
 
-        .form-group { margin-bottom: 18px; }
+        /* ========== FORM ========== */
+
+        .form-group { margin-bottom: 12px; }
 
         .form-label {
             display: block;
-            margin-bottom: 7px;
+            margin-bottom: 5px;
             color: #1F3157;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 700;
         }
 
@@ -198,26 +96,16 @@
 
         .form-input {
             width: 100%;
-            height: 48px;
-            padding: 0 45px;
+            height: 42px;
+            padding: 0 45px 0 42px;
             border: 1px solid #DDE1E7;
             border-radius: 8px;
             background: #FFFFFF;
             color: #1F3157;
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 14px;
+            font-size: 13px;
             outline: none;
             transition: all 0.2s ease;
-        }
-
-        select.form-input {
-            appearance: none;
-            -webkit-appearance: none;
-            cursor: pointer;
-            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
-            background-repeat: no-repeat;
-            background-position: right 13px center;
-            background-size: 18px;
         }
 
         .form-input::placeholder { color: #9CA3AF; opacity: 1; }
@@ -229,10 +117,10 @@
 
         .input-icon {
             position: absolute;
-            left: 15px;
+            left: 13px;
             top: 50%;
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             transform: translateY(-50%);
             color: #6B7280;
             pointer-events: none;
@@ -243,7 +131,7 @@
 
         .password-toggle {
             position: absolute;
-            right: 13px;
+            right: 11px;
             top: 50%;
             width: 24px;
             height: 24px;
@@ -260,12 +148,78 @@
 
         .password-toggle:hover { color: #1F3157; }
         .password-toggle:focus { outline: none; }
-        .password-toggle svg { width: 20px; height: 20px; display: block; }
+        .password-toggle svg { width: 18px; height: 18px; display: block; }
+
+        /* ========== BAGIAN PJL (muncul hanya untuk role pjl) ========== */
+
+        fieldset.pjl-fields { border: 0; min-width: 0; }
+
+        .section-title {
+            margin: 16px 0 12px;
+            padding-top: 14px;
+            border-top: 1px dashed #E5E7EB;
+            color: #6B7280;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .section-title strong {
+            display: block;
+            color: #1F3157;
+            font-size: 13px;
+        }
+
+        .jenis-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .jenis-option { flex: 1 1 90px; position: relative; }
+
+        .jenis-group--row { flex-wrap: nowrap; }
+        .jenis-group--row .jenis-option { flex: 1; }
+
+        .dinasan-empty { color: #B91C1C; font-size: 12px; }
+
+        .jenis-option input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .jenis-option label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 36px;
+            padding: 0 6px;
+            border: 1px solid #DDE1E7;
+            border-radius: 8px;
+            color: #6B7280;
+            font-size: 13px;
+            font-weight: 700;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .jenis-option input:checked + label {
+            border-color: #E3943D;
+            background: #FFF7ED;
+            color: #B45F0F;
+        }
+
+        .jenis-option input:focus-visible + label {
+            box-shadow: 0 0 0 3px rgba(227, 148, 61, 0.25);
+        }
+
+        /* ========== TOMBOL & INFO ========== */
 
         .login-button {
             width: 100%;
-            height: 48px;
-            margin-top: 4px;
+            height: 44px;
+            margin-top: 2px;
             border: none;
             border-radius: 8px;
             background: #E3943D;
@@ -280,13 +234,14 @@
         .login-button:hover { background: #D5822B; transform: translateY(-1px); }
         .login-button:active { transform: translateY(0); }
         .login-button:focus { outline: none; box-shadow: 0 0 0 3px rgba(227, 148, 61, 0.25); }
+        .login-button:disabled { opacity: 0.7; cursor: wait; transform: none; }
 
         .login-info {
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 6px;
-            margin-top: 15px;
+            margin-top: 12px;
             color: #7B8491;
             font-size: 10px;
             line-height: 1.4;
@@ -304,31 +259,27 @@
 
         .info-icon svg { width: 100%; height: 100%; }
 
+        /* ========== RESPONSIVE ========== */
+
         @media (max-width: 600px) {
             .login-container { padding: 25px 16px; }
-            .login-card { width: 100%; max-width: 380px; padding: 27px 23px 23px; }
+            .login-card { width: 100%; max-width: 380px; padding: 24px 22px 20px; }
             .logo-image { width: 90px; height: 52px; }
             .system-title { font-size: 16px; }
             .company-name { font-size: 10px; }
-            .divider { margin: 20px 0 21px; }
-            .form-group { margin-bottom: 16px; }
             .form-label { font-size: 13px; }
-            .form-input { height: 46px; padding-left: 43px; padding-right: 43px; font-size: 13px; }
-            .input-icon { left: 14px; width: 19px; height: 19px; }
-            .password-toggle { right: 12px; width: 23px; height: 23px; }
-            .password-toggle svg { width: 19px; height: 19px; }
+            .form-input { height: 44px; font-size: 13px; }
             .login-button { height: 46px; font-size: 13px; }
             .login-info { font-size: 9px; }
-            .login-tab { font-size: 12px; }
         }
 
         @media (max-width: 360px) {
-            .login-card { padding: 24px 18px 20px; }
+            .login-card { padding: 22px 16px 18px; }
             .logo-image { width: 82px; height: 48px; }
             .system-title { font-size: 15px; }
             .company-name { font-size: 9px; }
             .form-label { font-size: 12px; }
-            .form-input { height: 44px; font-size: 12px; }
+            .form-input { height: 42px; font-size: 12px; }
             .login-button { height: 44px; font-size: 12px; }
             .login-info { font-size: 8px; }
             .jenis-option label { font-size: 12px; }
@@ -339,14 +290,13 @@
 <body>
 
     @php
-        // Tab aktif: dari old input (saat validasi gagal) atau default petugas
-        $loginType = old('login_type', 'petugas');
-        $jenis     = old('jenis_petugas', 'reguler');
-
-        // Sesuaikan dengan master data dinasan di sistem Anda
-        // (atau kirim dari controller: $dinasanList)
         // Dikirim dari LoginController::showLoginForm() => [id_shift => nama_shift]
         $dinasanList = $dinasanList ?? [];
+        $jenis       = old('jenis_petugas', 'reguler');
+
+        // Tampilkan langsung bagian PJL jika ada input/error PJL dari submit sebelumnya
+        $showPjl = old('nomor_pjl') || old('dinasan')
+            || $errors->has('nomor_pjl') || $errors->has('dinasan') || $errors->has('jenis_petugas');
     @endphp
 
     <main class="login-container">
@@ -370,71 +320,66 @@
                 </div>
             @endif
 
-            <!-- PILIHAN AKSES -->
-            <div class="login-tabs" role="tablist">
-                <button type="button" class="login-tab {{ $loginType === 'petugas' ? 'active' : '' }}"
-                        data-type="petugas" role="tab">Petugas PJL</button>
-                <button type="button" class="login-tab {{ $loginType === 'admin' ? 'active' : '' }}"
-                        data-type="admin" role="tab">Admin / Superadmin</button>
-            </div>
+            {{-- Error dari pengecekan via JavaScript --}}
+            <div class="error-message" id="clientError" hidden></div>
 
             <form method="POST" action="{{ route('login.store') }}" id="loginForm">
                 @csrf
 
-                <input type="hidden" name="login_type" id="loginType" value="{{ $loginType }}">
+                <!-- ====================================================
+                     SEMUA ROLE (User/PJL, Admin, Superadmin):
+                     NIPP / NIPKWT + Kata Sandi
+                ===================================================== -->
+                <div class="form-group">
+                    <label for="nip" class="form-label">NIPP / NIPKWT</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                 stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="7" r="4"></circle>
+                                <path d="M5 21v-2a7 7 0 0 1 14 0v2"></path>
+                            </svg>
+                        </span>
+                        <input type="text" name="nip" id="nip" class="form-input"
+                               placeholder="Masukkan NIPP atau NIPKWT" value="{{ old('nip') }}"
+                               autocomplete="username" inputmode="numeric" required autofocus>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="password" class="form-label">Kata Sandi</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                 stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="4" y="10" width="16" height="10" rx="2"></rect>
+                                <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+                            </svg>
+                        </span>
+                        <input type="password" name="password" id="password" class="form-input"
+                               placeholder="••••••••••••" autocomplete="current-password" required>
+                        <button type="button" class="password-toggle" data-target="password"
+                                aria-label="Tampilkan password">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                 stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
 
                 <!-- ====================================================
-                     PANEL ADMIN / SUPERADMIN  (field & name tetap seperti
-                     semula: nip + password)
+                     KHUSUS PETUGAS PJL
+                     Disembunyikan + disabled (tidak divalidasi & tidak
+                     terkirim) sampai akun terdeteksi berrole pjl.
                 ===================================================== -->
-                <fieldset class="login-panel" id="panelAdmin"
-                          {{ $loginType === 'admin' ? '' : 'hidden disabled' }}>
+                <fieldset class="pjl-fields" id="pjlFields" {{ $showPjl ? '' : 'hidden disabled' }}>
 
-                    <div class="form-group">
-                        <label for="username" class="form-label">NIPP / NIPKWT</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="7" r="4"></circle>
-                                    <path d="M5 21v-2a7 7 0 0 1 14 0v2"></path>
-                                </svg>
-                            </span>
-                            <input type="text" name="nip" id="username" class="form-input"
-                                   placeholder="199208242015031002" value="{{ old('nip') }}"
-                                   autocomplete="username" required>
-                        </div>
+                    <div class="section-title">
+                        <strong>Data Dinas Petugas PJL</strong>
+                        Lengkapi data berikut untuk memulai dinas.
                     </div>
-
-                    <div class="form-group">
-                        <label for="password" class="form-label">Kata Sandi</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="4" y="10" width="16" height="10" rx="2"></rect>
-                                    <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
-                                </svg>
-                            </span>
-                            <input type="password" name="password" id="password" class="form-input"
-                                   placeholder="••••••••••••" autocomplete="current-password" required>
-                            <button type="button" class="password-toggle" data-target="password"
-                                    aria-label="Tampilkan password">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </fieldset>
-
-                <!-- ====================================================
-                     PANEL PETUGAS PJL (Reguler / Wakilan)
-                ===================================================== -->
-                <fieldset class="login-panel" id="panelPetugas"
-                          {{ $loginType === 'petugas' ? '' : 'hidden disabled' }}>
 
                     <!-- Nomor PJL -->
                     <div class="form-group">
@@ -449,47 +394,6 @@
                             </span>
                             <input type="text" name="nomor_pjl" id="nomorPjl" class="form-input"
                                    placeholder="Contoh: 351" value="{{ old('nomor_pjl') }}" required>
-                        </div>
-                    </div>
-
-                    <!-- NIPP (reguler) / NIPKWT (wakilan) -->
-                    <div class="form-group">
-                        <label for="nomorInduk" class="form-label" id="nomorIndukLabel">NIPP / NIPKWT</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="7" r="4"></circle>
-                                    <path d="M5 21v-2a7 7 0 0 1 14 0v2"></path>
-                                </svg>
-                            </span>
-                            <input type="text" name="nip" id="nomorInduk" class="form-input"
-                                   placeholder="Masukkan NIPP atau NIPKWT" value="{{ old('nip') }}"
-                                   autocomplete="username" inputmode="numeric" required>
-                        </div>
-                    </div>
-
-                    <!-- Password -->
-                    <div class="form-group">
-                        <label for="passwordPetugas" class="form-label">Kata Sandi</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="4" y="10" width="16" height="10" rx="2"></rect>
-                                    <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
-                                </svg>
-                            </span>
-                            <input type="password" name="password" id="passwordPetugas" class="form-input"
-                                   placeholder="••••••••••••" autocomplete="current-password" required>
-                            <button type="button" class="password-toggle" data-target="passwordPetugas"
-                                    aria-label="Tampilkan password">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                            </button>
                         </div>
                     </div>
 
@@ -511,10 +415,10 @@
                         </div>
                     </div>
 
-                    <!-- Reguler / Wakilan -->
+                    <!-- Reguler / Wakilan (Pengganti) -->
                     <div class="form-group">
                         <span class="form-label">Jenis Petugas</span>
-                        <div class="jenis-group jenis-group--stack">
+                        <div class="jenis-group jenis-group--row">
                             <div class="jenis-option">
                                 <input type="radio" name="jenis_petugas" id="jenisReguler" value="reguler"
                                        {{ $jenis === 'reguler' ? 'checked' : '' }}>
@@ -523,10 +427,11 @@
                             <div class="jenis-option">
                                 <input type="radio" name="jenis_petugas" id="jenisWakilan" value="wakilan"
                                        {{ $jenis === 'wakilan' ? 'checked' : '' }}>
-                                <label for="jenisWakilan">Wakilan</label>
+                                <label for="jenisWakilan">Wakilan (Pengganti)</label>
                             </div>
                         </div>
                     </div>
+
                 </fieldset>
 
                 <button type="submit" class="login-button">Masuk ke Sistem</button>
@@ -542,7 +447,7 @@
                         <circle cx="12" cy="7" r="0.5" fill="currentColor"></circle>
                     </svg>
                 </span>
-                <span id="loginInfoText">Gunakan kredensial resmi Anda.</span>
+                <span>Gunakan kredensial resmi Anda.</span>
             </div>
 
         </div>
@@ -551,14 +456,10 @@
 
     <script>
         (function () {
-            const EYE = `
-                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
-                <circle cx="12" cy="12" r="3"></circle>`;
-            const EYE_OFF = `
-                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
-                <line x1="4" y1="4" x2="20" y2="20"></line>`;
+            const EYE = `<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path><circle cx="12" cy="12" r="3"></circle>`;
+            const EYE_OFF = `<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path><line x1="4" y1="4" x2="20" y2="20"></line>`;
 
-            /* ---- Tampilkan / sembunyikan password (semua tombol) ---- */
+            /* ---- Tampilkan / sembunyikan password ---- */
             document.querySelectorAll('.password-toggle').forEach(function (btn) {
                 btn.addEventListener('click', function () {
                     const input = document.getElementById(btn.dataset.target);
@@ -569,30 +470,68 @@
                 });
             });
 
-            /* ---- Pindah tab Petugas PJL <-> Admin/Superadmin ---- */
-            const tabs        = document.querySelectorAll('.login-tab');
-            const loginType   = document.getElementById('loginType');
-            const panelAdmin  = document.getElementById('panelAdmin');
-            const panelPetugas = document.getElementById('panelPetugas');
-            const infoText    = document.getElementById('loginInfoText');
+            /* ---- Tampilkan field PJL hanya untuk akun role pjl ---- */
+            const form      = document.getElementById('loginForm');
+            const nipInput  = document.getElementById('nip');
+            const passInput = document.getElementById('password');
+            const pjlFields = document.getElementById('pjlFields');
+            const submitBtn = form.querySelector('.login-button');
+            const errorBox  = document.getElementById('clientError');
+            const token     = form.querySelector('input[name="_token"]').value;
 
-            function setPanel(panel, active) {
-                panel.hidden = !active;
-                panel.disabled = !active; // disabled => tidak divalidasi & tidak terkirim
+            function setPjl(show) {
+                pjlFields.hidden = !show;
+                pjlFields.disabled = !show;
             }
 
-            function switchType(type) {
-                loginType.value = type;
-                tabs.forEach(t => t.classList.toggle('active', t.dataset.type === type));
-                setPanel(panelAdmin, type === 'admin');
-                setPanel(panelPetugas, type === 'petugas');
-                infoText.textContent = type === 'admin'
-                    ? 'Gunakan kredensial NIP resmi Anda.'
-                    : 'Isi data sesuai penugasan dinas Anda.';
+            function showError(msg) {
+                errorBox.textContent = msg;
+                errorBox.hidden = false;
             }
 
-            tabs.forEach(t => t.addEventListener('click', () => switchType(t.dataset.type)));
-            switchType(loginType.value);
+            // Ubah NIP / password => sembunyikan lagi, dicek ulang saat submit
+            [nipInput, passInput].forEach(function (el) {
+                el.addEventListener('input', function () { setPjl(false); });
+            });
+
+            form.addEventListener('submit', async function (e) {
+                // Field PJL sudah tampil => submit normal (server yang memvalidasi)
+                if (!pjlFields.hidden) return;
+
+                e.preventDefault();
+                errorBox.hidden = true;
+                submitBtn.disabled = true;
+
+                try {
+                    const res = await fetch("{{ route('login.cek') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': token,
+                        },
+                        body: JSON.stringify({ nip: nipInput.value, password: passInput.value }),
+                    });
+
+                    const data = await res.json();
+
+                    if (!res.ok) {
+                        showError(data.message || 'NIPP / NIPKWT atau password tidak valid.');
+                        return;
+                    }
+
+                    if (data.role === 'pjl') {
+                        setPjl(true);
+                        document.getElementById('nomorPjl').focus();
+                    } else {
+                        form.submit(); // admin / superadmin langsung masuk
+                    }
+                } catch (err) {
+                    form.submit(); // jaringan bermasalah => biar server yang menangani
+                } finally {
+                    submitBtn.disabled = false;
+                }
+            });
         })();
     </script>
 

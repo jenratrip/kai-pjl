@@ -37,6 +37,40 @@ class SerahTerimaDinasController extends Controller
     }
 
     /**
+     * Apakah dinas ini sudah punya serah terima yang disetujui admin.
+     */
+    private function dinasTerkunci(Dinas $dinas): bool
+    {
+        return SerahTerima::query()
+            ->where('dinas_id', $dinas->id)
+            ->whereIn('status_review', SerahTerima::STATUS_TERKUNCI)
+            ->exists();
+    }
+
+    /**
+     * Mengembalikan respons penolakan jika dinas sudah terkunci,
+     * atau null jika masih boleh diubah.
+     */
+    private function tolakJikaTerkunci(Request $request, Dinas $dinas)
+    {
+        if (!$this->dinasTerkunci($dinas)) {
+            return null;
+        }
+
+        $pesan = 'Serah terima dinas ini sudah disetujui admin. '
+            . 'Data terkunci dan tidak dapat diubah.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => false,
+                'message' => $pesan,
+            ], 422);
+        }
+
+        return back()->withErrors(['dinas' => $pesan]);
+    }
+
+    /**
      * Mencari akun PJL aktif berdasarkan nama atau NIP.
      */
     public function cariPenerima(Request $request)
@@ -99,6 +133,7 @@ class SerahTerimaDinasController extends Controller
 
     /**
      * Membuka data serah terima untuk diedit.
+     * Data yang sudah disetujui dialihkan ke halaman lihat.
      */
     public function edit($serahTerima)
     {
@@ -112,12 +147,10 @@ class SerahTerimaDinasController extends Controller
             ->findOrFail($serahTerima);
 
         if ($data->isTerkunci()) {
-            return redirect()
-                ->route('user.serah-terima-dinas.riwayat')
-                ->withErrors([
-                    'riwayat' =>
-                        'Data yang sudah disetujui admin terkunci dan tidak dapat diedit.',
-                ]);
+            return redirect()->route(
+                'user.serah-terima-dinas.show',
+                $data
+            );
         }
 
         return $this->tampilkanHalaman(
@@ -209,6 +242,11 @@ class SerahTerimaDinasController extends Controller
                     ->latest('id')
                     ->first();
             }
+        }
+
+        // Jika sudah disetujui admin, halaman apa pun hanya mode lihat.
+        if ($serahTerima?->isTerkunci()) {
+            $modeLihat = true;
         }
 
         return view('user.serahterimacatatan.index', [
@@ -481,6 +519,11 @@ class SerahTerimaDinasController extends Controller
                 ->withInput();
         }
 
+        // Data yang sudah disetujui admin tidak boleh diubah.
+        if ($tolak = $this->tolakJikaTerkunci($request, $dinas)) {
+            return $tolak;
+        }
+
         $catatan = CatatanDinas::create([
             'dinas_id' => $dinas->id,
             'user_id' => auth()->id(),
@@ -549,6 +592,11 @@ class SerahTerimaDinasController extends Controller
             return back()
                 ->withErrors(['dinas' => $pesanError])
                 ->withInput();
+        }
+
+        // Data yang sudah disetujui admin tidak boleh diubah.
+        if ($tolak = $this->tolakJikaTerkunci($request, $dinas)) {
+            return $tolak;
         }
 
         $inventaris = Inventaris::query()
@@ -715,11 +763,15 @@ class SerahTerimaDinasController extends Controller
                 ->withInput();
         }
 
-        if ($serahTerimaLama?->isTerkunci()) {
+        // Sudah disetujui admin: tolak, apa pun jalur masuknya.
+        if (
+            $serahTerimaLama?->isTerkunci()
+            || $this->dinasTerkunci($dinas)
+        ) {
             return back()
                 ->withErrors([
                     'dinas' =>
-                        'Serah terima ini sudah disetujui dan terkunci.',
+                        'Serah terima ini sudah disetujui admin dan terkunci. Data tidak dapat diubah.',
                 ])
                 ->withInput();
         }
@@ -1005,6 +1057,12 @@ class SerahTerimaDinasController extends Controller
         $data = SerahTerima::with('dinas')
             ->findOrFail($serahTerima);
 
+        abort_if(
+            $data->isTerkunci(),
+            422,
+            'Serah terima ini sudah disetujui dan terkunci.'
+        );
+
         abort_unless(
             $data->penerima_user_id !== null
                 && (int) $data->penerima_user_id
@@ -1038,6 +1096,12 @@ class SerahTerimaDinasController extends Controller
                 $terkini = SerahTerima::query()
                     ->lockForUpdate()
                     ->findOrFail($data->id);
+
+                abort_if(
+                    $terkini->isTerkunci(),
+                    422,
+                    'Serah terima ini sudah disetujui dan terkunci.'
+                );
 
                 abort_unless(
                     $terkini->penerima_user_id !== null

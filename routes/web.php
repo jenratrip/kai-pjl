@@ -83,6 +83,13 @@ Route::middleware('guest')->group(function () {
         'showLoginForm',
     ])->name('login');
 
+    // Cek kredensial & role (untuk menampilkan field PJL pada form login).
+    // Tidak melakukan login. Throttle dipisah dari login.store.
+    Route::post('/login/cek', [
+        LoginController::class,
+        'cek',
+    ])->middleware('throttle:10,1')->name('login.cek');
+
     Route::post('/login', [
         LoginController::class,
         'login',

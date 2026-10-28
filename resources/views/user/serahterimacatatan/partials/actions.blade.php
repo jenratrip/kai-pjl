@@ -1,14 +1,41 @@
 @php
-    $modeEditForm = !empty($modeEdit) && !empty($serahTerima);
+    $modeLihat = !empty($modeLihat);
+    $modeEditForm = !empty($modeEdit) && !empty($serahTerima) && !$modeLihat;
 
     $ringkasanLama = old(
         'ringkasan_text',
-        data_get($serahTerima, 'ringkasan.catatan_serah_terima', '')
+        data_get($serahTerima ?? null, 'ringkasan.catatan_serah_terima', '')
     );
 
-    $adaTtdPenyerahLama = !empty($serahTerima?->tanda_tangan_penyerah);
+    $adaTtdPenyerahLama = !empty(($serahTerima ?? null)?->tanda_tangan_penyerah);
 @endphp
 
+@if ($modeLihat)
+    {{-- Data sudah disetujui admin: hanya boleh dilihat dan dicetak --}}
+    <div class="space-y-4 print:hidden">
+        <div class="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            Serah terima ini sudah disetujui admin dan terkunci. Data hanya
+            dapat dilihat atau dicetak.
+        </div>
+
+        <div class="flex flex-wrap items-center justify-end gap-3">
+            <a
+                href="{{ route('user.serah-terima-dinas.riwayat') }}"
+                class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#1d2d50] transition hover:bg-slate-50"
+            >
+                Kembali ke riwayat
+            </a>
+
+            <button
+                type="button"
+                onclick="window.print()"
+                class="rounded-lg border border-[#1d2d50] bg-white px-4 py-2.5 text-sm font-semibold text-[#1d2d50] transition hover:bg-slate-50"
+            >
+                Cetak
+            </button>
+        </div>
+    </div>
+@else
 <form
     id="serahTerimaSubmitForm"
     method="POST"
@@ -88,7 +115,7 @@
         </button>
     </div>
 
-    <div class="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
+    <div class="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900 print:hidden">
         Pastikan informasi KA, alat pengamanan, inventaris, catatan dinas, dan
         tanda tangan sudah diperiksa sebelum menyimpan serah terima. Setelah
         disimpan, serah terima langsung dikirim ke admin dan tercatat di
@@ -200,7 +227,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        // 1. Nama penerima wajib (controller: nama_penerima required).
+        // 1. Nama penerima wajib.
         if (!nilaiField('nama_penerima')) {
             event.preventDefault();
             tampilkanError(
@@ -293,6 +320,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        // Ada gambar baru = "set", tidak ada = "keep" (pakai tanda tangan lama).
         signatureSubmitInput.value = signature;
         signatureActionInput.value = signature ? 'set' : 'keep';
 
@@ -332,6 +360,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
+@endif
 
 <style>
 @media print {
