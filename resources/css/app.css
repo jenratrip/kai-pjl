@@ -7,3 +7,201 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* =====================================================
+   CETAK KHUSUS HALAMAN REALISASI KA
+===================================================== */
+
+@media print {
+    @page {
+        size: landscape;
+        margin: 8mm;
+    }
+
+    .realisasi-ka-page {
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .realisasi-ka-page > section {
+        width: 100% !important;
+        max-width: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .realisasi-ka-page .table-wrapper {
+        width: 100% !important;
+        max-width: none !important;
+        overflow: visible !important;
+        border: 0 !important;
+    }
+
+    .realisasi-ka-page .table-wrapper > div {
+        width: 100% !important;
+        max-width: none !important;
+        overflow: visible !important;
+    }
+    .realisasi-ka-page .table-wrapper table {
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+    }
+
+    /* Atur lebar kolom khusus untuk cetak */
+    .realisasi-ka-page .table-wrapper th:nth-child(1),
+    .realisasi-ka-page .table-wrapper td:nth-child(1) {
+        width: 3%;
+    }
+
+    .realisasi-ka-page .table-wrapper th:nth-child(2),
+    .realisasi-ka-page .table-wrapper td:nth-child(2) {
+        width: 7%;
+    }
+
+    .realisasi-ka-page .table-wrapper th:nth-child(3),
+    .realisasi-ka-page .table-wrapper td:nth-child(3) {
+        width: 7%;
+    }
+
+    .realisasi-ka-page .table-wrapper th:nth-child(4),
+    .realisasi-ka-page .table-wrapper td:nth-child(4),
+    .realisasi-ka-page .table-wrapper th:nth-child(5),
+    .realisasi-ka-page .table-wrapper td:nth-child(5) {
+        width: 6%;
+    }
+
+    .realisasi-ka-page .table-wrapper th:nth-child(6),
+    .realisasi-ka-page .table-wrapper td:nth-child(6) {
+        width: 10%;
+    }
+
+        /* JAM JADWAL */
+    .realisasi-ka-page .table-wrapper th:nth-child(7),
+    .realisasi-ka-page .table-wrapper td:nth-child(7) {
+        width: 9%;
+    }
+
+    /* JAM AKTUAL */
+    .realisasi-ka-page .table-wrapper th:nth-child(8),
+    .realisasi-ka-page .table-wrapper td:nth-child(8) {
+        width: 10%;
+    }
+
+    /* STATUS */
+    .realisasi-ka-page .table-wrapper th:nth-child(9),
+    .realisasi-ka-page .table-wrapper td:nth-child(9) {
+        width: 6%;
+    }
+
+    .realisasi-ka-page .table-wrapper th:nth-child(10),
+    .realisasi-ka-page .table-wrapper td:nth-child(10),
+    .realisasi-ka-page .table-wrapper th:nth-child(11),
+    .realisasi-ka-page .table-wrapper td:nth-child(11),
+    .realisasi-ka-page .table-wrapper th:nth-child(13),
+    .realisasi-ka-page .table-wrapper td:nth-child(13) {
+        width: 7%;
+    }
+
+    .realisasi-ka-page .table-wrapper th:nth-child(12),
+    .realisasi-ka-page .table-wrapper td:nth-child(12) {
+        width: 9%;
+    }
+
+    .realisasi-ka-page .table-wrapper th:nth-child(14),
+    .realisasi-ka-page .table-wrapper td:nth-child(14) {
+        width: 8%;
+    }
+
+    .realisasi-ka-page .table-wrapper th,
+    .realisasi-ka-page .table-wrapper td {
+        padding: 3px 2px !important;
+        font-size: 7px !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+
+    /* Sembunyikan kolom AKSI */
+    .realisasi-ka-page .table-wrapper th:nth-child(15),
+    .realisasi-ka-page .table-wrapper td:nth-child(15) {
+        display: none !important;
+    }
+
+    /* Sembunyikan elemen interaktif yang tidak dibutuhkan di cetakan */
+    .realisasi-ka-page #awasBanner,
+    .realisasi-ka-page #formTambahKa,
+    .realisasi-ka-page #toggleTambahKa,
+    .realisasi-ka-page #catatanModal,
+    .realisasi-ka-page .actions,
+    .realisasi-ka-page .waktu-info {
+        display: none !important;
+    }
+
+    /* Ringkasan dan legenda tetap terbaca */
+    .realisasi-ka-page .summary-chips,
+    .realisasi-ka-page .summary-progress,
+    .realisasi-ka-page .color-legend {
+        break-inside: avoid;
+    }
+
+    /* Pertahankan warna status dan pemeriksaan */
+    .realisasi-ka-page .table-wrapper *,
+    .realisasi-ka-page .color-legend *,
+    .realisasi-ka-page .chip-dot,
+    .realisasi-ka-page [id^="progress"] {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .realisasi-ka-page thead {
+        display: table-header-group;
+    }
+
+    .realisasi-ka-page tr {
+        break-inside: avoid;
+    }
+
+    /* Status JALAN/BATAL menjadi simbol saat dicetak */
+    .realisasi-ka-page .table-wrapper td:nth-child(9) button[data-print-status] {
+        display: none !important;
+    }
+
+    .realisasi-ka-page .table-wrapper td:nth-child(9) button[data-print-status][aria-pressed="true"] {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: auto !important;
+        min-width: 0 !important;
+        height: auto !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        font-size: 0 !important;
+        line-height: 1 !important;
+        box-shadow: none !important;
+    }
+
+    .realisasi-ka-page .table-wrapper td:nth-child(9) button[data-print-status="jalan"][aria-pressed="true"]::after {
+        content: "✓";
+        color: #15803d !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+    }
+
+    .realisasi-ka-page .table-wrapper td:nth-child(9) button[data-print-status="batal"][aria-pressed="true"]::after {
+        content: "×";
+        color: #b91c1c !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+    }
+}

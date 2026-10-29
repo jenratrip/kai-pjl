@@ -1,10 +1,6 @@
-@extends('layouts.user-operasional')
+@extends('layouts.user')
 
 @section('title', 'Catatan Dinas - Sistem PJL')
-
-@push('styles')
-    <link rel="stylesheet" href="{{ asset('css/user/catatan-dinas.css') }}">
-@endpush
 
 @section('content')
     @include('user.catatan-dinas._section', [
@@ -37,14 +33,16 @@
             }
 
             if (activeModal && activeModal !== modal) {
-                activeModal.classList.remove('show');
+                activeModal.classList.add('hidden');
+                activeModal.classList.remove('flex');
                 activeModal.setAttribute('aria-hidden', 'true');
             }
 
             activeModal = modal;
-            modal.classList.add('show');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
             modal.setAttribute('aria-hidden', 'false');
-            document.body.classList.add('modal-open');
+            document.body.classList.add('overflow-hidden');
 
             const firstInput = modal.querySelector(
                 'input:not([readonly]):not([type=hidden]), select, textarea, button'
@@ -57,12 +55,13 @@
             const modal = document.getElementById(modalId);
             if (!modal) return;
 
-            modal.classList.remove('show');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
             modal.setAttribute('aria-hidden', 'true');
 
             if (activeModal === modal) {
                 activeModal = null;
-                document.body.classList.remove('modal-open');
+                document.body.classList.remove('overflow-hidden');
 
                 if (
                     previousFocusedElement &&

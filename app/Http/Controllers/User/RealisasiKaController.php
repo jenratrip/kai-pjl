@@ -169,11 +169,11 @@ $dataKA[] = [
 * KA manual tidak memiliki jadwal_ka,
 * sehingga relasinya belum diketahui dari jadwal.
 */
-'dari' => '',
-'ke' => '',
-'hulu' => '',
-'hilir' => '',
-'relasi' => '',
+'dari' => $realisasi->hulu ?? '',
+'ke' => $realisasi->hilir ?? '',
+'hulu' => $realisasi->hulu ?? '',
+'hilir' => $realisasi->hilir ?? '',
+'relasi' => $realisasi->relasi ?? '',
 
 'jadwal' => '-',
 
@@ -245,6 +245,24 @@ $validated = $request->validate([
 'nullable',
 'string',
 'max:255',
+],
+
+'data.*.hulu' => [
+    'nullable',
+    'string',
+    'max:255',
+],
+
+'data.*.hilir' => [
+    'nullable',
+    'string',
+    'max:255',
+],
+
+'data.*.relasi' => [
+    'nullable',
+    'string',
+    'max:255',
 ],
 
 'data.*.jadwal_ka_id' => [
@@ -395,8 +413,16 @@ $realisasi->is_manual = true;
 }
 }
 
+
 $realisasi->kereta_api_id = $kereta->id;
+
+// Simpan detail perjalanan KA manual.
+$realisasi->hulu = $item['hulu'] ?? null;
+$realisasi->hilir = $item['hilir'] ?? null;
+$realisasi->relasi = $item['relasi'] ?? null;
+
 } else {
+
 /*
 * Validasi jadwal terhadap JPL, tanggal,
 * dan hari dinas aktif.
