@@ -207,6 +207,7 @@ class LoginController extends Controller
             $isWakilan
         ) {
             $dinas = Dinas::query()
+                ->lockForUpdate()
                 ->where('user_id', $user->id)
                 ->where('jpl_id', $jpl->id)
                 ->where('shift_id', $shift->id)
@@ -270,16 +271,6 @@ class LoginController extends Controller
             }
 
             $dinas->save();
-
-            logger()->info('Pelacakan petugas pengganti saat login', [
-                'user_id' => $user->id,
-                'jpl_id' => $jpl->id,
-                'shift_id' => $shift->id,
-                'tanggal' => $tanggal,
-                'is_wakilan' => $isWakilan,
-                'dinas_id' => $dinas->id,
-                'user_digantikan_id' => $dinas->user_digantikan_id,
-            ]);
 
             return $dinas;
         });

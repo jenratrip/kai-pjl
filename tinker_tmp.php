@@ -1,0 +1,1 @@
+$j = \App\Models\JadwalKa::orderByDesc('id')->limit(5)->get(['id','jpl_id','jam_lewat','hari_berlaku','tanggal_berlaku','is_active']); foreach($j as $r){ echo $r->id.','. $r->jpl_id.','. $r->jam_lewat.','. json_encode($r->hari_berlaku).','. ($r->tanggal_berlaku ?? 'NULL').','. ($r->is_active?'1':'0').'\n';}

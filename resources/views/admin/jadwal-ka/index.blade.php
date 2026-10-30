@@ -56,9 +56,9 @@
                     Arsip Jadwal
                 </a>
 
-                {{-- IMPORT EXCEL --}}
+                    {{-- IMPORT EXCEL --}}
                 <a
-                    href="{{ route('admin.jadwal-ka.import') }}"
+                    href="{{ route('admin.jadwal-ka.import.form') }}"
                     class="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-200"
                 >
                     <svg class="h-5 w-5"

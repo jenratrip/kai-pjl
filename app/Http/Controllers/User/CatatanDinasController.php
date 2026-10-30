@@ -12,6 +12,23 @@ use Illuminate\Support\Facades\Log;
 class CatatanDinasController extends Controller
 {
     /**
+     * Mengambil dinas aktif pengguna untuk kebutuhan header.
+     */
+    private function dinasAktif(): ?Dinas
+    {
+        return Dinas::with([
+            'user',
+            'userDigantikan',
+            'jpl.resort.wilayah',
+            'shift',
+        ])
+            ->where('user_id', auth()->id())
+            ->where('status', 'berlangsung')
+            ->latest('id')
+            ->first();
+    }
+
+    /**
      * Menampilkan halaman Catatan Dinas.
      */
     public function index()
@@ -23,20 +40,26 @@ class CatatanDinasController extends Controller
             return redirect()->route('login');
         }
 
+        // Mengambil dinas aktif untuk header.
+        $dinasAktif = $this->dinasAktif();
+
         // Mengambil catatan milik pengguna yang sedang login.
         $catatan = CatatanDinas::with([
             'user',
             'dinas.user',
+            'dinas.userDigantikan',
             'dinas.shift',
+            'dinas.jpl.resort.wilayah',
         ])
             ->where('user_id', $user->id)
             ->latest('waktu_catatan')
             ->get();
 
         // Mengambil jadwal dinas beserta data shift dari database.
-        // Jangan mengambil daftar shift dari localStorage.
         $daftarDinas = Dinas::with([
             'user',
+            'userDigantikan',
+            'jpl.resort.wilayah',
             'shift',
         ])
             ->where('user_id', $user->id)
@@ -48,6 +71,8 @@ class CatatanDinasController extends Controller
         Log::info('Pemeriksaan Catatan Dinas', [
             'user_id' => $user->id,
             'nama_user' => $user->name,
+            'dinas_aktif_id' => $dinasAktif?->id,
+            'dinas_aktif_status' => $dinasAktif?->status,
             'jumlah_catatan' => $catatan->count(),
             'jumlah_jadwal' => $daftarDinas->count(),
             'jadwal' => $daftarDinas->map(function ($dinas) {
@@ -59,14 +84,19 @@ class CatatanDinasController extends Controller
                     ),
                     'shift_id' => $dinas->shift_id,
                     'nama_shift' => $dinas->shift?->nama_shift,
+                    'is_pengganti' => $dinas->is_pengganti,
+                    'nama_jpl' => $dinas->jpl?->nama_jpl,
+                    'nama_petugas' => $dinas->user?->name,
+                    'nama_petugas_digantikan' => $dinas->userDigantikan?->name,
                 ];
             })->values()->all(),
         ]);
 
-        return view('user.catatan-dinas.index', compact(
-            'catatan',
-            'daftarDinas'
-        ));
+        return view('user.catatan-dinas.index', [
+            'catatan' => $catatan,
+            'daftarDinas' => $daftarDinas,
+            'dinasAktif' => $dinasAktif,
+        ]);
     }
 
     /**
@@ -97,7 +127,6 @@ class CatatanDinasController extends Controller
                 'string',
                 'max:5000',
             ],
-            // Penanda halaman asal (opsional).
             'redirect_to' => [
                 'nullable',
                 'string',
