@@ -1,4 +1,4 @@
-<header class="fixed inset-x-0 top-0 z-30 flex h-[76px] items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 transition-[margin,width] duration-300 ease-in-out"
+<header class="user-header fixed inset-x-0 top-0 z-30 flex h-[76px] items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 transition-[margin,width] duration-300 ease-in-out"
     :class="sidebarOpen ? 'ml-[230px] w-[calc(100%-230px)]' : 'ml-0 w-full'"
 >
     <div class="flex min-w-0 items-center gap-3">

@@ -16,25 +16,25 @@ use Illuminate\Validation\ValidationException;
 
 class RealisasiKaController extends Controller
 {
-/**
-* Menampilkan jadwal KA, realisasi, dan konfigurasi Admin
-* untuk dinas aktif pengguna.
-*/
-public function index()
-{
-$dinas = Dinas::with([
-'jpl.resort.wilayah',
-'shift',
-])
-->where('user_id', auth()->id())
-->where('status', 'berlangsung')
-->latest('id')
-->first();
+    /**
+     * Menampilkan jadwal KA, realisasi, dan konfigurasi Admin
+     * untuk dinas aktif pengguna.
+     */
+    public function index()
+    {
+        $dinas = Dinas::with([
+            'jpl.resort.wilayah',
+            'shift',
+        ])
+            ->where('user_id', auth()->id())
+            ->where('status', 'berlangsung')
+            ->latest('id')
+            ->first();
 
-$dataKA = [];
+        $dataKA = [];
 
-if ($dinas) {
-/*
+        if ($dinas) {
+            /*
 * Ambil jadwal aktif milik JPL pada dinas aktif.
 *
 * Jadwal khusus:
@@ -44,586 +44,641 @@ if ($dinas) {
 * tanggal_berlaku NULL dan hari_berlaku cocok
 * dengan hari dinas.
 */
-$jadwalQuery = JadwalKa::with('keretaApi')
-->where('jpl_id', $dinas->jpl_id)
-->where('is_active', true);
+            $jadwalQuery = JadwalKa::with('keretaApi')
+                ->where('jpl_id', $dinas->jpl_id)
+                ->where('is_active', true);
 
-$this->terapkanFilterJadwalBerlaku(
-$jadwalQuery,
-$dinas
-);
+            $this->terapkanFilterJadwalBerlaku(
+                $jadwalQuery,
+                $dinas
+            );
 
-/*
+            /*
 * Jadwal khusus ditampilkan lebih dahulu.
 * Jadwal khusus dan rutin dengan KA serta jam
 * yang sama hanya ditampilkan satu kali.
 */
-$jadwalList = $jadwalQuery
-->orderByRaw(
-'CASE WHEN tanggal_berlaku IS NULL THEN 1 ELSE 0 END'
-)
-->orderBy('jam_lewat')
-->get()
-->unique(function ($jadwal) {
-return ($jadwal->kereta_api_id ?? 'tanpa-ka')
-. '|'
-. ($jadwal->jam_lewat ?? 'tanpa-jam');
-})
-->values();
+            $jadwalList = $jadwalQuery
+                ->orderByRaw(
+                    'CASE WHEN tanggal_berlaku IS NULL THEN 1 ELSE 0 END'
+                )
+                ->orderBy('jam_lewat')
+                ->get()
+                ->filter(fn($jadwal) => $this->jadwalDalamRentangShift(
+                    $jadwal->jam_lewat,
+                    $dinas
+                ))
+                ->unique(function ($jadwal) {
+                    return ($jadwal->kereta_api_id ?? 'tanpa-ka')
+                        . '|'
+                        . ($jadwal->jam_lewat ?? 'tanpa-jam');
+                })
+                ->values();
 
-/*
+            /*
 * Ambil realisasi KA terjadwal yang telah tersimpan
 * untuk dinas aktif.
 */
-$realisasiList = RealisasiKa::with('keretaApi')
-->where('dinas_id', $dinas->id)
-->where('is_manual', false)
-->get()
-->keyBy('jadwal_ka_id');
+            $realisasiList = RealisasiKa::with('keretaApi')
+                ->where('dinas_id', $dinas->id)
+                ->where('is_manual', false)
+                ->get()
+                ->keyBy('jadwal_ka_id');
 
-/*
+            /*
 * Gabungkan jadwal dengan realisasi tersimpan.
 */
-foreach ($jadwalList as $jadwal) {
-$realisasi = $realisasiList->get($jadwal->id);
+            foreach ($jadwalList as $jadwal) {
+                $realisasi = $realisasiList->get($jadwal->id);
 
-/*
+                /*
 * HULU = jadwal_ka.dari
 * HILIR = jadwal_ka.ke
 * RELASI = dari + " - " + ke
 */
-$dari = trim((string) ($jadwal->dari ?? ''));
-$ke = trim((string) ($jadwal->ke ?? ''));
+                $dari = trim((string) ($jadwal->dari ?? ''));
+                $ke = trim((string) ($jadwal->ke ?? ''));
 
-$relasi = ($dari !== '' && $ke !== '')
-? "{$dari} - {$ke}"
-: ($dari !== '' ? $dari : $ke);
+                $relasi = ($dari !== '' && $ke !== '')
+                    ? "{$dari} - {$ke}"
+                    : ($dari !== '' ? $dari : $ke);
 
-$dataKA[] = [
-'no' => count($dataKA) + 1,
+                $dataKA[] = [
+                    'no' => count($dataKA) + 1,
 
-'nomor' => $jadwal->keretaApi?->nomor_ka ?? '-',
-'nama' => $jadwal->keretaApi?->nama_ka ?? '-',
+                    'nomor' => $jadwal->keretaApi?->nomor_ka ?? '-',
+                    'nama' => $jadwal->keretaApi?->nama_ka ?? '-',
 
-'dari' => $dari,
-'ke' => $ke,
-'hulu' => $dari,
-'hilir' => $ke,
-'relasi' => $relasi,
+                    'dari' => $dari,
+                    'ke' => $ke,
+                    'hulu' => $dari,
+                    'hilir' => $ke,
+                    'relasi' => $relasi,
 
-'jadwal' => $jadwal->jam_lewat
-? substr((string) $jadwal->jam_lewat, 0, 5)
-: '',
+                    'jadwal' => $jadwal->jam_lewat
+                        ? substr((string) $jadwal->jam_lewat, 0, 5)
+                        : '',
 
-'aktual' => $realisasi?->jam_aktual
-? substr((string) $realisasi->jam_aktual, 0, 5)
-: '',
+                    'aktual' => $realisasi?->jam_aktual
+                        ? substr((string) $realisasi->jam_aktual, 0, 5)
+                        : '',
 
-'status' => match ($realisasi?->status_lewat) {
-'centang' => 'JALAN',
-'silang' => 'BATAL',
-default => 'BELUM',
-},
+                    'status' => match ($realisasi?->status_lewat) {
+                        'centang' => 'JALAN',
+                        'silang' => 'BATAL',
+                        default => 'BELUM',
+                    },
 
-'semboyan21' => $this->checkValue(
-$realisasi?->status_s21
-),
+                    'semboyan21' => $this->checkValue(
+                        $realisasi?->status_s21
+                    ),
 
-'genta' => $this->checkValue(
-$realisasi?->status_genta
-),
+                    'genta' => $this->checkValue(
+                        $realisasi?->status_genta
+                    ),
 
-'pintu' => $this->checkValue(
-$realisasi?->status_pintu_perlintasan
-),
+                    'pintu' => $this->checkValue(
+                        $realisasi?->status_pintu_perlintasan
+                    ),
 
-'semboyan35' => $this->checkValue(
-$realisasi?->status_s35
-),
+                    'semboyan35' => $this->checkValue(
+                        $realisasi?->status_s35
+                    ),
 
-'keterangan' => $realisasi?->catatan ?? '',
+                    'keterangan' => $realisasi?->catatan ?? '',
 
-'jadwal_ka_id' => $jadwal->id,
-'realisasi_ka_id' => $realisasi?->id,
-'is_manual' => false,
-];
-}
+                    'jadwal_ka_id' => $jadwal->id,
+                    'realisasi_ka_id' => $realisasi?->id,
+                    'is_manual' => false,
+                ];
+            }
 
-/*
+            /*
 * Tambahkan KA manual yang telah tersimpan.
 */
-$manualList = RealisasiKa::with('keretaApi')
-->where('dinas_id', $dinas->id)
-->where('is_manual', true)
-->orderBy('id')
-->get();
+            $manualList = RealisasiKa::with('keretaApi')
+                ->where('dinas_id', $dinas->id)
+                ->where('is_manual', true)
+                ->orderBy('id')
+                ->get();
 
-foreach ($manualList as $realisasi) {
-$dataKA[] = [
-'no' => count($dataKA) + 1,
+            foreach ($manualList as $realisasi) {
+                $dataKA[] = [
+                    'no' => count($dataKA) + 1,
 
-'nomor' => $realisasi->keretaApi?->nomor_ka ?? '-',
-'nama' => $realisasi->keretaApi?->nama_ka ?? '-',
+                    'nomor' => $realisasi->keretaApi?->nomor_ka ?? '-',
+                    'nama' => $realisasi->keretaApi?->nama_ka ?? '-',
 
-/*
+                    /*
 * KA manual tidak memiliki jadwal_ka,
 * sehingga relasinya belum diketahui dari jadwal.
 */
-'dari' => $realisasi->hulu ?? '',
-'ke' => $realisasi->hilir ?? '',
-'hulu' => $realisasi->hulu ?? '',
-'hilir' => $realisasi->hilir ?? '',
-'relasi' => $realisasi->relasi ?? '',
+                    'dari' => $realisasi->hulu ?? '',
+                    'ke' => $realisasi->hilir ?? '',
+                    'hulu' => $realisasi->hulu ?? '',
+                    'hilir' => $realisasi->hilir ?? '',
+                    'relasi' => $realisasi->relasi ?? '',
 
-'jadwal' => '-',
+                    'jadwal' => '-',
 
-'aktual' => $realisasi->jam_aktual
-? substr((string) $realisasi->jam_aktual, 0, 5)
-: '',
+                    'aktual' => $realisasi->jam_aktual
+                        ? substr((string) $realisasi->jam_aktual, 0, 5)
+                        : '',
 
-'status' => match ($realisasi->status_lewat) {
-'centang' => 'JALAN',
-'silang' => 'BATAL',
-default => 'BELUM',
-},
+                    'status' => match ($realisasi->status_lewat) {
+                        'centang' => 'JALAN',
+                        'silang' => 'BATAL',
+                        default => 'BELUM',
+                    },
 
-'semboyan21' => $this->checkValue(
-$realisasi->status_s21
-),
+                    'semboyan21' => $this->checkValue(
+                        $realisasi->status_s21
+                    ),
 
-'genta' => $this->checkValue(
-$realisasi->status_genta
-),
+                    'genta' => $this->checkValue(
+                        $realisasi->status_genta
+                    ),
 
-'pintu' => $this->checkValue(
-$realisasi->status_pintu_perlintasan
-),
+                    'pintu' => $this->checkValue(
+                        $realisasi->status_pintu_perlintasan
+                    ),
 
-'semboyan35' => $this->checkValue(
-$realisasi->status_s35
-),
+                    'semboyan35' => $this->checkValue(
+                        $realisasi->status_s35
+                    ),
 
-'keterangan' => $realisasi->catatan ?? '',
+                    'keterangan' => $realisasi->catatan ?? '',
 
-'jadwal_ka_id' => null,
-'realisasi_ka_id' => $realisasi->id,
-'is_manual' => true,
-];
-}
-}
+                    'jadwal_ka_id' => null,
+                    'realisasi_ka_id' => $realisasi->id,
+                    'is_manual' => true,
+                ];
+            }
+        }
 
-/*
+        /*
 * Ambil konfigurasi realisasi KA yang dikelola Admin.
 */
-$realisasiKaSetting = RealisasiKaSetting::firstOrCreate([]);
+        $realisasiKaSetting = RealisasiKaSetting::firstOrCreate([]);
 
-return view('user.realisasi-ka.index', [
-'dataKA' => $dataKA,
-'dinasAktif' => $dinas,
-'realisasiKaSetting' => $realisasiKaSetting,
-]);
-}
+        return view('user.realisasi-ka.index', [
+            'dataKA' => $dataKA,
+            'dinasAktif' => $dinas,
+            'realisasiKaSetting' => $realisasiKaSetting,
+        ]);
+    }
 
-/**
-* Menyimpan realisasi KA ke database.
-*/
-public function store(Request $request)
-{
-$validated = $request->validate([
-'data' => [
-'required',
-'array',
-],
+    /**
+     * Menyimpan realisasi KA ke database.
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'data' => [
+                'required',
+                'array',
+            ],
 
-'data.*.nomor' => [
-'required',
-'string',
-'max:50',
-],
+            'data.*.nomor' => [
+                'required',
+                'string',
+                'max:50',
+            ],
 
-'data.*.nama' => [
-'nullable',
-'string',
-'max:255',
-],
+            'data.*.nama' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
 
-'data.*.hulu' => [
-    'nullable',
-    'string',
-    'max:255',
-],
+            'data.*.hulu' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
 
-'data.*.hilir' => [
-    'nullable',
-    'string',
-    'max:255',
-],
+            'data.*.hilir' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
 
-'data.*.relasi' => [
-    'nullable',
-    'string',
-    'max:255',
-],
+            'data.*.relasi' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
 
-'data.*.jadwal_ka_id' => [
-'nullable',
-'integer',
-],
+            'data.*.jadwal_ka_id' => [
+                'nullable',
+                'integer',
+            ],
 
-'data.*.realisasi_ka_id' => [
-'nullable',
-'integer',
-],
+            'data.*.realisasi_ka_id' => [
+                'nullable',
+                'integer',
+            ],
 
-'data.*.is_manual' => [
-'required',
-'boolean',
-],
+            'data.*.is_manual' => [
+                'required',
+                'boolean',
+            ],
 
-'data.*.aktual' => [
-'nullable',
-'date_format:H:i',
-],
+            'data.*.aktual' => [
+                'nullable',
+                'date_format:H:i',
+            ],
 
-'data.*.status' => [
-'required',
-Rule::in(['JALAN', 'BATAL', 'BELUM']),
-],
+            'data.*.status' => [
+                'required',
+                Rule::in(['JALAN', 'BATAL', 'BELUM']),
+            ],
 
-'data.*.semboyan21' => [
-'nullable',
-Rule::in(['yes', 'no']),
-],
+            'data.*.semboyan21' => [
+                'nullable',
+                Rule::in(['yes', 'no']),
+            ],
 
-'data.*.genta' => [
-'nullable',
-Rule::in(['yes', 'no']),
-],
+            'data.*.genta' => [
+                'nullable',
+                Rule::in(['yes', 'no']),
+            ],
 
-'data.*.pintu' => [
-'nullable',
-Rule::in(['yes', 'no']),
-],
+            'data.*.pintu' => [
+                'nullable',
+                Rule::in(['yes', 'no']),
+            ],
 
-'data.*.semboyan35' => [
-'nullable',
-Rule::in(['yes', 'no']),
-],
+            'data.*.semboyan35' => [
+                'nullable',
+                Rule::in(['yes', 'no']),
+            ],
 
-'data.*.keterangan' => [
-'nullable',
-'string',
-'max:2000',
-],
-]);
+            'data.*.keterangan' => [
+                'nullable',
+                'string',
+                'max:2000',
+            ],
+        ]);
 
-/*
+        /*
 * Pastikan dinas yang digunakan milik pengguna login
 * dan masih berstatus berlangsung.
 */
-$dinas = Dinas::where('user_id', auth()->id())
-->where('status', 'berlangsung')
-->latest('id')
-->first();
+        $dinas = Dinas::where('user_id', auth()->id())
+            ->where('status', 'berlangsung')
+            ->latest('id')
+            ->first();
 
-if (!$dinas) {
-return response()->json([
-'message' => 'Tidak ada dinas aktif. Mulai dinas terlebih dahulu.',
-], 422);
-}
+        if (!$dinas) {
+            return response()->json([
+                'message' => 'Tidak ada dinas aktif. Mulai dinas terlebih dahulu.',
+            ], 422);
+        }
 
-/*
+        /*
 * Simpan seluruh realisasi dalam satu transaksi.
 */
-$hasilSimpan = DB::transaction(
-function () use ($validated, $dinas) {
-$hasil = [];
+        $hasilSimpan = DB::transaction(
+            function () use ($validated, $dinas) {
+                $hasil = [];
 
-foreach ($validated['data'] as $index => $item) {
-$isManual = (bool) $item['is_manual'];
+                foreach ($validated['data'] as $index => $item) {
+                    $isManual = (bool) $item['is_manual'];
 
-$realisasiId = $item['realisasi_ka_id'] ?? null;
+                    $realisasiId = $item['realisasi_ka_id'] ?? null;
 
-if ($isManual) {
-/*
+                    if ($isManual) {
+                        /*
 * Cari atau buat data KA berdasarkan nomor KA.
 */
-$nomorKA = trim($item['nomor']);
-$namaKA = trim($item['nama'] ?? '');
+                        $nomorKA = trim($item['nomor']);
+                        $namaKA = trim($item['nama'] ?? '');
 
-$kereta = KeretaApi::firstOrCreate(
-[
-'nomor_ka' => $nomorKA,
-],
-[
-'nama_ka' => $namaKA !== ''
-? $namaKA
-: null,
-]
-);
+                        $kereta = KeretaApi::firstOrCreate(
+                            [
+                                'nomor_ka' => $nomorKA,
+                            ],
+                            [
+                                'nama_ka' => $namaKA !== ''
+                                    ? $namaKA
+                                    : null,
+                            ]
+                        );
 
-/*
+                        /*
 * Perbarui nama KA apabila sebelumnya kosong.
 */
-if (empty($kereta->nama_ka) && $namaKA !== '') {
-$kereta->nama_ka = $namaKA;
-$kereta->save();
-}
+                        if (empty($kereta->nama_ka) && $namaKA !== '') {
+                            $kereta->nama_ka = $namaKA;
+                            $kereta->save();
+                        }
 
-/*
+                        /*
 * Jika ID realisasi tersedia, pastikan
 * ID tersebut merupakan KA manual milik
 * dinas aktif.
 */
-if ($realisasiId) {
-$realisasi = RealisasiKa::where(
-'id',
-$realisasiId
-)
-->where('dinas_id', $dinas->id)
-->where('is_manual', true)
-->whereNull('jadwal_ka_id')
-->first();
+                        if ($realisasiId) {
+                            $realisasi = RealisasiKa::where(
+                                'id',
+                                $realisasiId
+                            )
+                                ->where('dinas_id', $dinas->id)
+                                ->where('is_manual', true)
+                                ->whereNull('jadwal_ka_id')
+                                ->first();
 
-if (!$realisasi) {
-throw ValidationException::withMessages([
-'data' => 'Realisasi KA manual tidak valid atau bukan milik dinas aktif.',
-]);
-}
-} else {
-/*
+                            if (!$realisasi) {
+                                throw ValidationException::withMessages([
+                                    'data' => 'Realisasi KA manual tidak valid atau bukan milik dinas aktif.',
+                                ]);
+                            }
+                        } else {
+                            /*
 * Gunakan realisasi manual yang cocok
 * jika sudah ada agar tidak duplikat.
 */
-$realisasi = RealisasiKa::where(
-'dinas_id',
-$dinas->id
-)
-->where('is_manual', true)
-->where('kereta_api_id', $kereta->id)
-->whereNull('jadwal_ka_id')
-->first();
+                            $realisasi = RealisasiKa::where(
+                                'dinas_id',
+                                $dinas->id
+                            )
+                                ->where('is_manual', true)
+                                ->where('kereta_api_id', $kereta->id)
+                                ->whereNull('jadwal_ka_id')
+                                ->first();
 
-if (!$realisasi) {
-$realisasi = new RealisasiKa();
+                            if (!$realisasi) {
+                                $realisasi = new RealisasiKa();
 
-$realisasi->dinas_id = $dinas->id;
-$realisasi->jadwal_ka_id = null;
-$realisasi->is_manual = true;
-}
-}
+                                $realisasi->dinas_id = $dinas->id;
+                                $realisasi->jadwal_ka_id = null;
+                                $realisasi->is_manual = true;
+                            }
+                        }
 
 
-$realisasi->kereta_api_id = $kereta->id;
+                        $realisasi->kereta_api_id = $kereta->id;
 
-// Simpan detail perjalanan KA manual.
-$realisasi->hulu = $item['hulu'] ?? null;
-$realisasi->hilir = $item['hilir'] ?? null;
-$realisasi->relasi = $item['relasi'] ?? null;
+                        // Simpan detail perjalanan KA manual.
+                        $realisasi->hulu = $item['hulu'] ?? null;
+                        $realisasi->hilir = $item['hilir'] ?? null;
+                        $realisasi->relasi = $item['relasi'] ?? null;
+                    } else {
 
-} else {
-
-/*
+                        /*
 * Validasi jadwal terhadap JPL, tanggal,
 * dan hari dinas aktif.
 */
-$jadwalId = $item['jadwal_ka_id'] ?? null;
+                        $jadwalId = $item['jadwal_ka_id'] ?? null;
 
-if (!$jadwalId) {
-throw ValidationException::withMessages([
-'data' => 'ID jadwal KA wajib diisi untuk KA terjadwal.',
-]);
-}
+                        if (!$jadwalId) {
+                            throw ValidationException::withMessages([
+                                'data' => 'ID jadwal KA wajib diisi untuk KA terjadwal.',
+                            ]);
+                        }
 
-$jadwalQuery = JadwalKa::where('id', $jadwalId)
-->where('jpl_id', $dinas->jpl_id)
-->where('is_active', true);
+                        $jadwalQuery = JadwalKa::where('id', $jadwalId)
+                            ->where('jpl_id', $dinas->jpl_id)
+                            ->where('is_active', true);
 
-$this->terapkanFilterJadwalBerlaku(
-$jadwalQuery,
-$dinas
-);
+                        $this->terapkanFilterJadwalBerlaku(
+                            $jadwalQuery,
+                            $dinas
+                        );
 
-$jadwal = $jadwalQuery->first();
+                        $jadwal = $jadwalQuery->first();
 
-if (!$jadwal) {
-throw ValidationException::withMessages([
-'data' => 'Jadwal KA tidak valid, tidak aktif, tidak sesuai hari/tanggal, atau bukan milik JPL dinas aktif.',
-]);
-}
+                        if (
+                            !$jadwal ||
+                            !$this->jadwalDalamRentangShift($jadwal->jam_lewat, $dinas)
+                        ) {
+                            throw ValidationException::withMessages([
+                                'data' => 'Jadwal KA tidak valid, tidak aktif, tidak sesuai hari/tanggal, atau bukan milik JPL dinas aktif.',
+                            ]);
+                        }
 
-/*
+                        /*
 * Jika ID realisasi tersedia, pastikan
 * cocok dengan jadwal dan dinas.
 */
-if ($realisasiId) {
-$realisasi = RealisasiKa::where(
-'id',
-$realisasiId
-)
-->where('dinas_id', $dinas->id)
-->where('jadwal_ka_id', $jadwal->id)
-->where('is_manual', false)
-->first();
+                        if ($realisasiId) {
+                            $realisasi = RealisasiKa::where(
+                                'id',
+                                $realisasiId
+                            )
+                                ->where('dinas_id', $dinas->id)
+                                ->where('jadwal_ka_id', $jadwal->id)
+                                ->where('is_manual', false)
+                                ->first();
 
-if (!$realisasi) {
-throw ValidationException::withMessages([
-'data' => 'ID realisasi tidak cocok dengan jadwal KA atau dinas aktif.',
-]);
-}
-} else {
-/*
+                            if (!$realisasi) {
+                                throw ValidationException::withMessages([
+                                    'data' => 'ID realisasi tidak cocok dengan jadwal KA atau dinas aktif.',
+                                ]);
+                            }
+                        } else {
+                            /*
 * Gunakan realisasi yang sudah ada agar
 * penyimpanan ulang tidak membuat duplikat.
 */
-$realisasi = RealisasiKa::firstOrNew([
-'dinas_id' => $dinas->id,
-'jadwal_ka_id' => $jadwal->id,
-'is_manual' => false,
-]);
-}
+                            $realisasi = RealisasiKa::firstOrNew([
+                                'dinas_id' => $dinas->id,
+                                'jadwal_ka_id' => $jadwal->id,
+                                'is_manual' => false,
+                            ]);
+                        }
 
-$realisasi->kereta_api_id = $jadwal->kereta_api_id;
-$realisasi->is_manual = false;
-}
+                        $realisasi->kereta_api_id = $jadwal->kereta_api_id;
+                        $realisasi->is_manual = false;
+                    }
 
-/*
+                    /*
 * Status perjalanan.
 */
-$realisasi->status_lewat = match ($item['status']) {
-'JALAN' => 'centang',
-'BATAL' => 'silang',
-default => null,
-};
+                    $realisasi->status_lewat = match ($item['status']) {
+                        'JALAN' => 'centang',
+                        'BATAL' => 'silang',
+                        default => null,
+                    };
 
-/*
+                    /*
 * Jam aktual.
 */
-$realisasi->jam_aktual = !empty($item['aktual'])
-? $item['aktual']
-: null;
+                    $realisasi->jam_aktual = !empty($item['aktual'])
+                        ? $item['aktual']
+                        : null;
 
-/*
+                    /*
 * Indikator keselamatan.
 */
-$realisasi->status_s21 = $this->databaseCheck(
-$item['semboyan21'] ?? null
-);
+                    $realisasi->status_s21 = $this->databaseCheck(
+                        $item['semboyan21'] ?? null
+                    );
 
-$realisasi->status_genta = $this->databaseCheck(
-$item['genta'] ?? null
-);
+                    $realisasi->status_genta = $this->databaseCheck(
+                        $item['genta'] ?? null
+                    );
 
-$realisasi->status_pintu_perlintasan = $this->databaseCheck(
-$item['pintu'] ?? null
-);
+                    $realisasi->status_pintu_perlintasan = $this->databaseCheck(
+                        $item['pintu'] ?? null
+                    );
 
-$realisasi->status_s35 = $this->databaseCheck(
-$item['semboyan35'] ?? null
-);
+                    $realisasi->status_s35 = $this->databaseCheck(
+                        $item['semboyan35'] ?? null
+                    );
 
-$realisasi->catatan = $item['keterangan'] ?? null;
-$realisasi->diedit_terakhir_pada = now();
+                    $realisasi->catatan = $item['keterangan'] ?? null;
+                    $realisasi->diedit_terakhir_pada = now();
 
-$realisasi->save();
+                    $realisasi->save();
 
-/*
+                    /*
 * Kembalikan ID yang benar-benar tersimpan
 * agar frontend dapat memperbarui dataKA.
 */
-$hasil[] = [
-'index' => $index,
-'realisasi_ka_id' => $realisasi->id,
-];
-}
+                    $hasil[] = [
+                        'index' => $index,
+                        'realisasi_ka_id' => $realisasi->id,
+                    ];
+                }
 
-return $hasil;
-});
+                return $hasil;
+            }
+        );
 
-return response()->json([
-'message' => 'Realisasi KA berhasil disimpan ke database.',
-'data' => $hasilSimpan,
-]);
-}
+        return response()->json([
+            'message' => 'Realisasi KA berhasil disimpan ke database.',
+            'data' => $hasilSimpan,
+        ]);
+    }
 
-/**
-* Filter jadwal khusus dan jadwal rutin.
-*
-* Jadwal khusus: tanggal_berlaku sama dengan tanggal dinas.
-* Jadwal rutin: tanggal_berlaku NULL dan hari_berlaku cocok.
-*/
-
-
-private function terapkanFilterJadwalBerlaku(
-$query,
-Dinas $dinas
-): void {
-$tanggalDinas = Carbon::parse($dinas->tanggal_dinas);
-$tanggalFormat = $tanggalDinas->toDateString();
-$namaHari = $this->namaHariIndonesia($tanggalDinas);
-
-$query->where(function ($q) use (
-$tanggalFormat,
-$namaHari
-) {
-// Jadwal khusus pada tanggal tertentu.
-$q->whereDate(
-'tanggal_berlaku',
-$tanggalFormat
-)
-
-// Jadwal rutin yang berlaku pada hari tersebut.
-->orWhere(function ($q2) use ($namaHari) {
-$q2->whereNull('tanggal_berlaku')
-->whereNotNull('hari_berlaku')
-->whereJsonContains(
-'hari_berlaku',
-$namaHari
-);
-});
-});
-}
+    /**
+     * Filter jadwal khusus dan jadwal rutin.
+     *
+     * Jadwal khusus: tanggal_berlaku sama dengan tanggal dinas.
+     * Jadwal rutin: tanggal_berlaku NULL dan hari_berlaku cocok.
+     */
 
 
-/**
-* Mengubah tanggal menjadi nama hari Indonesia.
-*/
-private function namaHariIndonesia(Carbon $tanggal): string
-{
-$hari = [
-1 => 'Senin',
-2 => 'Selasa',
-3 => 'Rabu',
-4 => 'Kamis',
-5 => 'Jumat',
-6 => 'Sabtu',
-7 => 'Minggu',
-];
+    private function terapkanFilterJadwalBerlaku(
+        $query,
+        Dinas $dinas
+    ): void {
+        $tanggalDinas = Carbon::parse($dinas->tanggal_dinas);
+        $tanggalFormat = $tanggalDinas->toDateString();
+        $namaHari = $this->namaHariIndonesia($tanggalDinas);
 
-return $hari[$tanggal->dayOfWeekIso];
-}
+        $query->where(function ($q) use (
+            $tanggalFormat,
+            $namaHari
+        ) {
+            // Jadwal khusus pada tanggal tertentu.
+            $q->whereDate(
+                'tanggal_berlaku',
+                $tanggalFormat
+            )
 
-/**
-* Format status indikator untuk frontend.
-*/
-private function checkValue(?string $value): string
-{
-return match ($value) {
-'centang' => 'yes',
-'silang' => 'no',
-default => '',
-};
-}
+                // Jadwal rutin yang berlaku pada hari tersebut.
+                ->orWhere(function ($q2) use ($namaHari) {
+                    $q2->whereNull('tanggal_berlaku')
+                        ->whereNotNull('hari_berlaku')
+                        ->whereJsonContains(
+                            'hari_berlaku',
+                            $namaHari
+                        );
+                });
+        });
+    }
 
-/**
-* Format status indikator untuk database.
-*/
-private function databaseCheck(?string $value): ?string
-{
-return match ($value) {
-'yes' => 'centang',
-'no' => 'silang',
-default => null,
-};
-}
+    /**
+     * Memastikan jam KA berada dalam rentang shift dinas.
+     * Mendukung shift yang melewati tengah malam.
+     */
+    private function jadwalDalamRentangShift(
+        ?string $jam,
+        Dinas $dinas
+    ): bool {
+        $dinas->loadMissing('shift');
+
+        $jamMulai = $dinas->shift?->jam_mulai;
+        $jamSelesai = $dinas->shift?->jam_selesai;
+
+        if (!$jam || !$jamMulai || !$jamSelesai) {
+            return false;
+        }
+
+        $toMinutes = function ($value) {
+            $parts = explode(':', (string) $value);
+
+            if (count($parts) < 2) {
+                return null;
+            }
+
+            return ((int) $parts[0] * 60) + (int) $parts[1];
+        };
+
+        $menitKA = $toMinutes($jam);
+        $menitMulai = $toMinutes($jamMulai);
+        $menitSelesai = $toMinutes($jamSelesai);
+
+        if (
+            $menitKA === null ||
+            $menitMulai === null ||
+            $menitSelesai === null
+        ) {
+            return false;
+        }
+
+        // Shift normal.
+        if ($menitMulai <= $menitSelesai) {
+            return $menitKA >= $menitMulai
+                && $menitKA <= $menitSelesai;
+        }
+
+        // Shift melewati tengah malam.
+        return $menitKA >= $menitMulai
+            || $menitKA <= $menitSelesai;
+    }
+    /**
+     * Mengubah tanggal menjadi nama hari Indonesia.
+     */
+    private function namaHariIndonesia(Carbon $tanggal): string
+    {
+        $hari = [
+            1 => 'Senin',
+            2 => 'Selasa',
+            3 => 'Rabu',
+            4 => 'Kamis',
+            5 => 'Jumat',
+            6 => 'Sabtu',
+            7 => 'Minggu',
+        ];
+
+        return $hari[$tanggal->dayOfWeekIso];
+    }
+
+    /**
+     * Format status indikator untuk frontend.
+     */
+    private function checkValue(?string $value): string
+    {
+        return match ($value) {
+            'centang' => 'yes',
+            'silang' => 'no',
+            default => '',
+        };
+    }
+
+    /**
+     * Format status indikator untuk database.
+     */
+    private function databaseCheck(?string $value): ?string
+    {
+        return match ($value) {
+            'yes' => 'centang',
+            'no' => 'silang',
+            default => null,
+        };
+    }
 }

@@ -8,14 +8,32 @@
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
 
+/* Pengaturan halaman cetak */
+@page {
+    size: A4 landscape;
+    margin: 8mm;
+}
+
 /* =====================================================
    CETAK KHUSUS HALAMAN REALISASI KA
 ===================================================== */
 
 @media print {
     @page {
-        size: landscape;
+        size: A4 landscape;
         margin: 8mm;
+    }
+
+    /* Sembunyikan elemen layout aplikasi saat mencetak */
+    .user-header,
+    #sidebar {
+        display: none !important;
+    }
+
+    /* Hilangkan jarak header pada konten utama */
+    body:has(.realisasi-ka-page) > main {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
     }
 
     .realisasi-ka-page {
@@ -164,10 +182,18 @@
 
     .realisasi-ka-page thead {
         display: table-header-group;
+        break-inside: avoid;
+        page-break-inside: avoid;
     }
 
-    .realisasi-ka-page tr {
-        break-inside: avoid;
+    .realisasi-ka-page tbody {
+        break-inside: auto;
+        page-break-inside: auto;
+    }
+
+    .realisasi-ka-page tbody tr {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
     }
 
     /* Status JALAN/BATAL menjadi simbol saat dicetak */

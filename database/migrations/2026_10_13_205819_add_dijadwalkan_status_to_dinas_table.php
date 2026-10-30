@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -7,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement("
             ALTER TABLE dinas
             MODIFY status
@@ -17,7 +22,10 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Pastikan tidak ada status yang hilang saat rollback.
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::table('dinas')
             ->where('status', 'dijadwalkan')
             ->update(['status' => 'berlangsung']);

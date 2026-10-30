@@ -12,23 +12,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Carbon\Carbon;
 
 class LoginController extends Controller
 {
     private const JPL_NOMOR_COLUMN  = 'kode_jpl';
     private const SHIFT_NAMA_COLUMN = 'nama_shift';
 
-    /*
-     * true  => petugas REGULER hanya boleh login jika admin sudah membuat
-     *          jadwal dinas untuk hari ini, PJL, dan dinasan itu.
-     * false => REGULER bebas memilih PJL & dinasan (dinas dibuat otomatis).
-     */
-    private const REGULER_HARUS_TERJADWAL = false;
 
     public function __construct(
         protected ActivityLogService $activityLogService
-    ) {
-    }
+    ) {}
 
     public function showLoginForm()
     {
@@ -39,15 +33,6 @@ class LoginController extends Controller
         return view('auth.login', compact('dinasanList'));
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Cek kredensial & role (dipanggil via fetch dari form login)
-    |--------------------------------------------------------------------------
-    | Dipakai form untuk menentukan apakah field PJL (nomor PJL, dinasan,
-    | jenis petugas) perlu ditampilkan. Role hanya dibuka SETELAH NIP dan
-    | password terbukti benar, jadi tidak bisa dipakai menebak NIP orang lain.
-    | Method ini TIDAK melakukan login.
-    */
 
     public function cek(Request $request)
     {
@@ -77,16 +62,6 @@ class LoginController extends Controller
         ], 422);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Login (satu pintu untuk User/PJL, Admin, dan Superadmin)
-    |--------------------------------------------------------------------------
-    | 1. Semua role: NIPP/NIPKWT (kolom users.nip) + password
-    | 2. Role pjl   : + nomor PJL, dinasan, jenis petugas (reguler/wakilan)
-    |
-    | Validasi akhir selalu di sini, jadi menembak langsung ke route login
-    | tanpa melewati endpoint cek() tidak menghindari aturan apa pun.
-    */
 
     public function login(Request $request)
     {
@@ -124,11 +99,6 @@ class LoginController extends Controller
         return $this->gagal($request, 'nip', 'Role pengguna tidak dikenali.');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Admin / Superadmin
-    |--------------------------------------------------------------------------
-    */
 
     protected function loginAdmin(Request $request, User $user)
     {
@@ -142,11 +112,6 @@ class LoginController extends Controller
             : redirect()->route('admin.dashboard');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Petugas PJL (Reguler / Wakilan)
-    |--------------------------------------------------------------------------
-    */
 
     protected function loginPetugas(Request $request, User $user)
     {
@@ -176,7 +141,29 @@ class LoginController extends Controller
         }
 
         $isWakilan = $data['jenis_petugas'] === 'wakilan';
-        $tanggal   = now('Asia/Jakarta')->toDateString();
+
+        $sekarang = now('Asia/Jakarta');
+
+        $tanggalHariIni = $sekarang->toDateString();
+
+        $jamMulaiHariIni = Carbon::parse(
+            $tanggalHariIni . ' ' . $shift->jam_mulai,
+            'Asia/Jakarta'
+        );
+
+        $jamSelesaiHariIni = Carbon::parse(
+            $tanggalHariIni . ' ' . $shift->jam_selesai,
+            'Asia/Jakarta'
+        );
+
+        if ($jamSelesaiHariIni->lessThanOrEqualTo($jamMulaiHariIni)) {
+            // Shift melewati tengah malam.
+            $tanggal = $sekarang->lt($jamSelesaiHariIni)
+                ? $sekarang->copy()->subDay()->toDateString()
+                : $tanggalHariIni;
+        } else {
+            $tanggal = $tanggalHariIni;
+        }
 
         $dinas = $this->siapkanDinas($user, $jpl, $shift, $tanggal, $isWakilan);
 
@@ -205,12 +192,6 @@ class LoginController extends Controller
         return redirect()->route('user.realisasi-ka');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Siapkan dinas aktif (tidak berubah dari versi sebelumnya)
-    |--------------------------------------------------------------------------
-    */
-
     protected function siapkanDinas(
         User $user,
         Jpl $jpl,
@@ -218,11 +199,19 @@ class LoginController extends Controller
         string $tanggal,
         bool $isWakilan
     ): Dinas {
-        return DB::transaction(function () use ($user, $jpl, $shift, $tanggal, $isWakilan) {
-            $dinas = Dinas::where('user_id', $user->id)
+        return DB::transaction(function () use (
+            $user,
+            $jpl,
+            $shift,
+            $tanggal,
+            $isWakilan
+        ) {
+            $dinas = Dinas::query()
+                ->where('user_id', $user->id)
                 ->where('jpl_id', $jpl->id)
                 ->where('shift_id', $shift->id)
                 ->whereDate('tanggal_dinas', $tanggal)
+                ->where('is_pengganti', $isWakilan)
                 ->latest('id')
                 ->first();
 
@@ -232,63 +221,65 @@ class LoginController extends Controller
                 ]);
             }
 
+            if (!$isWakilan && !$dinas) {
+                throw ValidationException::withMessages([
+                    'nomor_pjl' => 'Anda tidak dijadwalkan pada PJL dan dinasan ini hari ini.',
+                ]);
+            }
+
+            $digantikanId = null;
+
+            if ($isWakilan) {
+                $digantikanId = Dinas::query()
+                    ->where('jpl_id', $jpl->id)
+                    ->where('shift_id', $shift->id)
+                    ->whereDate('tanggal_dinas', $tanggal)
+                    ->where('is_pengganti', false)
+                    ->where('user_id', '!=', $user->id)
+                    ->value('user_id');
+            }
+
             if (!$dinas) {
-                if (!$isWakilan && self::REGULER_HARUS_TERJADWAL) {
-                    throw ValidationException::withMessages([
-                        'nomor_pjl' => 'Anda tidak dijadwalkan pada PJL dan dinasan ini hari ini.',
-                    ]);
-                }
+                $jamMulai = now('Asia/Jakarta');
 
-                $digantikan = null;
-
-                if ($isWakilan) {
-                    $digantikan = Dinas::where('jpl_id', $jpl->id)
-                        ->where('shift_id', $shift->id)
-                        ->whereDate('tanggal_dinas', $tanggal)
-                        ->where('user_id', '!=', $user->id)
-                        ->where('is_pengganti', false)
-                        ->value('user_id');
-                }
-
-                $jamMulai = now();
-
-                $jamSelesai = \Carbon\Carbon::parse(
-                    $tanggal . ' ' . $shift->jam_selesai
+                $jamSelesai = Carbon::parse(
+                    $tanggal . ' ' . $shift->jam_selesai,
+                    'Asia/Jakarta'
                 );
 
                 if ($jamSelesai->lte($jamMulai)) {
                     $jamSelesai->addDay();
                 }
 
-                $dinas = Dinas::create([
-                    'user_id'            => $user->id,
-                    'jpl_id'             => $jpl->id,
-                    'shift_id'           => $shift->id,
-                    'tanggal_dinas'      => $tanggal,
-                    'jam_mulai'          => $jamMulai,
-                    'jam_selesai'        => $jamSelesai,
-                    'status'             => 'berlangsung',
-                    'is_pengganti'       => $isWakilan,
-                    'user_digantikan_id' => $digantikan,
-                ]);
-            } else {
-                $dinas->is_pengganti = $isWakilan;
-
-                if (!$isWakilan) {
-                    $dinas->user_digantikan_id = null;
-                }
-
-                if (!$dinas->jam_mulai) {
-                    $dinas->jam_mulai = now();
-                }
-
-                $dinas->save();
+                $dinas = new Dinas();
+                $dinas->user_id = $user->id;
+                $dinas->jpl_id = $jpl->id;
+                $dinas->shift_id = $shift->id;
+                $dinas->tanggal_dinas = $tanggal;
+                $dinas->jam_mulai = $jamMulai;
+                $dinas->jam_selesai = $jamSelesai;
+                $dinas->status = 'berlangsung';
+            } elseif (!$dinas->jam_mulai) {
+                $dinas->jam_mulai = now('Asia/Jakarta');
+                $dinas->status = 'berlangsung';
             }
 
-            Dinas::where('user_id', $user->id)
-                ->where('status', 'berlangsung')
-                ->where('id', '!=', $dinas->id)
-                ->update(['status' => 'selesai']);
+            if ($isWakilan) {
+                $dinas->is_pengganti = true;
+                $dinas->user_digantikan_id = $digantikanId;
+            }
+
+            $dinas->save();
+
+            logger()->info('Pelacakan petugas pengganti saat login', [
+                'user_id' => $user->id,
+                'jpl_id' => $jpl->id,
+                'shift_id' => $shift->id,
+                'tanggal' => $tanggal,
+                'is_wakilan' => $isWakilan,
+                'dinas_id' => $dinas->id,
+                'user_digantikan_id' => $dinas->user_digantikan_id,
+            ]);
 
             return $dinas;
         });

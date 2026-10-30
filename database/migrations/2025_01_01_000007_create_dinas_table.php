@@ -16,7 +16,7 @@ return new class extends Migration
             $table->date('tanggal_dinas');
             $table->dateTime('jam_mulai')->nullable();
             $table->dateTime('jam_selesai')->nullable();
-            $table->enum('status', ['berlangsung', 'selesai'])->default('berlangsung');
+            $table->enum('status', ['dijadwalkan', 'berlangsung', 'selesai'])->default('dijadwalkan');
             $table->boolean('is_pengganti')->default(false);
             $table->foreignId('user_digantikan_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
