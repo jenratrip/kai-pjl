@@ -16,9 +16,8 @@ use Carbon\Carbon;
 
 class LoginController extends Controller
 {
-    private const JPL_NOMOR_COLUMN  = 'kode_jpl';
+    private const JPL_NOMOR_COLUMN = 'kode_jpl';
     private const SHIFT_NAMA_COLUMN = 'nama_shift';
-
 
     public function __construct(
         protected ActivityLogService $activityLogService
@@ -33,11 +32,19 @@ class LoginController extends Controller
         return view('auth.login', compact('dinasanList'));
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Cek kredensial dan role
+    |--------------------------------------------------------------------------
+    | Dipanggil melalui fetch dari form login untuk menentukan apakah
+    | field tambahan PJL perlu ditampilkan.
+    | Method ini hanya memeriksa kredensial dan tidak melakukan login.
+    */
 
     public function cek(Request $request)
     {
         $credentials = $request->validate([
-            'nip'      => ['required', 'string'],
+            'nip' => ['required', 'string'],
             'password' => ['required', 'string'],
         ]);
 
@@ -50,11 +57,15 @@ class LoginController extends Controller
         }
 
         if ($user->isSuperadmin() || $user->hasRole('admin')) {
-            return response()->json(['role' => 'admin']);
+            return response()->json([
+                'role' => 'admin',
+            ]);
         }
 
         if ($user->hasRole('pjl')) {
-            return response()->json(['role' => 'pjl']);
+            return response()->json([
+                'role' => 'pjl',
+            ]);
         }
 
         return response()->json([
@@ -62,32 +73,37 @@ class LoginController extends Controller
         ], 422);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Login utama
+    |--------------------------------------------------------------------------
+    | Admin dan Superadmin cukup menggunakan NIPP/NIPKWT dan password.
+    | Petugas PJL juga wajib mengisi nomor PJL, dinasan, dan jenis petugas.
+    | Validasi akhir tetap dilakukan di method ini.
+    */
 
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'nip'      => ['required', 'string'],
+            'nip' => ['required', 'string'],
             'password' => ['required', 'string'],
         ], [
-            'nip.required'      => 'NIPP / NIPKWT wajib diisi.',
+            'nip.required' => 'NIPP / NIPKWT wajib diisi.',
             'password.required' => 'Kata sandi wajib diisi.',
         ]);
 
         $pesanUmum = 'NIPP / NIPKWT atau password tidak valid.';
 
-        // 1) User & status
         $user = User::where('nip', $credentials['nip'])->first();
 
         if (!$user || !$user->is_active) {
             return $this->gagal($request, 'nip', $pesanUmum);
         }
 
-        // 2) Password (tanpa login dulu)
         if (!Auth::validate($credentials)) {
             return $this->gagal($request, 'nip', $pesanUmum);
         }
 
-        // 3) Cabang berdasarkan role
         if ($user->isSuperadmin() || $user->hasRole('admin')) {
             return $this->loginAdmin($request, $user);
         }
@@ -96,33 +112,52 @@ class LoginController extends Controller
             return $this->loginPetugas($request, $user);
         }
 
-        return $this->gagal($request, 'nip', 'Role pengguna tidak dikenali.');
+        return $this->gagal(
+            $request,
+            'nip',
+            'Role pengguna tidak dikenali.'
+        );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Login Admin dan Superadmin
+    |--------------------------------------------------------------------------
+    */
 
     protected function loginAdmin(Request $request, User $user)
     {
         Auth::login($user);
+
         $request->session()->regenerate();
 
-        $this->activityLogService->log('login', 'auth', 'User berhasil login', $user);
+        $this->activityLogService->log(
+            'login',
+            'auth',
+            'User berhasil login',
+            $user
+        );
 
         return $user->isSuperadmin()
             ? redirect()->route('superadmin.dashboard')
             : redirect()->route('admin.dashboard');
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Login Petugas PJL (Reguler / Wakilan)
+    |--------------------------------------------------------------------------
+    */
 
     protected function loginPetugas(Request $request, User $user)
     {
-        // Field tambahan baru divalidasi setelah kredensial terbukti benar
         $data = $request->validate([
-            'nomor_pjl'     => ['required', 'string'],
-            'dinasan'       => ['required', 'integer'],
+            'nomor_pjl' => ['required', 'string'],
+            'dinasan' => ['required', 'integer'],
             'jenis_petugas' => ['required', 'in:reguler,wakilan'],
         ], [
-            'nomor_pjl.required'     => 'Nomor PJL wajib diisi untuk petugas PJL.',
-            'dinasan.required'       => 'Dinasan wajib dipilih untuk petugas PJL.',
+            'nomor_pjl.required' => 'Nomor PJL wajib diisi untuk petugas PJL.',
+            'dinasan.required' => 'Dinasan wajib dipilih untuk petugas PJL.',
             'jenis_petugas.required' => 'Pilih jenis petugas (Reguler / Wakilan).',
         ]);
 
@@ -131,19 +166,26 @@ class LoginController extends Controller
             ->first();
 
         if (!$jpl) {
-            return $this->gagal($request, 'nomor_pjl', 'Nomor PJL tidak ditemukan.');
+            return $this->gagal(
+                $request,
+                'nomor_pjl',
+                'Nomor PJL tidak ditemukan.'
+            );
         }
 
         $shift = Shift::find($data['dinasan']);
 
         if (!$shift) {
-            return $this->gagal($request, 'dinasan', 'Dinasan tidak valid.');
+            return $this->gagal(
+                $request,
+                'dinasan',
+                'Dinasan tidak valid.'
+            );
         }
 
         $isWakilan = $data['jenis_petugas'] === 'wakilan';
 
         $sekarang = now('Asia/Jakarta');
-
         $tanggalHariIni = $sekarang->toDateString();
 
         $jamMulaiHariIni = Carbon::parse(
@@ -165,14 +207,21 @@ class LoginController extends Controller
             $tanggal = $tanggalHariIni;
         }
 
-        $dinas = $this->siapkanDinas($user, $jpl, $shift, $tanggal, $isWakilan);
+        $dinas = $this->siapkanDinas(
+            $user,
+            $jpl,
+            $shift,
+            $tanggal,
+            $isWakilan
+        );
 
         Auth::login($user);
+
         $request->session()->regenerate();
 
         $request->session()->put('petugas_login', [
-            'jenis'    => $data['jenis_petugas'],
-            'jpl_id'   => $jpl->id,
+            'jenis' => $data['jenis_petugas'],
+            'jpl_id' => $jpl->id,
             'shift_id' => $shift->id,
             'dinas_id' => $dinas->id,
         ]);
@@ -191,6 +240,12 @@ class LoginController extends Controller
 
         return redirect()->route('user.realisasi-ka');
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Menyiapkan Dinas Aktif
+    |--------------------------------------------------------------------------
+    */
 
     protected function siapkanDinas(
         User $user,
@@ -221,12 +276,14 @@ class LoginController extends Controller
                 ]);
             }
 
+            // Petugas reguler harus memiliki jadwal dari admin.
             if (!$isWakilan && !$dinas) {
                 throw ValidationException::withMessages([
                     'nomor_pjl' => 'Anda tidak dijadwalkan pada PJL dan dinasan ini hari ini.',
                 ]);
             }
 
+            // Cari petugas reguler yang akan digantikan.
             $digantikanId = null;
 
             if ($isWakilan) {
@@ -239,6 +296,7 @@ class LoginController extends Controller
                     ->value('user_id');
             }
 
+            // Buat dinas baru untuk petugas wakilan jika belum tersedia.
             if (!$dinas) {
                 $jamMulai = now('Asia/Jakarta');
 
@@ -252,6 +310,7 @@ class LoginController extends Controller
                 }
 
                 $dinas = new Dinas();
+
                 $dinas->user_id = $user->id;
                 $dinas->jpl_id = $jpl->id;
                 $dinas->shift_id = $shift->id;
@@ -271,6 +330,15 @@ class LoginController extends Controller
 
             $dinas->save();
 
+            // Tutup dinas aktif lain milik user setelah dinas baru tersimpan.
+            Dinas::query()
+                ->where('user_id', $user->id)
+                ->where('status', 'berlangsung')
+                ->where('id', '!=', $dinas->id)
+                ->update([
+                    'status' => 'selesai',
+                ]);
+
             logger()->info('Pelacakan petugas pengganti saat login', [
                 'user_id' => $user->id,
                 'jpl_id' => $jpl->id,
@@ -285,19 +353,48 @@ class LoginController extends Controller
         });
     }
 
-    protected function gagal(Request $request, string $field, string $pesan)
-    {
+    /*
+    |--------------------------------------------------------------------------
+    | Login Gagal
+    |--------------------------------------------------------------------------
+    */
+
+    protected function gagal(
+        Request $request,
+        string $field,
+        string $pesan
+    ) {
         return back()
-            ->withErrors([$field => $pesan])
-            ->withInput($request->only('nip', 'jenis_petugas', 'nomor_pjl', 'dinasan'));
+            ->withErrors([
+                $field => $pesan,
+            ])
+            ->withInput(
+                $request->only(
+                    'nip',
+                    'jenis_petugas',
+                    'nomor_pjl',
+                    'dinasan'
+                )
+            );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Logout
+    |--------------------------------------------------------------------------
+    */
 
     public function logout(Request $request)
     {
         $user = $request->user();
 
         if ($user) {
-            $this->activityLogService->log('logout', 'auth', 'User berhasil logout', $user);
+            $this->activityLogService->log(
+                'logout',
+                'auth',
+                'User berhasil logout',
+                $user
+            );
         }
 
         Auth::logout();

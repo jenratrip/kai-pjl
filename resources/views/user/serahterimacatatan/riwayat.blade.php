@@ -1,4 +1,3 @@
-
 @extends('layouts.user')
 
 @section('title', 'Riwayat Serah Terima Dinas - Sistem PJL')
@@ -263,6 +262,7 @@
             <div class="space-y-3 md:hidden">
                 @foreach ($baris as $b)
                     <article class="rounded-xl border border-l-4 border-slate-200 bg-white p-4 shadow-sm {{ $b['garis'] }}">
+
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
                                 <p class="font-bold text-slate-800">
