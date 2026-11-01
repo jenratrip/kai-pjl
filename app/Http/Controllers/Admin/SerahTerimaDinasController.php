@@ -301,23 +301,76 @@ class SerahTerimaDinasController extends Controller
                 'Catatan revisi maksimal 5000 karakter.',
         ]);
 
+        // Pastikan catatan revisi tidak hanya berisi spasi.
+        if (
+            $validated['status_review'] === 'perlu_revisi'
+            && trim((string) ($validated['catatan_revisi'] ?? '')) === ''
+        ) {
+            return back()
+                ->withErrors([
+                    'catatan_revisi' =>
+                        'Catatan wajib diisi jika meminta revisi.',
+                ])
+                ->withInput();
+        }
+
         DB::transaction(function () use (
             $serahTerima,
             $validated
         ) {
-            $serahTerima->status_review =
+            // Ambil ulang data dengan lock agar tidak direview
+            // bersamaan oleh proses lain.
+            $data = SerahTerima::query()
+                ->lockForUpdate()
+                ->findOrFail($serahTerima->id);
+
+            // Pastikan status serah terima masih dapat direview.
+            abort_unless(
+                in_array(
+                    $data->status,
+                    self::STATUS_TAMPIL,
+                    true
+                ),
+                422,
+                'Status serah terima tidak dapat direview.'
+            );
+
+            // Admin hanya boleh melakukan review setelah penerima
+            // mengonfirmasi serah terima.
+            abort_if(
+                $data->status !== 'selesai',
+                422,
+                'Serah terima belum dikonfirmasi oleh penerima.'
+            );
+
+            // Kedua tanda tangan harus tersedia.
+            abort_if(
+                empty($data->tanda_tangan_penyerah)
+                || empty($data->tanda_tangan_penerima),
+                422,
+                'Tanda tangan penyerah dan penerima harus lengkap sebelum review.'
+            );
+
+            // Jika sudah disetujui, tidak boleh diproses ulang.
+            abort_if(
+                $data->status_review === 'disetujui',
+                422,
+                'Serah terima ini sudah disetujui dan terkunci.'
+            );
+
+            $data->status_review =
                 $validated['status_review'];
 
-            $serahTerima->catatan_revisi =
+            $data->catatan_revisi =
                 $validated['status_review'] === 'perlu_revisi'
                     ? trim($validated['catatan_revisi'])
                     : null;
 
-            $serahTerima->ditinjau_oleh = auth()->id();
-            $serahTerima->ditinjau_pada = now();
+            $data->ditinjau_oleh = auth()->id();
+            $data->ditinjau_pada = now();
 
             // Status serah terima dan tanda tangan tidak diubah.
-            $serahTerima->save();
+            $data->save();
         });
 
         return redirect()

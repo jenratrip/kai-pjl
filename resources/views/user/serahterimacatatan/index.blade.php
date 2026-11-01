@@ -1,10 +1,14 @@
-
 @extends('layouts.user')
 
 @php
     $modeLihat = !empty($modeLihat);
     $modeEdit = !empty($modeEdit);
+    $modePenerima = !empty($modePenerima);
+
     $statusSerahTerima = $serahTerima?->status ?? null;
+    $statusReview = $serahTerima?->status_review ?? null;
+
+    $terkunci = $statusReview === 'disetujui';
 @endphp
 
 @section('title', $modeLihat
@@ -26,25 +30,82 @@
             'catatan',
             'petugas',
             'tanda-tangan',
-            'actions',
         ];
-
-        // Di mode lihat, tombol simpan/kirim tidak ditampilkan.
-        if ($modeLihat) {
-            $sections = array_values(array_diff($sections, ['actions']));
-        }
     @endphp
 
     <div class="mx-auto w-full max-w-7xl space-y-4 px-4 py-6 sm:px-6">
 
-        {{-- Banner mode lihat --}}
-        @if ($modeLihat)
+        {{-- Banner konfirmasi untuk penerima --}}
+        @if ($modePenerima && $statusSerahTerima === 'menunggu_penerima')
+            <div
+                class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900"
+                role="status"
+            >
+                <span>
+                    Anda ditunjuk sebagai penerima serah terima dinas ini.
+                    Silakan periksa data yang disampaikan, kemudian bubuhkan tanda tangan
+                    untuk mengonfirmasi penerimaan.
+                </span>
+
+                <a
+                    href="{{ route('user.serah-terima-dinas.riwayat') }}"
+                    class="inline-flex items-center justify-center rounded-lg border border-blue-300 bg-white px-3 py-2 text-xs font-semibold text-blue-900 transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                >
+                    Kembali ke riwayat
+                </a>
+            </div>
+
+        {{-- Penerima menunggu penyerah melakukan revisi --}}
+        @elseif ($modePenerima && $statusReview === 'perlu_revisi')
+            <div
+                class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900"
+                role="status"
+            >
+                <span>
+                    Admin meminta revisi terhadap serah terima ini.
+                    Penyerah perlu memperbaiki dan mengirim ulang data terlebih dahulu.
+                    Setelah dikirim ulang, Anda dapat melakukan konfirmasi kembali.
+                </span>
+
+                <a
+                    href="{{ route('user.serah-terima-dinas.riwayat') }}"
+                    class="inline-flex items-center justify-center rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-900 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                >
+                    Kembali ke riwayat
+                </a>
+            </div>
+
+        {{-- Penerima sudah melakukan konfirmasi --}}
+        @elseif ($modePenerima && $statusSerahTerima === 'selesai')
+            <div
+                class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                role="status"
+            >
+                <span>
+                    Anda sudah mengonfirmasi serah terima ini.
+                    @if ($statusReview === 'menunggu_review')
+                        Data sedang menunggu tinjauan admin.
+                    @elseif ($statusReview === 'disetujui')
+                        Serah terima telah disetujui admin.
+                    @endif
+                </span>
+
+                <a
+                    href="{{ route('user.serah-terima-dinas.riwayat') }}"
+                    class="inline-flex items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                >
+                    Kembali ke riwayat
+                </a>
+            </div>
+
+        {{-- Banner mode lihat biasa --}}
+        @elseif ($modeLihat)
             <div
                 class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
                 role="status"
             >
                 <span class="font-semibold">
-                    Serah terima ini sudah disetujui. Tampilan hanya bisa dilihat.
+                    Serah terima ini sudah disetujui admin. Tampilan hanya bisa dilihat.
                 </span>
 
                 <a
@@ -73,20 +134,58 @@
                 </a>
             </div>
 
-        {{-- Serah terima sudah dikirim dan menunggu admin --}}
+        {{-- Serah terima menunggu tanda tangan penerima --}}
         @elseif ($dinas && $statusSerahTerima === 'menunggu_penerima')
             <div
                 class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900"
                 role="status"
             >
                 <span>
-                    Serah terima dinas ini sudah tersimpan dan menunggu persetujuan admin.
-                    Kamu masih bisa memperbarui isinya, lalu simpan kembali.
+                    Serah terima dinas ini sudah tersimpan dan menunggu tanda tangan penerima.
+                    Anda masih bisa memperbarui isinya selama penerima belum melakukan konfirmasi.
                 </span>
 
                 <a
                     href="{{ route('user.serah-terima-dinas.riwayat') }}"
                     class="inline-flex items-center justify-center rounded-lg border border-blue-300 bg-white px-3 py-2 text-xs font-semibold text-blue-900 transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                >
+                    Lihat riwayat
+                </a>
+            </div>
+
+        {{-- Penerima sudah tanda tangan, menunggu tinjauan admin --}}
+        @elseif ($dinas && $statusSerahTerima === 'selesai' && $statusReview === 'menunggu_review')
+            <div
+                class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                role="status"
+            >
+                <span>
+                    Penerima sudah mengonfirmasi serah terima. Data sedang menunggu tinjauan admin
+                    dan belum dapat diubah.
+                </span>
+
+                <a
+                    href="{{ route('user.serah-terima-dinas.riwayat') }}"
+                    class="inline-flex items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                >
+                    Lihat riwayat
+                </a>
+            </div>
+
+        {{-- Admin meminta revisi --}}
+        @elseif ($dinas && $statusReview === 'perlu_revisi')
+            <div
+                class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900"
+                role="status"
+            >
+                <span>
+                    Serah terima perlu direvisi berdasarkan hasil tinjauan admin.
+                    Silakan periksa kembali data dan lakukan perbaikan.
+                </span>
+
+                <a
+                    href="{{ route('user.serah-terima-dinas.riwayat') }}"
+                    class="inline-flex items-center justify-center rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-900 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
                 >
                     Lihat riwayat
                 </a>
@@ -152,7 +251,7 @@
                 </a>
             </div>
         @else
-            {{-- Formulir dikunci penuh pada mode lihat --}}
+            {{-- Data utama tetap dikunci pada mode lihat --}}
             <fieldset
                 @disabled($modeLihat)
                 @class([
@@ -165,6 +264,11 @@
                     @include('user.serahterimacatatan.partials.' . $section)
                 @endforeach
             </fieldset>
+
+            {{-- Actions tetap tersedia bagi penerima yang perlu konfirmasi --}}
+            @if (!$modeLihat || $modePenerima)
+                @include('user.serahterimacatatan.partials.actions')
+            @endif
         @endif
     </div>
 
@@ -172,22 +276,27 @@
     @if ($modeLihat)
         <script>
             document.addEventListener('DOMContentLoaded', function () {
-                document.querySelectorAll('[data-mode-lihat] input:disabled, [data-mode-lihat] textarea:disabled, [data-mode-lihat] select:disabled')
-                    .forEach(function (field) {
-                        field.style.opacity = '1';
-                        field.style.cursor = 'default';
-                        field.style.webkitTextFillColor = 'currentColor';
-                    });
+                document.querySelectorAll(
+                    '[data-mode-lihat] input:disabled, ' +
+                    '[data-mode-lihat] textarea:disabled, ' +
+                    '[data-mode-lihat] select:disabled'
+                ).forEach(function (field) {
+                    field.style.opacity = '1';
+                    field.style.cursor = 'default';
+                    field.style.webkitTextFillColor = 'currentColor';
+                });
 
-                document.querySelectorAll('[data-mode-lihat] canvas')
-                    .forEach(function (canvas) {
-                        canvas.style.pointerEvents = 'none';
-                    });
+                document.querySelectorAll(
+                    '[data-mode-lihat] canvas'
+                ).forEach(function (canvas) {
+                    canvas.style.pointerEvents = 'none';
+                });
 
-                document.querySelectorAll('[data-mode-lihat] [data-sembunyi-lihat]')
-                    .forEach(function (element) {
-                        element.style.display = 'none';
-                    });
+                document.querySelectorAll(
+                    '[data-mode-lihat] [data-sembunyi-lihat]'
+                ).forEach(function (element) {
+                    element.style.display = 'none';
+                });
             });
         </script>
     @endif
