@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
@@ -17,27 +16,60 @@
 </head>
 
 <body
-    class="min-h-screen bg-[#f5f6f8] text-[#1d2d50] antialiased"
-    x-data="{ sidebarOpen: false }"
-    @keydown.escape.window="sidebarOpen = false"
+    class="min-h-screen overflow-x-hidden bg-[#f5f6f8] text-[#1d2d50] antialiased"
+    x-data="{
+        sidebarOpen: localStorage.getItem('pjl_sidebar_open') === 'true',
+
+        toggleSidebar() {
+            this.sidebarOpen = !this.sidebarOpen;
+
+            localStorage.setItem(
+                'pjl_sidebar_open',
+                this.sidebarOpen ? 'true' : 'false'
+            );
+        },
+
+        closeSidebar() {
+            this.sidebarOpen = false;
+
+            localStorage.setItem('pjl_sidebar_open', 'false');
+        }
+    }"
+    @keydown.escape.window="closeSidebar()"
 >
-    {{-- Overlay mobile --}}
+    {{-- =====================================================
+         OVERLAY MOBILE
+    ====================================================== --}}
     <div
         x-cloak
         x-show="sidebarOpen"
-        x-transition.opacity
-        @click="sidebarOpen = false"
+        x-transition:enter="transition-opacity ease-in-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition-opacity ease-in-out duration-300"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        @click="closeSidebar()"
         class="fixed inset-0 z-40 bg-black/50 lg:hidden"
         aria-hidden="true"
     ></div>
 
-    {{-- Sidebar PJL --}}
+
+    {{-- =====================================================
+         SIDEBAR PJL
+    ====================================================== --}}
     @include('components.user.sidebar')
 
-    {{-- Header PJL --}}
+
+    {{-- =====================================================
+         HEADER PJL
+    ====================================================== --}}
     @include('components.user.header')
 
-    {{-- Konten halaman --}}
+
+    {{-- =====================================================
+         KONTEN HALAMAN
+    ====================================================== --}}
     <main
         class="min-h-screen pt-[76px] transition-[margin,width] duration-300 ease-in-out"
         :class="sidebarOpen
@@ -49,6 +81,11 @@
         </div>
     </main>
 
+
+    {{-- =====================================================
+         SCRIPT TAMBAHAN
+    ====================================================== --}}
     @stack('scripts')
+
 </body>
 </html>

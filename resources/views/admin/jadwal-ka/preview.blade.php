@@ -17,7 +17,7 @@
         </div>
 
         <a
-            href="{{ route('admin.jadwal-ka.import') }}"
+            href="{{ route('admin.jadwal-ka.import.form') }}"
             class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
         >
             &larr; Kembali ke Import
@@ -411,7 +411,7 @@
 
         <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <a
-                href="{{ route('admin.jadwal-ka.import') }}"
+                href="{{ route('admin.jadwal-ka.import.form') }}"
                 class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
             >
                 Batal dan Upload Ulang

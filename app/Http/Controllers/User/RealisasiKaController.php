@@ -22,9 +22,25 @@ class RealisasiKaController extends Controller
      */
     public function index()
     {
+        /*
+        |--------------------------------------------------------------------------
+        | AMBIL DINAS AKTIF DAN IDENTITAS PETUGAS
+        |--------------------------------------------------------------------------
+        |
+        | user:
+        | Petugas yang sedang menjalankan dinas.
+        |
+        | userDigantikan:
+        | Petugas reguler yang digantikan apabila petugas
+        | yang sedang berdinas merupakan PJL Wakil.
+        |
+        */
+
         $dinas = Dinas::with([
             'jpl.resort.wilayah',
             'shift',
+            'user',
+            'userDigantikan',
         ])
             ->where('user_id', auth()->id())
             ->where('status', 'berlangsung')
@@ -35,15 +51,19 @@ class RealisasiKaController extends Controller
 
         if ($dinas) {
             /*
-* Ambil jadwal aktif milik JPL pada dinas aktif.
-*
-* Jadwal khusus:
-* tanggal_berlaku sama dengan tanggal dinas.
-*
-* Jadwal rutin:
-* tanggal_berlaku NULL dan hari_berlaku cocok
-* dengan hari dinas.
-*/
+            |--------------------------------------------------------------------------
+            | AMBIL JADWAL KA BERDASARKAN JPL DAN TANGGAL DINAS
+            |--------------------------------------------------------------------------
+            |
+            | Jadwal khusus:
+            | tanggal_berlaku sama dengan tanggal dinas.
+            |
+            | Jadwal rutin:
+            | tanggal_berlaku NULL dan hari_berlaku cocok
+            | dengan hari dinas.
+            |
+            */
+
             $jadwalQuery = JadwalKa::with('keretaApi')
                 ->where('jpl_id', $dinas->jpl_id)
                 ->where('is_active', true);
@@ -54,17 +74,23 @@ class RealisasiKaController extends Controller
             );
 
             /*
-* Jadwal khusus ditampilkan lebih dahulu.
-* Jadwal khusus dan rutin dengan KA serta jam
-* yang sama hanya ditampilkan satu kali.
-*/
+            |--------------------------------------------------------------------------
+            | URUTKAN DAN FILTER JADWAL BERDASARKAN SHIFT
+            |--------------------------------------------------------------------------
+            |
+            | Jadwal khusus ditampilkan lebih dahulu.
+            | Jadwal khusus dan rutin dengan KA serta jam
+            | yang sama hanya ditampilkan satu kali.
+            |
+            */
+
             $jadwalList = $jadwalQuery
                 ->orderByRaw(
                     'CASE WHEN tanggal_berlaku IS NULL THEN 1 ELSE 0 END'
                 )
                 ->orderBy('jam_lewat')
                 ->get()
-                ->filter(fn($jadwal) => $this->jadwalDalamRentangShift(
+                ->filter(fn ($jadwal) => $this->jadwalDalamRentangShift(
                     $jadwal->jam_lewat,
                     $dinas
                 ))
@@ -76,9 +102,11 @@ class RealisasiKaController extends Controller
                 ->values();
 
             /*
-* Ambil realisasi KA terjadwal yang telah tersimpan
-* untuk dinas aktif.
-*/
+            |--------------------------------------------------------------------------
+            | AMBIL REALISASI KA TERJADWAL
+            |--------------------------------------------------------------------------
+            */
+
             $realisasiList = RealisasiKa::with('keretaApi')
                 ->where('dinas_id', $dinas->id)
                 ->where('is_manual', false)
@@ -86,16 +114,25 @@ class RealisasiKaController extends Controller
                 ->keyBy('jadwal_ka_id');
 
             /*
-* Gabungkan jadwal dengan realisasi tersimpan.
-*/
+            |--------------------------------------------------------------------------
+            | GABUNGKAN JADWAL DENGAN REALISASI
+            |--------------------------------------------------------------------------
+            */
+
             foreach ($jadwalList as $jadwal) {
                 $realisasi = $realisasiList->get($jadwal->id);
 
                 /*
-* HULU = jadwal_ka.dari
-* HILIR = jadwal_ka.ke
-* RELASI = dari + " - " + ke
-*/
+                |--------------------------------------------------------------------------
+                | HULU, HILIR, DAN RELASI
+                |--------------------------------------------------------------------------
+                |
+                | HULU = jadwal_ka.dari
+                | HILIR = jadwal_ka.ke
+                | RELASI = dari + " - " + ke
+                |
+                */
+
                 $dari = trim((string) ($jadwal->dari ?? ''));
                 $ke = trim((string) ($jadwal->ke ?? ''));
 
@@ -154,8 +191,11 @@ class RealisasiKaController extends Controller
             }
 
             /*
-* Tambahkan KA manual yang telah tersimpan.
-*/
+            |--------------------------------------------------------------------------
+            | TAMBAHKAN KA MANUAL
+            |--------------------------------------------------------------------------
+            */
+
             $manualList = RealisasiKa::with('keretaApi')
                 ->where('dinas_id', $dinas->id)
                 ->where('is_manual', true)
@@ -170,9 +210,11 @@ class RealisasiKaController extends Controller
                     'nama' => $realisasi->keretaApi?->nama_ka ?? '-',
 
                     /*
-* KA manual tidak memiliki jadwal_ka,
-* sehingga relasinya belum diketahui dari jadwal.
-*/
+                    |--------------------------------------------------------------------------
+                    | KA MANUAL TIDAK MEMILIKI JADWAL_KA
+                    |--------------------------------------------------------------------------
+                    */
+
                     'dari' => $realisasi->hulu ?? '',
                     'ke' => $realisasi->hilir ?? '',
                     'hulu' => $realisasi->hulu ?? '',
@@ -217,9 +259,27 @@ class RealisasiKaController extends Controller
         }
 
         /*
-* Ambil konfigurasi realisasi KA yang dikelola Admin.
-*/
+        |--------------------------------------------------------------------------
+        | AMBIL KONFIGURASI REALISASI KA DARI ADMIN
+        |--------------------------------------------------------------------------
+        */
+
         $realisasiKaSetting = RealisasiKaSetting::firstOrCreate([]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | KIRIM DATA KE VIEW
+        |--------------------------------------------------------------------------
+        |
+        | $dinasAktif sudah memuat:
+        | - jpl.resort.wilayah
+        | - shift
+        | - user
+        | - userDigantikan
+        |
+        | Data tersebut dapat digunakan langsung oleh header.
+        |
+        */
 
         return view('user.realisasi-ka.index', [
             'dataKA' => $dataKA,
@@ -322,9 +382,11 @@ class RealisasiKaController extends Controller
         ]);
 
         /*
-* Pastikan dinas yang digunakan milik pengguna login
-* dan masih berstatus berlangsung.
-*/
+        |--------------------------------------------------------------------------
+        | PASTIKAN DINAS AKTIF MILIK PENGGUNA LOGIN
+        |--------------------------------------------------------------------------
+        */
+
         $dinas = Dinas::where('user_id', auth()->id())
             ->where('status', 'berlangsung')
             ->latest('id')
@@ -337,8 +399,11 @@ class RealisasiKaController extends Controller
         }
 
         /*
-* Simpan seluruh realisasi dalam satu transaksi.
-*/
+        |--------------------------------------------------------------------------
+        | SIMPAN SELURUH REALISASI DALAM TRANSAKSI DATABASE
+        |--------------------------------------------------------------------------
+        */
+
         $hasilSimpan = DB::transaction(
             function () use ($validated, $dinas) {
                 $hasil = [];
@@ -350,10 +415,17 @@ class RealisasiKaController extends Controller
 
                     if ($isManual) {
                         /*
-* Cari atau buat data KA berdasarkan nomor KA.
-*/
+                        |--------------------------------------------------------------------------
+                        | PROSES KA MANUAL
+                        |--------------------------------------------------------------------------
+                        */
+
                         $nomorKA = trim($item['nomor']);
                         $namaKA = trim($item['nama'] ?? '');
+
+                        /*
+                        | Cari atau buat data KA berdasarkan nomor KA.
+                        */
 
                         $kereta = KeretaApi::firstOrCreate(
                             [
@@ -367,18 +439,19 @@ class RealisasiKaController extends Controller
                         );
 
                         /*
-* Perbarui nama KA apabila sebelumnya kosong.
-*/
+                        | Perbarui nama KA apabila sebelumnya kosong.
+                        */
+
                         if (empty($kereta->nama_ka) && $namaKA !== '') {
                             $kereta->nama_ka = $namaKA;
                             $kereta->save();
                         }
 
                         /*
-* Jika ID realisasi tersedia, pastikan
-* ID tersebut merupakan KA manual milik
-* dinas aktif.
-*/
+                        | Jika ID realisasi tersedia, pastikan ID tersebut
+                        | merupakan KA manual milik dinas aktif.
+                        */
+
                         if ($realisasiId) {
                             $realisasi = RealisasiKa::where(
                                 'id',
@@ -396,9 +469,10 @@ class RealisasiKaController extends Controller
                             }
                         } else {
                             /*
-* Gunakan realisasi manual yang cocok
-* jika sudah ada agar tidak duplikat.
-*/
+                            | Gunakan realisasi manual yang cocok
+                            | jika sudah ada agar tidak duplikat.
+                            */
+
                             $realisasi = RealisasiKa::where(
                                 'dinas_id',
                                 $dinas->id
@@ -417,7 +491,6 @@ class RealisasiKaController extends Controller
                             }
                         }
 
-
                         $realisasi->kereta_api_id = $kereta->id;
 
                         // Simpan detail perjalanan KA manual.
@@ -425,11 +498,16 @@ class RealisasiKaController extends Controller
                         $realisasi->hilir = $item['hilir'] ?? null;
                         $realisasi->relasi = $item['relasi'] ?? null;
                     } else {
-
                         /*
-* Validasi jadwal terhadap JPL, tanggal,
-* dan hari dinas aktif.
-*/
+                        |--------------------------------------------------------------------------
+                        | PROSES KA TERJADWAL
+                        |--------------------------------------------------------------------------
+                        |
+                        | Validasi jadwal terhadap JPL, tanggal,
+                        | dan hari dinas aktif.
+                        |
+                        */
+
                         $jadwalId = $item['jadwal_ka_id'] ?? null;
 
                         if (!$jadwalId) {
@@ -451,7 +529,10 @@ class RealisasiKaController extends Controller
 
                         if (
                             !$jadwal ||
-                            !$this->jadwalDalamRentangShift($jadwal->jam_lewat, $dinas)
+                            !$this->jadwalDalamRentangShift(
+                                $jadwal->jam_lewat,
+                                $dinas
+                            )
                         ) {
                             throw ValidationException::withMessages([
                                 'data' => 'Jadwal KA tidak valid, tidak aktif, tidak sesuai hari/tanggal, atau bukan milik JPL dinas aktif.',
@@ -459,9 +540,10 @@ class RealisasiKaController extends Controller
                         }
 
                         /*
-* Jika ID realisasi tersedia, pastikan
-* cocok dengan jadwal dan dinas.
-*/
+                        | Jika ID realisasi tersedia, pastikan cocok
+                        | dengan jadwal dan dinas.
+                        */
+
                         if ($realisasiId) {
                             $realisasi = RealisasiKa::where(
                                 'id',
@@ -479,9 +561,10 @@ class RealisasiKaController extends Controller
                             }
                         } else {
                             /*
-* Gunakan realisasi yang sudah ada agar
-* penyimpanan ulang tidak membuat duplikat.
-*/
+                            | Gunakan realisasi yang sudah ada agar
+                            | penyimpanan ulang tidak membuat duplikat.
+                            */
+
                             $realisasi = RealisasiKa::firstOrNew([
                                 'dinas_id' => $dinas->id,
                                 'jadwal_ka_id' => $jadwal->id,
@@ -494,8 +577,11 @@ class RealisasiKaController extends Controller
                     }
 
                     /*
-* Status perjalanan.
-*/
+                    |--------------------------------------------------------------------------
+                    | STATUS PERJALANAN
+                    |--------------------------------------------------------------------------
+                    */
+
                     $realisasi->status_lewat = match ($item['status']) {
                         'JALAN' => 'centang',
                         'BATAL' => 'silang',
@@ -503,15 +589,21 @@ class RealisasiKaController extends Controller
                     };
 
                     /*
-* Jam aktual.
-*/
+                    |--------------------------------------------------------------------------
+                    | JAM AKTUAL
+                    |--------------------------------------------------------------------------
+                    */
+
                     $realisasi->jam_aktual = !empty($item['aktual'])
                         ? $item['aktual']
                         : null;
 
                     /*
-* Indikator keselamatan.
-*/
+                    |--------------------------------------------------------------------------
+                    | INDIKATOR KESELAMATAN
+                    |--------------------------------------------------------------------------
+                    */
+
                     $realisasi->status_s21 = $this->databaseCheck(
                         $item['semboyan21'] ?? null
                     );
@@ -534,9 +626,11 @@ class RealisasiKaController extends Controller
                     $realisasi->save();
 
                     /*
-* Kembalikan ID yang benar-benar tersimpan
-* agar frontend dapat memperbarui dataKA.
-*/
+                    |--------------------------------------------------------------------------
+                    | KEMBALIKAN ID REALISASI YANG TERSIMPAN
+                    |--------------------------------------------------------------------------
+                    */
+
                     $hasil[] = [
                         'index' => $index,
                         'realisasi_ka_id' => $realisasi->id,
@@ -556,11 +650,12 @@ class RealisasiKaController extends Controller
     /**
      * Filter jadwal khusus dan jadwal rutin.
      *
-     * Jadwal khusus: tanggal_berlaku sama dengan tanggal dinas.
-     * Jadwal rutin: tanggal_berlaku NULL dan hari_berlaku cocok.
+     * Jadwal khusus:
+     * tanggal_berlaku sama dengan tanggal dinas.
+     *
+     * Jadwal rutin:
+     * tanggal_berlaku NULL dan hari_berlaku cocok.
      */
-
-
     private function terapkanFilterJadwalBerlaku(
         $query,
         Dinas $dinas
@@ -583,10 +678,17 @@ class RealisasiKaController extends Controller
                 ->orWhere(function ($q2) use ($namaHari) {
                     $q2->whereNull('tanggal_berlaku')
                         ->whereNotNull('hari_berlaku')
-                        ->whereJsonContains(
-                            'hari_berlaku',
-                            $namaHari
-                        );
+                        ->where(function ($hariQuery) use ($namaHari) {
+                            $hariQuery
+                                ->whereJsonContains(
+                                    'hari_berlaku',
+                                    $namaHari
+                                )
+                                ->orWhereJsonContains(
+                                    'hari_berlaku',
+                                    'Setiap Hari'
+                                );
+                        });
                 });
         });
     }
@@ -640,6 +742,7 @@ class RealisasiKaController extends Controller
         return $menitKA >= $menitMulai
             || $menitKA <= $menitSelesai;
     }
+
     /**
      * Mengubah tanggal menjadi nama hari Indonesia.
      */

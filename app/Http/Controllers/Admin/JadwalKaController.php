@@ -2,14 +2,21 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\JadwalKaTemplateExport;
 use App\Http\Controllers\Controller;
+use App\Imports\JadwalKaWorkbookImport;
 use App\Models\JadwalKa;
 use App\Models\KeretaApi;
 use App\Models\Jpl;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use Throwable;
 
 class JadwalKaController extends Controller
 {
@@ -344,6 +351,208 @@ class JadwalKaController extends Controller
             'tanggal',
             'tanggalHariIni'
         ));
+    }
+
+    /**
+     * Mengunduh template Excel untuk import jadwal KA.
+     */
+    public function downloadTemplate()
+    {
+        return Excel::download(
+            new JadwalKaTemplateExport(),
+            'template-jadwal-ka.xlsx'
+        );
+    }
+
+    /**
+     * Menerima upload Excel dan menyimpan jadwal KA ke database.
+     *
+     * Menggunakan alur yang sama dengan JadwalKaImportController
+     * namun melalui endpoint resource controller (POST /admin/jadwal-ka/import).
+     */
+    public function importExcel(Request $request)
+    {
+        $validated = $request->validate([
+            'tanggal_berlaku' => [
+                'required',
+                'date_format:Y-m-d',
+            ],
+            'file' => [
+                'required',
+                'file',
+                'mimes:xlsx,xls',
+                'max:20480',
+            ],
+        ], [
+            'tanggal_berlaku.required' => 'Tanggal jadwal KA wajib dipilih.',
+            'tanggal_berlaku.date_format' => 'Format tanggal jadwal tidak valid.',
+            'file.required' => 'File Excel wajib dipilih.',
+            'file.mimes' => 'File harus berformat XLS atau XLSX.',
+            'file.max' => 'Ukuran file maksimal 20 MB.',
+        ]);
+
+        $tanggalBerlaku = $validated['tanggal_berlaku'];
+
+        $path = $request->file('file')->store('imports/jadwal-ka', 'local');
+
+        try {
+            $reader = IOFactory::createReaderForFile(
+                Storage::disk('local')->path($path)
+            );
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load(Storage::disk('local')->path($path));
+
+            $parser = new JadwalKaWorkbookImport();
+            $batch = (string) Str::uuid();
+            $inserted = 0;
+            $skipped = 0;
+
+            DB::transaction(function () use (
+                $spreadsheet,
+                $parser,
+                $tanggalBerlaku,
+                $batch,
+                &$inserted,
+                &$skipped
+            ) {
+                $keretaCache = [];
+                $seenKeys    = [];
+
+                foreach ($spreadsheet->getWorksheetIterator() as $worksheet) {
+                    $result = $parser->parseSheet($worksheet);
+
+                    if (! $result['header_found']) {
+                        continue;
+                    }
+
+                    if (! empty($result['errors'])) {
+                        throw new \RuntimeException(
+                            'Terdapat baris tidak valid pada sheet ' . $result['sheet'] . '.'
+                        );
+                    }
+
+                    $jpl = Jpl::query()
+                        ->where('kode_jpl', trim($result['sheet']))
+                        ->where('is_active', true)
+                        ->first();
+
+                    if (! $jpl) {
+                        throw new \RuntimeException(
+                            'JPL untuk sheet ' . $result['sheet'] . ' tidak ditemukan atau tidak aktif.'
+                        );
+                    }
+
+                    foreach ($result['rows'] as $row) {
+                        if (! ($row['valid'] ?? false)) {
+                            throw new \RuntimeException(
+                                'Baris tidak valid pada sheet ' . $result['sheet'] . '.'
+                            );
+                        }
+
+                        $nomorKa = trim((string) $row['nomor_ka']);
+                        $jam     = $row['jam_lewat'];
+                        $key     = mb_strtolower($nomorKa) . '|' . $jpl->id . '|' . $jam . '|' . $tanggalBerlaku;
+
+                        if (isset($seenKeys[$key])) {
+                            $skipped++;
+                            continue;
+                        }
+
+                        $seenKeys[$key] = true;
+
+                        if (! array_key_exists($nomorKa, $keretaCache)) {
+                            $kereta = KeretaApi::firstOrCreate(
+                                ['nomor_ka' => $nomorKa],
+                                ['nama_ka' => $row['nama_ka'] ?? null]
+                            );
+                            $keretaCache[$nomorKa] = $kereta;
+                        }
+
+                        $kereta  = $keretaCache[$nomorKa];
+                        $exists = JadwalKa::query()
+                            ->where('kereta_api_id', $kereta->id)
+                            ->where('jpl_id', $jpl->id)
+                            ->where('jam_lewat', $jam)
+                            ->whereDate('tanggal_berlaku', $tanggalBerlaku)
+                            ->exists();
+
+                        if ($exists) {
+                            $skipped++;
+                            continue;
+                        }
+
+                        JadwalKa::create([
+                            'kereta_api_id'  => $kereta->id,
+                            'jpl_id'         => $jpl->id,
+                            'jam_lewat'      => $jam,
+                            'hari_berlaku'   => null,
+                            'tanggal_berlaku'=> $tanggalBerlaku,
+                            'dari'           => isset($row['dari']) && trim((string) $row['dari']) !== '' ? trim((string) $row['dari']) : null,
+                            'ke'             => isset($row['ke'])   && trim((string) $row['ke'])   !== '' ? trim((string) $row['ke'])   : null,
+                            'keterangan'     => $row['keterangan'] ?? null,
+                            'is_active'      => true,
+                            'batch_import'   => $batch,
+                        ]);
+
+                        $inserted++;
+                    }
+                }
+
+                $spreadsheet->disconnectWorksheets();
+            });
+
+            Storage::disk('local')->delete($path);
+
+            return redirect()
+                ->route('admin.jadwal-ka.index')
+                ->with('success', "Import selesai: {$inserted} jadwal ditambahkan, {$skipped} dilewati. Tanggal: " . Carbon::parse($tanggalBerlaku)->format('d-m-Y'));
+        } catch (Throwable $e) {
+            Storage::disk('local')->delete($path);
+            report($e);
+
+            $message = 'Import gagal. Periksa format file dan coba lagi.';
+            if (config('app.debug')) {
+                $message .= ' Detail: ' . class_basename($e) . ' — ' . $e->getMessage();
+            }
+
+            return redirect()
+                ->route('admin.jadwal-ka.import.form')
+                ->withErrors(['file' => $message])
+                ->withInput();
+        }
+    }
+
+    /**
+     * Mengaktifkan atau menonaktifkan jadwal KA.
+     *
+     * Jadwal tidak dapat dinonaktifkan jika ada dinas yang sedang
+     * berlangsung dan jadwal tersebut sudah masuk dalam realisasi dinas itu.
+     */
+    public function toggleStatus(JadwalKa $jadwal_ka)
+    {
+        // Cegah nonaktifkan jadwal yang sedang dipakai dinas berlangsung.
+        if ($jadwal_ka->is_active) {
+            $adaDinasBerlangsung = \App\Models\RealisasiKa::query()
+                ->where('jadwal_ka_id', $jadwal_ka->id)
+                ->whereHas('dinas', fn ($q) => $q->where('status', 'berlangsung'))
+                ->exists();
+
+            if ($adaDinasBerlangsung) {
+                return redirect()
+                    ->back()
+                    ->with('error', "Jadwal KA #{$jadwal_ka->id} tidak dapat dinonaktifkan karena sedang digunakan dalam dinas yang berlangsung.");
+            }
+        }
+
+        $jadwal_ka->update([
+            'is_active' => ! $jadwal_ka->is_active,
+        ]);
+
+        $status = $jadwal_ka->is_active ? 'diaktifkan' : 'dinonaktifkan';
+
+        return redirect()
+            ->back()
+            ->with('success', "Jadwal KA #{$jadwal_ka->id} berhasil {$status}.");
     }
 
     /**

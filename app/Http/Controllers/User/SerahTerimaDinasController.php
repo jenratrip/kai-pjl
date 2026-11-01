@@ -27,6 +27,7 @@ class SerahTerimaDinasController extends Controller
     {
         return Dinas::with([
             'user',
+            'userDigantikan',
             'jpl.resort.wilayah',
             'shift',
         ])
@@ -82,7 +83,7 @@ class SerahTerimaDinasController extends Controller
         }
 
         $petugas = User::query()
-            ->where('role_id', 1)
+            ->whereHas('role', fn ($q) => $q->where('name', 'pjl'))
             ->where('is_active', true)
             ->where('id', '!=', auth()->id())
             ->where(function ($query) use ($keyword) {
@@ -115,8 +116,14 @@ class SerahTerimaDinasController extends Controller
      */
     public function riwayat()
     {
+        // Dinas aktif tetap digunakan untuk header,
+        // bukan dinas historis yang tercatat di riwayat.
+        $dinasAktif = $this->dinasAktif();
+
         $riwayat = SerahTerima::with([
-            'dinas.jpl',
+            'dinas.user',
+            'dinas.userDigantikan',
+            'dinas.jpl.resort.wilayah',
             'dinas.shift',
             'penerima',
         ])
@@ -127,7 +134,7 @@ class SerahTerimaDinasController extends Controller
 
         return view(
             'user.serahterimacatatan.riwayat',
-            compact('riwayat')
+            compact('riwayat', 'dinasAktif')
         );
     }
 
@@ -139,6 +146,7 @@ class SerahTerimaDinasController extends Controller
     {
         $data = SerahTerima::with([
             'dinas.user',
+            'dinas.userDigantikan',
             'dinas.jpl.resort.wilayah',
             'dinas.shift',
             'penerima',
@@ -167,6 +175,7 @@ class SerahTerimaDinasController extends Controller
     {
         $data = SerahTerima::with([
             'dinas.user',
+            'dinas.userDigantikan',
             'dinas.jpl.resort.wilayah',
             'dinas.shift',
             'penerima',
@@ -191,6 +200,12 @@ class SerahTerimaDinasController extends Controller
 
     /**
      * Menyiapkan data untuk halaman serah terima.
+     *
+     * $dinas:
+     * Data dinas yang digunakan untuk konten serah terima.
+     *
+     * $dinasAktif:
+     * Data dinas aktif user login untuk kebutuhan header.
      */
     private function tampilkanHalaman(
         ?Dinas $dinas,
@@ -249,8 +264,16 @@ class SerahTerimaDinasController extends Controller
             $modeLihat = true;
         }
 
+        /*
+         * Ambil dinas aktif secara terpisah.
+         *
+         * Jangan menggunakan $dinas sebagai dinasAktif karena
+         * pada halaman edit/show, $dinas dapat berupa dinas historis.
+         */
+        $dinasAktif = $this->dinasAktif();
+
         return view('user.serahterimacatatan.index', [
-            'dinasAktif' => $dinas,
+            'dinasAktif' => $dinasAktif,
             'dinas' => $dinas,
             'catatan' => $catatan,
             'inventaris' => $inventaris,
@@ -449,9 +472,8 @@ class SerahTerimaDinasController extends Controller
 
         $tanggalDinas = Carbon::parse($dinas->tanggal_dinas);
 
-        $namaHari = mb_strtolower(
-            $this->namaHariIndonesia($tanggalDinas)
-        );
+        // Gunakan Titlecase agar cocok dengan format JSON di DB.
+        $namaHari = $this->namaHariIndonesia($tanggalDinas);
 
         $query->where(function ($q) use (
             $tanggalDinas,
@@ -464,13 +486,8 @@ class SerahTerimaDinasController extends Controller
                 $q2->whereNull('tanggal_berlaku')
                     ->where(function ($hariQuery) use ($namaHari) {
                         $hariQuery
-                            ->whereRaw(
-                                'LOWER(TRIM(hari_berlaku)) = ?',
-                                [$namaHari]
-                            )
-                            ->orWhereRaw(
-                                "LOWER(TRIM(hari_berlaku)) = 'setiap hari'"
-                            );
+                            ->whereJsonContains('hari_berlaku', $namaHari)
+                            ->orWhereJsonContains('hari_berlaku', 'Setiap Hari');
                     });
             });
         });
@@ -479,13 +496,13 @@ class SerahTerimaDinasController extends Controller
     private function namaHariIndonesia(Carbon $tanggal): string
     {
         return [
-            1 => 'senin',
-            2 => 'selasa',
-            3 => 'rabu',
-            4 => 'kamis',
-            5 => 'jumat',
-            6 => 'sabtu',
-            7 => 'minggu',
+            1 => 'Senin',
+            2 => 'Selasa',
+            3 => 'Rabu',
+            4 => 'Kamis',
+            5 => 'Jumat',
+            6 => 'Sabtu',
+            7 => 'Minggu',
         ][$tanggal->dayOfWeekIso];
     }
 
@@ -519,7 +536,6 @@ class SerahTerimaDinasController extends Controller
                 ->withInput();
         }
 
-        // Data yang sudah disetujui admin tidak boleh diubah.
         if ($tolak = $this->tolakJikaTerkunci($request, $dinas)) {
             return $tolak;
         }
@@ -594,7 +610,6 @@ class SerahTerimaDinasController extends Controller
                 ->withInput();
         }
 
-        // Data yang sudah disetujui admin tidak boleh diubah.
         if ($tolak = $this->tolakJikaTerkunci($request, $dinas)) {
             return $tolak;
         }
@@ -695,10 +710,15 @@ class SerahTerimaDinasController extends Controller
                 'required',
                 'integer',
                 Rule::exists('users', 'id')->where(
-                    fn ($query) => $query
-                        ->where('role_id', 1)
-                        ->where('is_active', true)
+                    fn ($query) => $query->where('is_active', true)
                 ),
+                function ($attribute, $value, $fail) {
+                    $user = User::find($value);
+
+                    if (!$user || !$user->hasRole('pjl')) {
+                        $fail('Penerima harus merupakan petugas PJL yang aktif.');
+                    }
+                },
             ],
             'ringkasan' => [
                 'required',
@@ -763,7 +783,6 @@ class SerahTerimaDinasController extends Controller
                 ->withInput();
         }
 
-        // Sudah disetujui admin: tolak, apa pun jalur masuknya.
         if (
             $serahTerimaLama?->isTerkunci()
             || $this->dinasTerkunci($dinas)
@@ -777,7 +796,7 @@ class SerahTerimaDinasController extends Controller
         }
 
         $penerima = User::query()
-            ->where('role_id', 1)
+            ->whereHas('role', fn ($q) => $q->where('name', 'pjl'))
             ->where('is_active', true)
             ->findOrFail($validated['penerima_user_id']);
 
@@ -834,6 +853,7 @@ class SerahTerimaDinasController extends Controller
         $tandaTanganPenyerahLama =
             $serahTerimaLama?->tanda_tangan_penyerah;
 
+        // Ambil tanda tangan penerima lama sebelum data diperbarui.
         $tandaTanganPenerimaLama =
             $serahTerimaLama?->tanda_tangan_penerima;
 
@@ -913,8 +933,6 @@ class SerahTerimaDinasController extends Controller
 
             /*
              * Identitas penyerah dan PPKA berasal dari akun login.
-             * Nilai ppka dari browser tidak digunakan sebagai sumber
-             * identitas agar tidak kosong atau dapat dimanipulasi.
              */
             $userPenyerah = auth()->user();
 
@@ -1041,7 +1059,7 @@ class SerahTerimaDinasController extends Controller
         $serahTerima
     ) {
         abort_unless(
-            (int) auth()->user()->role_id === 1,
+            auth()->user()?->hasRole('pjl'),
             403,
             'Hanya petugas PJL yang dapat mengonfirmasi sebagai penerima.'
         );

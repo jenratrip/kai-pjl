@@ -22,6 +22,9 @@ class RealisasiKa extends Model
         'is_manual',
         'catatan',
         'diedit_terakhir_pada',
+        'hulu',
+        'hilir',
+        'relasi',
     ];
 
     protected $casts = [

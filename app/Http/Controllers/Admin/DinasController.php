@@ -1023,7 +1023,8 @@ class DinasController extends Controller
         if (
             $dina->catatanDinas()->exists() ||
             $dina->serahTerima()->exists() ||
-            $dina->realisasiInventaris()->exists()
+            $dina->realisasiInventaris()->exists() ||
+            $dina->realisasiKa()->exists()
         ) {
             throw ValidationException::withMessages([
                 'dinas' =>

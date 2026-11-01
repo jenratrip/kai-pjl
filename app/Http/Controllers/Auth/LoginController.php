@@ -262,6 +262,7 @@ class LoginController extends Controller
             $isWakilan
         ) {
             $dinas = Dinas::query()
+                ->lockForUpdate()
                 ->where('user_id', $user->id)
                 ->where('jpl_id', $jpl->id)
                 ->where('shift_id', $shift->id)
@@ -329,7 +330,7 @@ class LoginController extends Controller
             }
 
             $dinas->save();
-
+            
             // Tutup dinas aktif lain milik user setelah dinas baru tersimpan.
             Dinas::query()
                 ->where('user_id', $user->id)

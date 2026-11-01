@@ -186,7 +186,7 @@ class JadwalKaImportController extends Controller
                 Storage::disk('local')->delete($path);
 
                 return redirect()
-                    ->route('admin.jadwal-ka.import')
+                    ->route('admin.jadwal-ka.import.form')
                     ->withErrors([
                         'file' => 'Tidak ditemukan baris jadwal KA yang dapat dibaca.',
                     ])
@@ -261,7 +261,7 @@ class JadwalKaImportController extends Controller
             }
 
             return redirect()
-                ->route('admin.jadwal-ka.import')
+                ->route('admin.jadwal-ka.import.form')
                 ->withErrors(['file' => $message])
                 ->withInput([
                     'tanggal_berlaku' => $tanggalBerlaku,
@@ -284,7 +284,7 @@ class JadwalKaImportController extends Controller
         // Sesi preview tidak ditemukan.
         if (! $import || empty($import['path'])) {
             return redirect()
-                ->route('admin.jadwal-ka.import')
+                ->route('admin.jadwal-ka.import.form')
                 ->withErrors([
                     'file' => 'Sesi preview tidak ditemukan. Silakan upload ulang.',
                 ]);
@@ -298,7 +298,7 @@ class JadwalKaImportController extends Controller
             session()->forget($key);
 
             return redirect()
-                ->route('admin.jadwal-ka.import')
+                ->route('admin.jadwal-ka.import.form')
                 ->withErrors([
                     'file' => 'Preview kedaluwarsa. Silakan upload ulang.',
                 ]);
@@ -312,7 +312,7 @@ class JadwalKaImportController extends Controller
          */
         if (! is_string($tanggalBerlaku)) {
             return redirect()
-                ->route('admin.jadwal-ka.import')
+                ->route('admin.jadwal-ka.import.form')
                 ->withErrors([
                     'file' => 'Tanggal berlaku tidak ditemukan pada sesi preview. Silakan upload ulang.',
                 ]);
@@ -330,7 +330,7 @@ class JadwalKaImportController extends Controller
             || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $tanggalBerlaku)
         ) {
             return redirect()
-                ->route('admin.jadwal-ka.import')
+                ->route('admin.jadwal-ka.import.form')
                 ->withErrors([
                     'file' => 'Tanggal berlaku pada sesi preview tidak valid. Silakan upload ulang.',
                 ]);
@@ -343,7 +343,7 @@ class JadwalKaImportController extends Controller
             session()->forget($key);
 
             return redirect()
-                ->route('admin.jadwal-ka.import')
+                ->route('admin.jadwal-ka.import.form')
                 ->withErrors([
                     'file' => 'File sementara tidak ditemukan. Silakan upload ulang.',
                 ]);
@@ -557,7 +557,7 @@ class JadwalKaImportController extends Controller
             }
 
             return redirect()
-                ->route('admin.jadwal-ka.import')
+                ->route('admin.jadwal-ka.import.form')
                 ->withErrors(['file' => $message]);
         }
     }
