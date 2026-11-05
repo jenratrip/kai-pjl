@@ -166,6 +166,112 @@
             </div>
         </div>
 
+        {{-- MANAJEMEN VERSI JADWAL --}}
+        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-200 p-5 sm:p-6">
+                <h2 class="text-lg font-bold text-slate-900">Batch Jadwal KA</h2>
+                <p class="mt-1 text-sm text-slate-500">
+                    Jadwalkan batch draft. Batch terjadwal, aktif, dan arsip ditampilkan sebagai informasi.
+                </p>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Nama / ID batch</th>
+                            <th class="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
+                            <th class="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Tanggal efektif</th>
+                            <th class="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">JPL yang termasuk</th>
+                            <th class="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Pengelolaan</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 bg-white">
+                        @forelse ($batches as $batch)
+                            @php
+                                $statusBatch = [
+                                    'draft' => ['Draft', 'bg-amber-50 text-amber-800'],
+                                    'scheduled' => ['Terjadwal', 'bg-blue-50 text-blue-800'],
+                                    'active' => ['Aktif', 'bg-emerald-50 text-emerald-800'],
+                                    'archived' => ['Arsip', 'bg-slate-100 text-slate-700'],
+                                ][$batch->status] ?? [$batch->status, 'bg-slate-100 text-slate-700'];
+                            @endphp
+                            <tr class="align-top">
+                                <td class="max-w-56 break-all px-5 py-4 text-sm font-semibold text-slate-800">
+                                    {{ $batch->uuid }}
+                                </td>
+                                <td class="whitespace-nowrap px-5 py-4">
+                                    <span class="inline-flex rounded-full px-3 py-1.5 text-xs font-bold {{ $statusBatch[1] }}">
+                                        {{ $statusBatch[0] }}
+                                    </span>
+                                </td>
+                                <td class="whitespace-nowrap px-5 py-4 text-sm text-slate-700">
+                                    {{ $batch->tanggal_mulai_berlaku?->locale('id')->translatedFormat('d F Y') ?? 'Belum ditentukan' }}
+                                </td>
+                                <td class="min-w-64 px-5 py-4">
+                                    @if ($batch->jpls->isNotEmpty())
+                                        <ul class="space-y-2">
+                                            @foreach ($batch->jpls as $jpl)
+                                                <li class="text-sm text-slate-700">
+                                                    <span class="font-semibold text-slate-900">{{ $jpl->kode_jpl }}</span>
+                                                    <span class="text-slate-500">— {{ $jpl->nama_jpl ?: 'Nama JPL belum tersedia' }}</span>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    @else
+                                        <span class="text-sm text-slate-500">Belum ada JPL tercatat</span>
+                                    @endif
+                                </td>
+                                <td class="min-w-64 px-5 py-4">
+                                    @if ($batch->status === 'draft')
+                                        <form method="POST" action="{{ route('admin.jadwal-ka-batches.schedule', $batch) }}" class="space-y-3">
+                                            @csrf
+                                            <label for="tanggal_mulai_berlaku_{{ $batch->id }}" class="block text-xs font-semibold text-slate-600">
+                                                Tanggal mulai berlaku
+                                            </label>
+                                            <input
+                                                id="tanggal_mulai_berlaku_{{ $batch->id }}"
+                                                type="date"
+                                                name="tanggal_mulai_berlaku"
+                                                min="{{ now()->toDateString() }}"
+                                                value="{{ old('tanggal_mulai_berlaku', max($batch->tanggal_mulai_berlaku->toDateString(), now()->toDateString())) }}"
+                                                required
+                                                class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                                            >
+                                            <button
+                                                type="submit"
+                                                class="inline-flex items-center justify-center rounded-lg bg-blue-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-200"
+                                            >
+                                                Jadwalkan / Update Jadwal
+                                            </button>
+                                        </form>
+                                    @elseif ($batch->status === 'scheduled')
+                                        <p class="text-sm font-medium text-blue-800">Menunggu tanggal efektif.</p>
+                                    @elseif ($batch->status === 'active')
+                                        <p class="text-sm font-medium text-emerald-800">Informasi versi aktif.</p>
+                                    @else
+                                        <p class="text-sm text-slate-500">Informasi arsip.</p>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="px-5 py-10 text-center text-sm text-slate-500">
+                                    Belum ada batch Jadwal KA.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            @if ($batches->hasPages())
+                <div class="border-t border-slate-200 px-5 py-4">
+                    {{ $batches->links() }}
+                </div>
+            @endif
+        </section>
+
         {{-- DAFTAR JPL --}}
         <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 

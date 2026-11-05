@@ -25,7 +25,6 @@ class UserImportController extends Controller
         protected ActivityLogService $activityLogService
     ) {}
 
-
     /*
     |--------------------------------------------------------------------------
     | Download Template
@@ -38,11 +37,10 @@ class UserImportController extends Controller
     public function downloadTemplate()
     {
         return Excel::download(
-            new UserImportTemplateExport(),
+            new UserImportTemplateExport,
             'template-import-user.xlsx'
         );
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -71,19 +69,14 @@ class UserImportController extends Controller
                 'max:5120',
             ],
         ], [
-            'file.required' =>
-                'File Excel wajib dipilih.',
+            'file.required' => 'File Excel wajib dipilih.',
 
-            'file.file' =>
-                'File yang dikirim tidak valid.',
+            'file.file' => 'File yang dikirim tidak valid.',
 
-            'file.mimes' =>
-                'File harus berformat .xlsx.',
+            'file.mimes' => 'File harus berformat .xlsx.',
 
-            'file.max' =>
-                'Ukuran file maksimal 5 MB.',
+            'file.max' => 'Ukuran file maksimal 5 MB.',
         ]);
-
 
         /*
         |--------------------------------------------------------------------------
@@ -91,7 +84,7 @@ class UserImportController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $import = new UsersImport();
+        $import = new UsersImport;
 
         Excel::import(
             $import,
@@ -99,7 +92,6 @@ class UserImportController extends Controller
         );
 
         $rows = $import->rows;
-
 
         /*
         |--------------------------------------------------------------------------
@@ -122,7 +114,6 @@ class UserImportController extends Controller
             )
         );
 
-
         /*
         |--------------------------------------------------------------------------
         | Jika Tidak Ada Data
@@ -132,11 +123,9 @@ class UserImportController extends Controller
         if (count($rows) === 0) {
             return response()->json([
                 'success' => false,
-                'message' =>
-                    'File Excel tidak memiliki data pengguna.',
+                'message' => 'File Excel tidak memiliki data pengguna.',
             ], 422);
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -152,12 +141,6 @@ class UserImportController extends Controller
         | NIP yang sudah ditemukan dalam file.
         */
         $nipInFile = [];
-
-        /*
-        | Email yang sudah ditemukan dalam file.
-        */
-        $emailInFile = [];
-
 
         /*
         |--------------------------------------------------------------------------
@@ -178,7 +161,6 @@ class UserImportController extends Controller
             */
 
             $excelRow = $index + 2;
-
 
             /*
             |--------------------------------------------------------------------------
@@ -213,7 +195,6 @@ class UserImportController extends Controller
                     (string) ($row['status'] ?? '')
                 )
             );
-
 
             /*
             |--------------------------------------------------------------------------
@@ -259,41 +240,29 @@ class UserImportController extends Controller
                     ],
                 ],
                 [
-                    'nip.required' =>
-                        'NIP wajib diisi.',
+                    'nip.required' => 'NIP wajib diisi.',
 
-                    'nip.max' =>
-                        'NIP maksimal 50 karakter.',
+                    'nip.max' => 'NIP maksimal 50 karakter.',
 
-                    'name.required' =>
-                        'Nama wajib diisi.',
+                    'name.required' => 'Nama wajib diisi.',
 
-                    'name.max' =>
-                        'Nama maksimal 255 karakter.',
+                    'name.max' => 'Nama maksimal 255 karakter.',
 
-                    'email.email' =>
-                        'Format email tidak valid.',
+                    'email.email' => 'Format email tidak valid.',
 
-                    'email.max' =>
-                        'Email maksimal 255 karakter.',
+                    'email.max' => 'Email maksimal 255 karakter.',
 
-                    'phone.max' =>
-                        'Nomor HP maksimal 20 karakter.',
+                    'phone.max' => 'Nomor HP maksimal 20 karakter.',
 
-                    'role.required' =>
-                        'Role wajib diisi.',
+                    'role.required' => 'Role wajib diisi.',
 
-                    'role.in' =>
-                        'Role harus superadmin, admin, atau pjl.',
+                    'role.in' => 'Role harus superadmin, admin, atau pjl.',
 
-                    'status.required' =>
-                        'Status wajib diisi.',
+                    'status.required' => 'Status wajib diisi.',
 
-                    'status.in' =>
-                        'Status harus Aktif atau Nonaktif.',
+                    'status.in' => 'Status harus Aktif atau Nonaktif.',
                 ]
             );
-
 
             /*
             |--------------------------------------------------------------------------
@@ -320,7 +289,6 @@ class UserImportController extends Controller
                 }
             }
 
-
             /*
             |--------------------------------------------------------------------------
             | Cek NIP di Database
@@ -342,55 +310,6 @@ class UserImportController extends Controller
                 );
             }
 
-
-            /*
-            |--------------------------------------------------------------------------
-            | Cek Duplikat Email Dalam Excel
-            |--------------------------------------------------------------------------
-            */
-
-            if ($row['email'] !== '') {
-
-                if (isset($emailInFile[$row['email']])) {
-
-                    $validator->after(
-                        function ($validator) {
-                            $validator->errors()->add(
-                                'email',
-                                'Email duplikat dengan baris lain dalam file Excel.'
-                            );
-                        }
-                    );
-
-                } else {
-
-                    $emailInFile[$row['email']] = $excelRow;
-                }
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | Cek Email di Database
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                $row['email'] !== '' &&
-                User::where('email', $row['email'])->exists()
-            ) {
-
-                $validator->after(
-                    function ($validator) {
-                        $validator->errors()->add(
-                            'email',
-                            'Email sudah terdaftar di database.'
-                        );
-                    }
-                );
-            }
-
-
             /*
             |--------------------------------------------------------------------------
             | Simpan Hasil Validasi
@@ -404,13 +323,11 @@ class UserImportController extends Controller
 
                     'data' => $row,
 
-                    'errors' =>
-                        $validator->errors()->all(),
+                    'errors' => $validator->errors()->all(),
                 ];
 
                 continue;
             }
-
 
             /*
             |--------------------------------------------------------------------------
@@ -425,7 +342,6 @@ class UserImportController extends Controller
             ];
         }
 
-
         /*
         |--------------------------------------------------------------------------
         | Simpan Preview ke Cache
@@ -438,11 +354,10 @@ class UserImportController extends Controller
         $previewToken = (string) Str::uuid();
 
         Cache::put(
-            'user_import_preview:' . $previewToken,
+            'user_import_preview:'.$previewToken,
             $validRows,
             now()->addMinutes(10)
         );
-
 
         /*
         |--------------------------------------------------------------------------
@@ -453,29 +368,21 @@ class UserImportController extends Controller
         return response()->json([
             'success' => true,
 
-            'message' =>
-                'File berhasil diperiksa.',
+            'message' => 'File berhasil diperiksa.',
 
-            'token' =>
-                $previewToken,
+            'token' => $previewToken,
 
-            'total' =>
-                count($rows),
+            'total' => count($rows),
 
-            'valid' =>
-                count($validRows),
+            'valid' => count($validRows),
 
-            'invalid' =>
-                count($errors),
+            'invalid' => count($errors),
 
-            'valid_rows' =>
-                $validRows,
+            'valid_rows' => $validRows,
 
-            'errors' =>
-                $errors,
+            'errors' => $errors,
         ]);
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -502,10 +409,8 @@ class UserImportController extends Controller
                 'string',
             ],
         ], [
-            'token.required' =>
-                'Token preview import tidak ditemukan.',
+            'token.required' => 'Token preview import tidak ditemukan.',
         ]);
-
 
         /*
         |--------------------------------------------------------------------------
@@ -514,11 +419,10 @@ class UserImportController extends Controller
         */
 
         $cacheKey =
-            'user_import_preview:' .
+            'user_import_preview:'.
             $validated['token'];
 
         $validRows = Cache::get($cacheKey);
-
 
         /*
         |--------------------------------------------------------------------------
@@ -531,12 +435,10 @@ class UserImportController extends Controller
             return response()->json([
                 'success' => false,
 
-                'message' =>
-                    'Data preview sudah kedaluwarsa atau tidak ditemukan. ' .
+                'message' => 'Data preview sudah kedaluwarsa atau tidak ditemukan. '.
                     'Silakan upload file Excel kembali.',
             ], 422);
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -551,12 +453,10 @@ class UserImportController extends Controller
             return response()->json([
                 'success' => false,
 
-                'message' =>
-                    'Data preview tidak valid. ' .
+                'message' => 'Data preview tidak valid. '.
                     'Silakan upload file Excel kembali.',
             ], 422);
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -571,11 +471,9 @@ class UserImportController extends Controller
             return response()->json([
                 'success' => false,
 
-                'message' =>
-                    'Tidak ada data valid yang dapat diimport.',
+                'message' => 'Tidak ada data valid yang dapat diimport.',
             ], 422);
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -595,7 +493,6 @@ class UserImportController extends Controller
 
                     $failed = [];
 
-
                     /*
                     |--------------------------------------------------------------------------
                     | Proses Setiap User
@@ -609,7 +506,6 @@ class UserImportController extends Controller
 
                         $data =
                             $item['data'] ?? [];
-
 
                         /*
                         |--------------------------------------------------------------------------
@@ -644,7 +540,6 @@ class UserImportController extends Controller
                                 (string) ($data['status'] ?? '')
                             )
                         );
-
 
                         /*
                         |--------------------------------------------------------------------------
@@ -702,7 +597,6 @@ class UserImportController extends Controller
                             ]
                         );
 
-
                         /*
                         |--------------------------------------------------------------------------
                         | Jika Validasi Gagal
@@ -712,27 +606,22 @@ class UserImportController extends Controller
                         if ($validator->fails()) {
 
                             $failed[] = [
-                                'row' =>
-                                    $rowNumber,
+                                'row' => $rowNumber,
 
-                                'nip' =>
-                                    $nip,
+                                'nip' => $nip,
 
-                                'name' =>
-                                    $name,
+                                'name' => $name,
 
-                                'message' =>
-                                    implode(
-                                        ' ',
-                                        $validator
-                                            ->errors()
-                                            ->all()
-                                    ),
+                                'message' => implode(
+                                    ' ',
+                                    $validator
+                                        ->errors()
+                                        ->all()
+                                ),
                             ];
 
                             continue;
                         }
-
 
                         /*
                         |--------------------------------------------------------------------------
@@ -748,54 +637,17 @@ class UserImportController extends Controller
                         ) {
 
                             $failed[] = [
-                                'row' =>
-                                    $rowNumber,
+                                'row' => $rowNumber,
 
-                                'nip' =>
-                                    $nip,
+                                'nip' => $nip,
 
-                                'name' =>
-                                    $name,
+                                'name' => $name,
 
-                                'message' =>
-                                    'NIP sudah terdaftar di database.',
+                                'message' => 'NIP sudah terdaftar di database.',
                             ];
 
                             continue;
                         }
-
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Cek Email Terbaru
-                        |--------------------------------------------------------------------------
-                        */
-
-                        if (
-                            $email !== '' &&
-                            User::where(
-                                'email',
-                                $email
-                            )->exists()
-                        ) {
-
-                            $failed[] = [
-                                'row' =>
-                                    $rowNumber,
-
-                                'nip' =>
-                                    $nip,
-
-                                'name' =>
-                                    $name,
-
-                                'message' =>
-                                    'Email sudah terdaftar di database.',
-                            ];
-
-                            continue;
-                        }
-
 
                         /*
                         |--------------------------------------------------------------------------
@@ -808,7 +660,6 @@ class UserImportController extends Controller
                             $roleName
                         )->first();
 
-
                         /*
                         |--------------------------------------------------------------------------
                         | Role Tidak Ditemukan
@@ -818,24 +669,19 @@ class UserImportController extends Controller
                         if (! $role) {
 
                             $failed[] = [
-                                'row' =>
-                                    $rowNumber,
+                                'row' => $rowNumber,
 
-                                'nip' =>
-                                    $nip,
+                                'nip' => $nip,
 
-                                'name' =>
-                                    $name,
+                                'name' => $name,
 
-                                'message' =>
-                                    'Role "' .
-                                    $roleName .
+                                'message' => 'Role "'.
+                                    $roleName.
                                     '" tidak ditemukan di database.',
                             ];
 
                             continue;
                         }
-
 
                         /*
                         |--------------------------------------------------------------------------
@@ -845,7 +691,6 @@ class UserImportController extends Controller
 
                         $isActive =
                             $status === 'aktif';
-
 
                         /*
                         |--------------------------------------------------------------------------
@@ -866,7 +711,6 @@ class UserImportController extends Controller
 
                         $initialPassword = $nip;
 
-
                         /*
                         |--------------------------------------------------------------------------
                         | Buat User
@@ -874,34 +718,26 @@ class UserImportController extends Controller
                         */
 
                         $user = User::create([
-                            'nip' =>
-                                $nip,
+                            'nip' => $nip,
 
-                            'name' =>
-                                $name,
+                            'name' => $name,
 
-                            'email' =>
-                                $email !== ''
+                            'email' => $email !== ''
                                     ? $email
                                     : null,
 
-                            'phone' =>
-                                $phone !== ''
+                            'phone' => $phone !== ''
                                     ? $phone
                                     : null,
 
-                            'role_id' =>
-                                $role->id,
+                            'role_id' => $role->id,
 
-                            'is_active' =>
-                                $isActive,
+                            'is_active' => $isActive,
 
-                            'password' =>
-                                Hash::make(
-                                    $initialPassword
-                                ),
+                            'password' => Hash::make(
+                                $initialPassword
+                            ),
                         ]);
-
 
                         /*
                         |--------------------------------------------------------------------------
@@ -912,34 +748,26 @@ class UserImportController extends Controller
                         $this->activityLogService->log(
                             'create',
                             'users',
-                            'Superadmin mengimport pengguna melalui Excel: ' .
+                            'Superadmin mengimport pengguna melalui Excel: '.
                                 $user->name,
                             $user,
                             null,
                             [
-                                'nip' =>
-                                    $user->nip,
+                                'nip' => $user->nip,
 
-                                'name' =>
-                                    $user->name,
+                                'name' => $user->name,
 
-                                'email' =>
-                                    $user->email,
+                                'email' => $user->email,
 
-                                'phone' =>
-                                    $user->phone,
+                                'phone' => $user->phone,
 
-                                'role_id' =>
-                                    $user->role_id,
+                                'role_id' => $user->role_id,
 
-                                'is_active' =>
-                                    $user->is_active,
+                                'is_active' => $user->is_active,
 
-                                'import_source' =>
-                                    'excel',
+                                'import_source' => 'excel',
                             ]
                         );
-
 
                         /*
                         |--------------------------------------------------------------------------
@@ -950,7 +778,6 @@ class UserImportController extends Controller
                         $imported++;
                     }
 
-
                     /*
                     |--------------------------------------------------------------------------
                     | Return Hasil
@@ -958,15 +785,12 @@ class UserImportController extends Controller
                     */
 
                     return [
-                        'imported' =>
-                            $imported,
+                        'imported' => $imported,
 
-                        'failed' =>
-                            $failed,
+                        'failed' => $failed,
                     ];
                 }
             );
-
 
             /*
             |--------------------------------------------------------------------------
@@ -980,7 +804,6 @@ class UserImportController extends Controller
 
             Cache::forget($cacheKey);
 
-
             /*
             |--------------------------------------------------------------------------
             | Response Berhasil
@@ -988,22 +811,16 @@ class UserImportController extends Controller
             */
 
             return response()->json([
-                'success' =>
-                    true,
+                'success' => true,
 
-                'message' =>
-                    'Import pengguna berhasil diproses.',
+                'message' => 'Import pengguna berhasil diproses.',
 
-                'imported' =>
-                    $result['imported'],
+                'imported' => $result['imported'],
 
-                'failed' =>
-                    count($result['failed']),
+                'failed' => count($result['failed']),
 
-                'errors' =>
-                    $result['failed'],
+                'errors' => $result['failed'],
             ]);
-
 
         } catch (\Throwable $e) {
 
@@ -1015,7 +832,6 @@ class UserImportController extends Controller
 
             report($e);
 
-
             /*
             |--------------------------------------------------------------------------
             | Response Error
@@ -1023,11 +839,9 @@ class UserImportController extends Controller
             */
 
             return response()->json([
-                'success' =>
-                    false,
+                'success' => false,
 
-                'message' =>
-                    'Terjadi kesalahan saat melakukan import. ' .
+                'message' => 'Terjadi kesalahan saat melakukan import. '.
                     'Tidak ada data yang disimpan.',
             ], 500);
         }

@@ -9,6 +9,10 @@
                     'id' => $ka['id'] ?? null,
                     'nomor' => $nomor,
                     'nama' => $nama,
+                    'semboyan21' => $ka['semboyan21'] ?? '',
+                    'genta' => $ka['genta'] ?? '',
+                    'pintu' => $ka['pintu'] ?? '',
+                    'semboyan35' => $ka['semboyan35'] ?? '',
                 ];
             })
             ->unique(function ($ka) {
@@ -75,6 +79,8 @@
                         BATAL
                     </span>
                 </div>
+
+                @include('user.serahterimacatatan.partials.ka-check-indicators', ['ka' => $ka])
             </div>
         @empty
             <div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center">

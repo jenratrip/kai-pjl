@@ -21,6 +21,7 @@ class JadwalKa extends Model
         'keterangan',
         'is_active',
         'batch_import',
+        'jadwal_ka_batch_id',
     ];
 
     protected function casts(): array
@@ -40,6 +41,11 @@ class JadwalKa extends Model
     public function jpl(): BelongsTo
     {
         return $this->belongsTo(Jpl::class, 'jpl_id');
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(JadwalKaBatch::class, 'jadwal_ka_batch_id');
     }
 
     public function realisasiKa(): HasMany

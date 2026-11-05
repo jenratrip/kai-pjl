@@ -328,8 +328,9 @@
                                     <code>00:29:00</code>.
                                 </p>
                                 <p class="mt-2">
-                                    Jadwal dengan KA, JPL, jam, dan tanggal berlaku yang sama
-                                    seharusnya dilewati, bukan digandakan.
+                                    Duplikat dengan nomor KA, JPL, jam, dan tanggal berlaku yang sama
+                                    hanya dilewati jika muncul berulang di workbook ini. Jadwal yang sama
+                                    dari versi sebelumnya tetap dapat diimpor sebagai batch baru.
                                 </p>
                             </div>
                         </div>

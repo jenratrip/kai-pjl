@@ -88,6 +88,22 @@
         return '—';
     };
 
+    $formatJawaban = function ($nilai) use ($formatNilai) {
+        if (is_bool($nilai)) {
+            return $nilai ? '✓' : '✗';
+        }
+
+        if (is_scalar($nilai)) {
+            return match (strtolower(trim((string) $nilai))) {
+                'yes', 'ya', 'true', '1', 'centang' => '✓',
+                'no', 'tidak', 'false', '0', 'silang' => '✗',
+                default => $formatNilai($nilai),
+            };
+        }
+
+        return $formatNilai($nilai);
+    };
+
     $labelKunci = function ($key) {
         return ucwords(str_replace(
             ['_', '-'],
@@ -656,6 +672,11 @@
                                                 'semboyan_35',
                                             ]);
 
+                                            $semboyan21Tampil = $formatJawaban($semboyan21);
+                                            $gentaTampil = $formatJawaban($genta);
+                                            $pintuTampil = $formatJawaban($pintu);
+                                            $semboyan35Tampil = $formatJawaban($semboyan35);
+
                                             $dari = $nilaiPertama($ka, [
                                                 'dari',
                                                 'asal',
@@ -790,19 +811,27 @@
                                             </td>
 
                                             <td class="whitespace-nowrap px-4 py-3 text-slate-700">
-                                                {{ $formatNilai($semboyan21) }}
+                                                <span @if ($semboyan21Tampil === '✓') role="img" aria-label="Ya" title="Ya" @elseif ($semboyan21Tampil === '✗') role="img" aria-label="Tidak" title="Tidak" @endif>
+                                                    {{ $semboyan21Tampil }}
+                                                </span>
                                             </td>
 
                                             <td class="whitespace-nowrap px-4 py-3 text-slate-700">
-                                                {{ $formatNilai($genta) }}
+                                                <span @if ($gentaTampil === '✓') role="img" aria-label="Ya" title="Ya" @elseif ($gentaTampil === '✗') role="img" aria-label="Tidak" title="Tidak" @endif>
+                                                    {{ $gentaTampil }}
+                                                </span>
                                             </td>
 
                                             <td class="whitespace-nowrap px-4 py-3 text-slate-700">
-                                                {{ $formatNilai($pintu) }}
+                                                <span @if ($pintuTampil === '✓') role="img" aria-label="Ya" title="Ya" @elseif ($pintuTampil === '✗') role="img" aria-label="Tidak" title="Tidak" @endif>
+                                                    {{ $pintuTampil }}
+                                                </span>
                                             </td>
 
                                             <td class="whitespace-nowrap px-4 py-3 text-slate-700">
-                                                {{ $formatNilai($semboyan35) }}
+                                                <span @if ($semboyan35Tampil === '✓') role="img" aria-label="Ya" title="Ya" @elseif ($semboyan35Tampil === '✗') role="img" aria-label="Tidak" title="Tidak" @endif>
+                                                    {{ $semboyan35Tampil }}
+                                                </span>
                                             </td>
 
                                             <td class="px-4 py-3 text-slate-600">
