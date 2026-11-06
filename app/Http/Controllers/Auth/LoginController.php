@@ -18,10 +18,6 @@ use Illuminate\Validation\ValidationException;
 class LoginController extends Controller
 {
     private const JPL_NOMOR_COLUMN = 'kode_jpl';
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main
     private const SHIFT_NAMA_COLUMN = 'nama_shift';
 
     public function __construct(
@@ -38,7 +34,6 @@ class LoginController extends Controller
         return view('auth.login', compact('dinasanList'));
     }
 
-<<<<<<< HEAD
     /*
     |--------------------------------------------------------------------------
     | Cek kredensial dan role
@@ -48,8 +43,6 @@ class LoginController extends Controller
     | Method ini hanya memeriksa kredensial dan tidak melakukan login.
     */
 
-=======
->>>>>>> origin/main
     public function cek(Request $request)
     {
         $credentials = $request->validate([
@@ -82,7 +75,6 @@ class LoginController extends Controller
         ], 422);
     }
 
-<<<<<<< HEAD
     /*
     |--------------------------------------------------------------------------
     | Login utama
@@ -92,8 +84,6 @@ class LoginController extends Controller
     | Validasi akhir tetap dilakukan di method ini.
     */
 
-=======
->>>>>>> origin/main
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -112,12 +102,7 @@ class LoginController extends Controller
             return $this->gagal($request, 'nip', $pesanUmum);
         }
 
-<<<<<<< HEAD
-        if (!Auth::validate($credentials)) {
-=======
-        // 2) Password (tanpa login dulu)
         if (! Auth::validate($credentials)) {
->>>>>>> origin/main
             return $this->gagal($request, 'nip', $pesanUmum);
         }
 
@@ -136,15 +121,12 @@ class LoginController extends Controller
         );
     }
 
-<<<<<<< HEAD
     /*
     |--------------------------------------------------------------------------
     | Login Admin dan Superadmin
     |--------------------------------------------------------------------------
     */
 
-=======
->>>>>>> origin/main
     protected function loginAdmin(Request $request, User $user)
     {
         Auth::login($user);
@@ -163,15 +145,12 @@ class LoginController extends Controller
             : redirect()->route('admin.dashboard');
     }
 
-<<<<<<< HEAD
     /*
     |--------------------------------------------------------------------------
     | Login Petugas PJL (Reguler / Wakilan)
     |--------------------------------------------------------------------------
     */
 
-=======
->>>>>>> origin/main
     protected function loginPetugas(Request $request, User $user)
     {
         $data = $request->validate([
@@ -188,32 +167,22 @@ class LoginController extends Controller
             ->where('is_active', true)
             ->first();
 
-<<<<<<< HEAD
-        if (!$jpl) {
+        if (! $jpl) {
             return $this->gagal(
                 $request,
                 'nomor_pjl',
                 'Nomor PJL tidak ditemukan.'
             );
-=======
-        if (! $jpl) {
-            return $this->gagal($request, 'nomor_pjl', 'Nomor PJL tidak ditemukan.');
->>>>>>> origin/main
         }
 
         $shift = Shift::find($data['dinasan']);
 
-<<<<<<< HEAD
-        if (!$shift) {
+        if (! $shift) {
             return $this->gagal(
                 $request,
                 'dinasan',
                 'Dinasan tidak valid.'
             );
-=======
-        if (! $shift) {
-            return $this->gagal($request, 'dinasan', 'Dinasan tidak valid.');
->>>>>>> origin/main
         }
 
         $isWakilan = $data['jenis_petugas'] === 'wakilan';
@@ -222,12 +191,12 @@ class LoginController extends Controller
         $tanggalHariIni = $sekarang->toDateString();
 
         $jamMulaiHariIni = Carbon::parse(
-            $tanggalHariIni.' '.$shift->jam_mulai,
+            $tanggalHariIni . ' ' . $shift->jam_mulai,
             'Asia/Jakarta'
         );
 
         $jamSelesaiHariIni = Carbon::parse(
-            $tanggalHariIni.' '.$shift->jam_selesai,
+            $tanggalHariIni . ' ' . $shift->jam_selesai,
             'Asia/Jakarta'
         );
 
@@ -258,6 +227,7 @@ class LoginController extends Controller
             'shift_id' => $shift->id,
             'dinas_id' => $dinas->id,
         ]);
+
         $request->session()->put('dinas_id', $dinas->id);
 
         $this->activityLogService->log(
@@ -362,6 +332,7 @@ class LoginController extends Controller
                 ->where('is_pengganti', $isWakilan)
                 ->latest('id')
                 ->first();
+
             $dinasBaru = $dinas === null;
 
             if ($dinas && $dinas->status === 'selesai') {
@@ -370,26 +341,19 @@ class LoginController extends Controller
                 ]);
             }
 
-<<<<<<< HEAD
             // Petugas reguler harus memiliki jadwal dari admin.
-            if (!$isWakilan && !$dinas) {
-=======
             if (! $isWakilan && ! $dinas) {
->>>>>>> origin/main
                 throw ValidationException::withMessages([
                     'nomor_pjl' => 'Anda tidak dijadwalkan pada PJL dan dinasan ini hari ini.',
                 ]);
             }
 
-<<<<<<< HEAD
-            // Cari petugas reguler yang akan digantikan.
-            $digantikanId = null;
-=======
+            // Validasi identitas dan konteks Dinas yang sudah terkunci.
             if (
                 $dinas
                 && $dinas->jadwal_ka_snapshot !== null
                 && (
-                    (int) $dinas->user_id !== (int) $user->id
+                    (int) $dinas->user_id !== (int) $lockedUser->id
                     || (int) $dinas->jpl_id !== (int) $lockedJpl->id
                     || (int) $dinas->shift_id !== (int) $shift->id
                     || Carbon::parse($dinas->tanggal_dinas)->toDateString() !== $tanggal
@@ -400,8 +364,8 @@ class LoginController extends Controller
                     'dinasan' => 'Identitas atau konteks Dinas tidak sesuai dengan Dinas yang sudah terkunci oleh snapshot Jadwal KA.',
                 ]);
             }
->>>>>>> origin/main
 
+            // Cari petugas reguler yang akan digantikan.
             $digantikanId = $dinas?->user_digantikan_id;
 
             if ($isWakilan && (! $dinas || $dinas->jadwal_ka_snapshot === null)) {
@@ -414,16 +378,12 @@ class LoginController extends Controller
                     ->value('user_id');
             }
 
-<<<<<<< HEAD
-            // Buat dinas baru untuk petugas wakilan jika belum tersedia.
-            if (!$dinas) {
-=======
+            // Buat Dinas baru untuk petugas wakilan jika belum tersedia.
             if (! $dinas) {
->>>>>>> origin/main
                 $jamMulai = now('Asia/Jakarta');
 
                 $jamSelesai = Carbon::parse(
-                    $tanggal.' '.$shift->jam_selesai,
+                    $tanggal . ' ' . $shift->jam_selesai,
                     'Asia/Jakarta'
                 );
 
@@ -431,16 +391,10 @@ class LoginController extends Controller
                     $jamSelesai->addDay();
                 }
 
-<<<<<<< HEAD
                 $dinas = new Dinas();
 
-                $dinas->user_id = $user->id;
-                $dinas->jpl_id = $jpl->id;
-=======
-                $dinas = new Dinas;
                 $dinas->user_id = $lockedUser->id;
                 $dinas->jpl_id = $lockedJpl->id;
->>>>>>> origin/main
                 $dinas->shift_id = $shift->id;
                 $dinas->tanggal_dinas = $tanggal;
                 $dinas->jam_mulai = $jamMulai;
@@ -460,10 +414,10 @@ class LoginController extends Controller
             }
 
             $dinas->save();
-            
-            // Tutup dinas aktif lain milik user setelah dinas baru tersimpan.
+
+            // Tutup Dinas aktif lain milik user setelah Dinas baru tersimpan.
             Dinas::query()
-                ->where('user_id', $user->id)
+                ->where('user_id', $lockedUser->id)
                 ->where('status', 'berlangsung')
                 ->where('id', '!=', $dinas->id)
                 ->update([
@@ -471,8 +425,8 @@ class LoginController extends Controller
                 ]);
 
             logger()->info('Pelacakan petugas pengganti saat login', [
-                'user_id' => $user->id,
-                'jpl_id' => $jpl->id,
+                'user_id' => $lockedUser->id,
+                'jpl_id' => $lockedJpl->id,
                 'shift_id' => $shift->id,
                 'tanggal' => $tanggal,
                 'is_wakilan' => $isWakilan,
@@ -481,10 +435,15 @@ class LoginController extends Controller
             ]);
 
             if (
-                $dinasBaru ||
-                (is_array($dinas->jadwal_ka_snapshot) && $dinas->jadwal_ka_snapshot !== [])
+                $dinasBaru
+                || (
+                    is_array($dinas->jadwal_ka_snapshot)
+                    && $dinas->jadwal_ka_snapshot !== []
+                )
             ) {
-                $this->dinasJadwalSnapshotService->resolveAndStore((int) $dinas->id);
+                $this->dinasJadwalSnapshotService->resolveAndStore(
+                    (int) $dinas->id
+                );
             }
 
             return $dinas;
