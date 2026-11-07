@@ -39,9 +39,9 @@ class UserController extends Controller
             $search = trim($request->input('search'));
 
             $query->where(function ($q) use ($search) {
-                $q->where('nip', 'like', '%' . $search . '%')
-                    ->orWhere('name', 'like', '%' . $search . '%')
-                    ->orWhere('email', 'like', '%' . $search . '%');
+                $q->where('nip', 'like', '%'.$search.'%')
+                    ->orWhere('name', 'like', '%'.$search.'%')
+                    ->orWhere('email', 'like', '%'.$search.'%');
             });
         }
 
@@ -185,7 +185,6 @@ class UserController extends Controller
                 'nullable',
                 'email',
                 'max:255',
-                'unique:users,email',
             ],
 
             'phone' => [
@@ -231,7 +230,7 @@ class UserController extends Controller
         $this->activityLogService->log(
             'create',
             'users',
-            'Superadmin membuat pengguna baru: ' . $user->name,
+            'Superadmin membuat pengguna baru: '.$user->name,
             $user,
             null,
             [
@@ -284,6 +283,32 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
+        $isOwnAccount = (string) auth()->id() === (string) $user->getKey();
+        $protectedAccountChangeAttempted = false;
+
+        if ($isOwnAccount) {
+            $submittedRoleId = $request->input('role_id');
+            $submittedIsActive = $request->input('is_active');
+            $normalizedIsActive = is_scalar($submittedIsActive)
+                ? filter_var($submittedIsActive, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+                : null;
+
+            $protectedAccountChangeAttempted =
+                ($submittedRoleId !== null && (
+                    ! is_scalar($submittedRoleId) ||
+                    (string) $submittedRoleId !== (string) $user->role_id
+                )) ||
+                ($submittedIsActive !== null && (
+                    $normalizedIsActive === null ||
+                    $normalizedIsActive !== $user->is_active
+                ));
+
+            $request->merge([
+                'role_id' => $user->role_id,
+                'is_active' => $user->is_active,
+            ]);
+        }
+
         $validated = $request->validate([
             'nip' => [
                 'required',
@@ -302,7 +327,6 @@ class UserController extends Controller
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('users', 'email')->ignore($user->id),
             ],
 
             'phone' => [
@@ -354,8 +378,11 @@ class UserController extends Controller
         $user->name = $validated['name'];
         $user->email = $validated['email'] ?? null;
         $user->phone = $validated['phone'] ?? null;
-        $user->role_id = $validated['role_id'];
-        $user->is_active = $validated['is_active'];
+
+        if (! $isOwnAccount) {
+            $user->role_id = $validated['role_id'];
+            $user->is_active = $validated['is_active'];
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -399,19 +426,28 @@ class UserController extends Controller
             $this->activityLogService->log(
                 'update',
                 'users',
-                'Superadmin memperbarui pengguna: ' . $user->name,
+                'Superadmin memperbarui pengguna: '.$user->name,
                 $user,
                 $oldValues,
                 $newValues
             );
         }
 
-        return redirect()
+        $redirect = redirect()
             ->route('superadmin.users.index')
             ->with(
                 'success',
                 'Data pengguna berhasil diperbarui.'
             );
+
+        if ($protectedAccountChangeAttempted) {
+            $redirect->with(
+                'error',
+                'Role dan status aktif akun sendiri tidak dapat diubah. Perubahan field lain yang valid tetap diproses.'
+            );
+        }
+
+        return $redirect;
     }
 
     /**
@@ -485,9 +521,9 @@ class UserController extends Controller
         $this->activityLogService->log(
             $action,
             'users',
-            'Superadmin ' .
-                $statusText .
-                ' pengguna: ' .
+            'Superadmin '.
+                $statusText.
+                ' pengguna: '.
                 $user->name,
             $user,
             [
@@ -520,7 +556,7 @@ class UserController extends Controller
 
         return back()->with(
             'success',
-            'Pengguna berhasil ' .
+            'Pengguna berhasil '.
                 (
                     $user->is_active
                         ? 'diaktifkan.'

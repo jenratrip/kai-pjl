@@ -32,10 +32,18 @@
                 </h1>
 
                 <p class="mt-2 text-sm text-slate-500">
-                    Tanggal:
-                    <span class="font-semibold text-slate-800">
-                        {{ \Carbon\Carbon::parse($tanggal)->translatedFormat('l, d F Y') }}
-                    </span>
+                    @if ($jenisArsip === 'batch')
+                        Periode efektif:
+                        <span class="font-semibold text-slate-800">
+                            {{ \Carbon\Carbon::parse($tanggal)->translatedFormat('d F Y') }} –
+                            {{ \Carbon\Carbon::parse($tanggalAkhir)->translatedFormat('d F Y') }}
+                        </span>
+                    @else
+                        Tanggal legacy:
+                        <span class="font-semibold text-slate-800">
+                            {{ \Carbon\Carbon::parse($tanggal)->translatedFormat('l, d F Y') }}
+                        </span>
+                    @endif
                 </p>
             </div>
 
@@ -59,11 +67,16 @@
 
             <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p class="text-sm font-medium text-slate-500">
-                    Tanggal Arsip
+                    {{ $jenisArsip === 'batch' ? 'Mulai Berlaku' : 'Tanggal Arsip Legacy' }}
                 </p>
 
                 <p class="mt-2 text-lg font-bold text-slate-900">
                     {{ \Carbon\Carbon::parse($tanggal)->format('d-m-Y') }}
+                    @if ($jenisArsip === 'batch')
+                        <span class="mt-1 block text-sm font-medium text-slate-600">
+                            Sampai {{ \Carbon\Carbon::parse($tanggalAkhir)->format('d-m-Y') }}
+                        </span>
+                    @endif
                 </p>
             </div>
 
@@ -91,7 +104,7 @@
                 </p>
 
                 <p class="mt-1 text-xs text-slate-500">
-                    Data ditampilkan berdasarkan tanggal jadwal.
+                    {{ $jenisArsip === 'batch' ? 'Rentang dibaca dari tanggal efektif batch dan cakupan JPL.' : 'Data legacy dikelompokkan menurut tanggal berlaku lama.' }}
                 </p>
             </div>
 
@@ -117,7 +130,7 @@
 
             <div class="border-b border-slate-200 p-5 sm:p-6">
                 <h2 class="text-lg font-bold text-slate-900">
-                    Daftar Jadwal pada Tanggal Ini
+                    {{ $jenisArsip === 'batch' ? 'Jadwal dalam Periode Batch' : 'Jadwal Legacy pada Tanggal Ini' }}
                 </h2>
 
                 <p class="mt-1 text-sm text-slate-500">
@@ -251,11 +264,11 @@
                                         </div>
 
                                         <h3 class="text-sm font-bold text-slate-800">
-                                            Tidak ada jadwal pada tanggal ini
+                                            Tidak ada jadwal pada periode arsip ini
                                         </h3>
 
                                         <p class="mt-1 text-sm text-slate-500">
-                                            Tidak ditemukan jadwal yang memiliki tanggal berlaku tersebut.
+                                            Tidak ditemukan jadwal untuk rentang atau tanggal arsip tersebut.
                                         </p>
                                     </div>
                                 </td>

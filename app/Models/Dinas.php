@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\RealisasiKa;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -19,15 +17,25 @@ class Dinas extends Model
         'tanggal_dinas',
         'jam_mulai',
         'jam_selesai',
+        'jadwal_ka_batch_id',
+        'jadwal_ka_snapshot',
         'status',
         'is_pengganti',
         'user_digantikan_id',
     ];
 
+    /**
+     * Snapshot: format_version, snapshot_at, source ('batch' or
+     * 'legacy'), jadwal_ka_batch_id, and a jadwal list containing
+     * jadwal_ka_id, kereta_api_id, nomor_ka, nama_ka, jam_lewat, dari, ke,
+     * and jpl_id. Null means not captured; an empty jadwal list means a
+     * captured snapshot with no matching schedules.
+     */
     protected $casts = [
         'tanggal_dinas' => 'date',
         'jam_mulai' => 'datetime',
         'jam_selesai' => 'datetime',
+        'jadwal_ka_snapshot' => 'array',
         'is_pengganti' => 'boolean',
     ];
 
@@ -53,6 +61,14 @@ class Dinas extends Model
     public function shift(): BelongsTo
     {
         return $this->belongsTo(Shift::class, 'shift_id');
+    }
+
+    /**
+     * Versi jadwal KA yang menjadi sumber Dinas ini, jika menggunakan batch.
+     */
+    public function jadwalKaBatch(): BelongsTo
+    {
+        return $this->belongsTo(JadwalKaBatch::class, 'jadwal_ka_batch_id');
     }
 
     /**

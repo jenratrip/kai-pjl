@@ -4,19 +4,20 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\JadwalKaTemplateExport;
 use App\Http\Controllers\Controller;
-use App\Imports\JadwalKaWorkbookImport;
 use App\Models\JadwalKa;
-use App\Models\KeretaApi;
+use App\Models\JadwalKaBatch;
 use App\Models\Jpl;
+use App\Models\KeretaApi;
+use App\Models\RealisasiKa;
+use App\Services\JadwalKaVersionService;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
+use LogicException;
 use Maatwebsite\Excel\Facades\Excel;
-use PhpOffice\PhpSpreadsheet\IOFactory;
-use Throwable;
 
 class JadwalKaController extends Controller
 {
@@ -36,27 +37,42 @@ class JadwalKaController extends Controller
         $namaHari = $this->namaHariIndonesia($sekarang);
 
         $counts = JadwalKa::query()
-            ->where('is_active', true)
             ->where('jam_lewat', '>=', $jamSekarang)
             ->where(function ($query) use (
                 $tanggalHariIni,
                 $namaHari
             ) {
-                // Jadwal khusus tanggal hari ini.
-                $query->whereDate(
-                    'tanggal_berlaku',
-                    $tanggalHariIni
-                )
-
-                // Jadwal berulang sesuai hari ini.
-                ->orWhere(function ($rutin) use ($namaHari) {
-                    $rutin
-                        ->whereNull('tanggal_berlaku')
-                        ->whereNotNull('hari_berlaku')
-                        ->whereRaw(
-                            'LOWER(hari_berlaku) LIKE ?',
-                            ['%' . mb_strtolower($namaHari) . '%']
-                        );
+                $query->where(function ($batch) use ($tanggalHariIni) {
+                    $batch->whereNotNull('jadwal_ka_batch_id')
+                        ->whereHas('batch', function ($version) use ($tanggalHariIni) {
+                            $version->whereIn('status', ['scheduled', 'active', 'archived'])
+                                ->whereDate('tanggal_mulai_berlaku', '<=', $tanggalHariIni)
+                                ->whereHas('jpls', function ($scope) use ($tanggalHariIni) {
+                                    $scope->whereColumn('jpl.id', 'jadwal_ka.jpl_id')
+                                        ->where(function ($end) use ($tanggalHariIni) {
+                                            $end->whereNull('jadwal_ka_batch_jpl.tanggal_akhir_berlaku')
+                                                ->orWhereDate(
+                                                    'jadwal_ka_batch_jpl.tanggal_akhir_berlaku',
+                                                    '>=',
+                                                    $tanggalHariIni
+                                                );
+                                        });
+                                });
+                        });
+                })->orWhere(function ($legacy) use ($tanggalHariIni, $namaHari) {
+                    $legacy->whereNull('jadwal_ka_batch_id')
+                        ->where('is_active', true)
+                        ->where(function ($applicability) use ($tanggalHariIni, $namaHari) {
+                            $applicability->whereDate('tanggal_berlaku', $tanggalHariIni)
+                                ->orWhere(function ($rutin) use ($namaHari) {
+                                    $rutin->whereNull('tanggal_berlaku')
+                                        ->whereNotNull('hari_berlaku')
+                                        ->whereRaw(
+                                            'LOWER(hari_berlaku) LIKE ?',
+                                            ['%'.mb_strtolower($namaHari).'%']
+                                        );
+                                });
+                        });
                 });
             })
             ->selectRaw('jpl_id, COUNT(*) as aggregate')
@@ -84,9 +100,17 @@ class JadwalKaController extends Controller
             return $jpl;
         });
 
+        $batches = JadwalKaBatch::query()
+            ->with('jpls:id,kode_jpl,nama_jpl')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate(10, ['*'], 'batch_page')
+            ->withQueryString();
+
         return view('admin.jadwal-ka.index', compact(
             'jpls',
-            'tanggalHariIni'
+            'tanggalHariIni',
+            'batches'
         ));
     }
 
@@ -131,16 +155,37 @@ class JadwalKaController extends Controller
 
             // Hanya jadwal yang berlaku hari ini.
             ->where(function ($query) use ($tanggalHariIni, $namaHari) {
-                $query->whereDate('tanggal_berlaku', $tanggalHariIni)
-                    ->orWhere(function ($rutin) use ($namaHari) {
-                        $rutin
-                            ->whereNull('tanggal_berlaku')
-                            ->whereNotNull('hari_berlaku')
-                            ->whereRaw(
-                                'LOWER(hari_berlaku) LIKE ?',
-                                ['%' . mb_strtolower($namaHari) . '%']
-                            );
-                    });
+                $query->where(function ($batch) use ($tanggalHariIni) {
+                    $batch->whereNotNull('jadwal_ka_batch_id')
+                        ->whereHas('batch', function ($version) use ($tanggalHariIni) {
+                            $version->whereIn('status', ['scheduled', 'active', 'archived'])
+                                ->whereDate('tanggal_mulai_berlaku', '<=', $tanggalHariIni)
+                                ->whereHas('jpls', function ($scope) use ($tanggalHariIni) {
+                                    $scope->whereColumn('jpl.id', 'jadwal_ka.jpl_id')
+                                        ->where(function ($end) use ($tanggalHariIni) {
+                                            $end->whereNull('jadwal_ka_batch_jpl.tanggal_akhir_berlaku')
+                                                ->orWhereDate(
+                                                    'jadwal_ka_batch_jpl.tanggal_akhir_berlaku',
+                                                    '>=',
+                                                    $tanggalHariIni
+                                                );
+                                        });
+                                });
+                        });
+                })->orWhere(function ($legacy) use ($tanggalHariIni, $namaHari) {
+                    $legacy->whereNull('jadwal_ka_batch_id')
+                        ->where(function ($applicability) use ($tanggalHariIni, $namaHari) {
+                            $applicability->whereDate('tanggal_berlaku', $tanggalHariIni)
+                                ->orWhere(function ($rutin) use ($namaHari) {
+                                    $rutin->whereNull('tanggal_berlaku')
+                                        ->whereNotNull('hari_berlaku')
+                                        ->whereRaw(
+                                            'LOWER(hari_berlaku) LIKE ?',
+                                            ['%'.mb_strtolower($namaHari).'%']
+                                        );
+                                });
+                        });
+                });
             })
             ->orderBy('jam_lewat')
             ->paginate(25)
@@ -152,12 +197,26 @@ class JadwalKaController extends Controller
             'tanggalHariIni'
         ));
     }
-    
+
     /**
      * Menampilkan form edit jadwal KA.
      */
-    public function edit(JadwalKa $jadwal_ka): View
+    public function edit(JadwalKa $jadwal_ka): View|RedirectResponse
     {
+        $statusBatch = $jadwal_ka->batch?->status;
+
+        if (in_array($statusBatch, ['active', 'scheduled', 'archived'], true)) {
+            $pesan = match ($statusBatch) {
+                'active' => 'Jadwal dalam batch aktif tidak dapat diedit langsung. Koreksi harus dilakukan melalui impor batch baru.',
+                'scheduled' => 'Jadwal sudah masuk versi terjadwal dan tidak dapat diedit.',
+                'archived' => 'Jadwal dari batch yang sudah diarsipkan hanya dapat dibaca dan tidak dapat diubah.',
+            };
+
+            return redirect()
+                ->route('admin.jadwal-ka.index')
+                ->with('error', $pesan);
+        }
+
         $jadwalKa = $jadwal_ka;
 
         $keretaApi = KeretaApi::orderBy('nomor_ka')->get();
@@ -219,11 +278,104 @@ class JadwalKaController extends Controller
         $validated['tanggal_berlaku'] =
             $validated['tanggal_berlaku'] ?? null;
 
-        $jadwal_ka->update($validated);
+        $jadwalId = (int) $jadwal_ka->getKey();
+        $initialJadwal = JadwalKa::query()
+            ->with('batch:id,status')
+            ->select(['id', 'jpl_id', 'jadwal_ka_batch_id'])
+            ->findOrFail($jadwalId);
+        $initialBatchStatus = $initialJadwal->batch?->status;
+
+        $hasil = DB::transaction(function () use ($initialJadwal, $initialBatchStatus, $jadwalId, $validated) {
+            Jpl::query()
+                ->whereKey($initialJadwal->jpl_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $batch = $initialJadwal->jadwal_ka_batch_id === null
+                ? null
+                : JadwalKaBatch::query()
+                    ->whereKey($initialJadwal->jadwal_ka_batch_id)
+                    ->lockForUpdate()
+                    ->first();
+
+            $jadwalTerkunci = JadwalKa::query()
+                ->whereKey($jadwalId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $batchIdTerkunci = $jadwalTerkunci->jadwal_ka_batch_id === null
+                ? null
+                : (int) $jadwalTerkunci->jadwal_ka_batch_id;
+            $batchIdAwal = $initialJadwal->jadwal_ka_batch_id === null
+                ? null
+                : (int) $initialJadwal->jadwal_ka_batch_id;
+
+            if (
+                (int) $jadwalTerkunci->jpl_id !== (int) $initialJadwal->jpl_id
+                || $batchIdTerkunci !== $batchIdAwal
+            ) {
+                return redirect()
+                    ->back()
+                    ->with('error', 'Konteks jadwal berubah selama proses. Muat ulang halaman sebelum mencoba kembali.');
+            }
+
+            $statusBatch = $batch?->status;
+            $statusBatchTerlarang = in_array($statusBatch, ['active', 'scheduled', 'archived'], true)
+                ? $statusBatch
+                : $initialBatchStatus;
+
+            if (
+                in_array($initialBatchStatus, ['active', 'scheduled', 'archived'], true)
+                || in_array($statusBatch, ['active', 'scheduled', 'archived'], true)
+            ) {
+                $pesan = match ($statusBatchTerlarang) {
+                    'active' => 'Jadwal dalam batch aktif tidak dapat diedit langsung. Koreksi harus dilakukan melalui impor batch baru.',
+                    'scheduled' => 'Jadwal sudah masuk versi terjadwal dan tidak dapat diedit.',
+                    'archived' => 'Jadwal dari batch yang sudah diarsipkan hanya dapat dibaca dan tidak dapat diubah.',
+                    default => 'Jadwal batch tidak dapat diedit.',
+                };
+
+                return redirect()
+                    ->back()
+                    ->with('error', $pesan);
+            }
+
+            if (
+                $batch !== null
+                && (int) $validated['jpl_id'] !== (int) $jadwalTerkunci->jpl_id
+            ) {
+                return redirect()
+                    ->back()
+                    ->withErrors([
+                        'jpl_id' => 'JPL jadwal dalam batch draft tidak dapat dipindahkan karena cakupan JPL batch sudah ditetapkan saat impor.',
+                    ])
+                    ->withInput();
+            }
+
+            if (
+                in_array($statusBatch, ['draft', 'scheduled'], true)
+                && $validated['is_active']
+            ) {
+                return redirect()
+                    ->back()
+                    ->withErrors([
+                        'is_active' => 'Jadwal dalam batch draft atau terjadwal tidak dapat diaktifkan sebelum tanggal efektif batch.',
+                    ])
+                    ->withInput();
+            }
+
+            $jadwalTerkunci->update($validated);
+
+            return $jadwalTerkunci;
+        }, 3);
+
+        if ($hasil instanceof RedirectResponse) {
+            return $hasil;
+        }
 
         return redirect()
             ->route('admin.jadwal-ka.show', [
-                'jpl' => $jadwal_ka->jpl_id,
+                'jpl' => $hasil->jpl_id,
             ])
             ->with('success', 'Jadwal KA berhasil diperbarui.');
     }
@@ -237,57 +389,72 @@ class JadwalKaController extends Controller
     public function arsip(Request $request): View
     {
         $tanggalHariIni = Carbon::today()->toDateString();
+        $tanggalFilter = null;
+        $tanggalFilterValid = true;
 
-        $arsip = DB::table('jadwal_ka')
+        if ($request->filled('tanggal')) {
+            try {
+                $tanggalParsed = Carbon::createFromFormat('!Y-m-d', $request->input('tanggal'));
+                $tanggalFilterValid = $tanggalParsed !== false
+                    && $tanggalParsed->format('Y-m-d') === $request->input('tanggal');
+                $tanggalFilter = $tanggalFilterValid ? $tanggalParsed->toDateString() : null;
+            } catch (\Throwable) {
+                $tanggalFilterValid = false;
+            }
+        }
+
+        $legacyArsip = DB::table('jadwal_ka as jadwal')
+            ->join('jpl', 'jpl.id', '=', 'jadwal.jpl_id')
             ->selectRaw(
-                'DATE(tanggal_berlaku) as tanggal,
-                 COUNT(*) as total_jadwal,
-                 COUNT(DISTINCT jpl_id) as total_jpl'
+                "'legacy' as source, NULL as batch_id, DATE(jadwal.tanggal_berlaku) as tanggal, NULL as tanggal_akhir,
+                 COUNT(*) as total_jadwal, COUNT(DISTINCT jadwal.jpl_id) as total_jpl"
             )
-            ->whereNotNull('tanggal_berlaku')
-            ->whereDate('tanggal_berlaku', '<', $tanggalHariIni)
-
-            // Filter berdasarkan tanggal.
-            ->when($request->filled('tanggal'), function ($query) use ($request) {
-                try {
-                    $tanggal = Carbon::createFromFormat(
-                        '!Y-m-d',
-                        $request->input('tanggal')
-                    );
-
-                    if (
-                        !$tanggal ||
-                        $tanggal->format('Y-m-d') !== $request->input('tanggal')
-                    ) {
-                        return $query->whereRaw('1 = 0');
-                    }
-
-                    return $query->whereDate(
-                        'tanggal_berlaku',
-                        $tanggal->toDateString()
-                    );
-                } catch (\Throwable $e) {
-                    return $query->whereRaw('1 = 0');
-                }
-            })
-
-            // Filter berdasarkan kode atau nama JPL.
+            ->whereNull('jadwal.jadwal_ka_batch_id')
+            ->whereNotNull('jadwal.tanggal_berlaku')
+            ->whereDate('jadwal.tanggal_berlaku', '<', $tanggalHariIni)
+            ->when(! $tanggalFilterValid, fn ($query) => $query->whereRaw('1 = 0'))
+            ->when($tanggalFilter !== null, fn ($query) => $query->whereDate('jadwal.tanggal_berlaku', $tanggalFilter))
             ->when($request->filled('q'), function ($query) use ($request) {
                 $keyword = trim($request->input('q'));
-
-                $query->whereExists(function ($subquery) use ($keyword) {
-                    $subquery->selectRaw('1')
-                        ->from('jpl')
-                        ->whereColumn('jpl.id', 'jadwal_ka.jpl_id')
-                        ->where(function ($search) use ($keyword) {
-                            $search
-                                ->where('jpl.kode_jpl', 'like', "%{$keyword}%")
-                                ->orWhere('jpl.nama_jpl', 'like', "%{$keyword}%");
-                        });
+                $query->where(function ($search) use ($keyword) {
+                    $search->where('jpl.kode_jpl', 'like', "%{$keyword}%")
+                        ->orWhere('jpl.nama_jpl', 'like', "%{$keyword}%");
                 });
             })
-            ->groupByRaw('DATE(tanggal_berlaku)')
+            ->groupByRaw('DATE(jadwal.tanggal_berlaku)');
+
+        $batchArsip = DB::table('jadwal_ka_batch_jpl as cakupan')
+            ->join('jadwal_ka_batches as batch', 'batch.id', '=', 'cakupan.jadwal_ka_batch_id')
+            ->join('jadwal_ka as jadwal', function ($join) {
+                $join->on('jadwal.jadwal_ka_batch_id', '=', 'batch.id')
+                    ->on('jadwal.jpl_id', '=', 'cakupan.jpl_id');
+            })
+            ->join('jpl', 'jpl.id', '=', 'cakupan.jpl_id')
+            ->selectRaw(
+                "'batch' as source, batch.id as batch_id, batch.tanggal_mulai_berlaku as tanggal,
+                 cakupan.tanggal_akhir_berlaku as tanggal_akhir,
+                 COUNT(jadwal.id) as total_jadwal, COUNT(DISTINCT cakupan.jpl_id) as total_jpl"
+            )
+            ->whereIn('batch.status', ['scheduled', 'active', 'archived'])
+            ->whereNotNull('cakupan.tanggal_akhir_berlaku')
+            ->whereColumn('batch.tanggal_mulai_berlaku', '<=', 'cakupan.tanggal_akhir_berlaku')
+            ->whereDate('cakupan.tanggal_akhir_berlaku', '<', $tanggalHariIni)
+            ->when(! $tanggalFilterValid, fn ($query) => $query->whereRaw('1 = 0'))
+            ->when($tanggalFilter !== null, fn ($query) => $query->whereDate('batch.tanggal_mulai_berlaku', $tanggalFilter))
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $keyword = trim($request->input('q'));
+                $query->where(function ($search) use ($keyword) {
+                    $search->where('jpl.kode_jpl', 'like', "%{$keyword}%")
+                        ->orWhere('jpl.nama_jpl', 'like', "%{$keyword}%");
+                });
+            })
+            ->groupBy('batch.id', 'batch.tanggal_mulai_berlaku', 'cakupan.tanggal_akhir_berlaku');
+
+        $arsip = $legacyArsip
+            ->unionAll($batchArsip)
+            ->orderByDesc('tanggal_akhir')
             ->orderByDesc('tanggal')
+            ->orderByDesc('batch_id')
             ->paginate(20)
             ->withQueryString();
 
@@ -309,7 +476,7 @@ class JadwalKaController extends Controller
         $tanggalInput = $tanggal ?? $request->query('tanggal');
 
         abort_if(
-            !is_string($tanggalInput) || $tanggalInput === '',
+            ! is_string($tanggalInput) || $tanggalInput === '',
             404,
             'Tanggal arsip tidak ditemukan.'
         );
@@ -324,7 +491,7 @@ class JadwalKaController extends Controller
         }
 
         abort_if(
-            !$parsedTanggal ||
+            ! $parsedTanggal ||
             $parsedTanggal->format('Y-m-d') !== $tanggalInput,
             404,
             'Tanggal arsip tidak valid.'
@@ -338,18 +505,79 @@ class JadwalKaController extends Controller
             return redirect()->route('admin.jadwal-ka.index');
         }
 
-        $jadwal = JadwalKa::query()
-            ->with(['keretaApi', 'jpl'])
-            ->whereDate('tanggal_berlaku', $tanggal)
-            ->orderBy('jpl_id')
-            ->orderBy('jam_lewat')
-            ->paginate(50)
-            ->withQueryString();
+        $batchId = $request->query('batch_id');
+        $tanggalAkhir = null;
+
+        if ($batchId !== null) {
+            abort_if(
+                ! is_scalar($batchId)
+                    || filter_var($batchId, FILTER_VALIDATE_INT) === false
+                    || (int) $batchId < 1,
+                404,
+                'Batch arsip tidak valid.'
+            );
+
+            $batch = JadwalKaBatch::query()->findOrFail((int) $batchId);
+            abort_if(
+                $batch->status === 'draft'
+                    || $batch->tanggal_mulai_berlaku?->toDateString() !== $tanggal,
+                404,
+                'Periode batch arsip tidak ditemukan.'
+            );
+
+            $tanggalAkhirInput = $request->query('tanggal_akhir');
+            try {
+                $tanggalAkhirParsed = is_string($tanggalAkhirInput)
+                    ? Carbon::createFromFormat('!Y-m-d', $tanggalAkhirInput)
+                    : false;
+            } catch (\Throwable) {
+                $tanggalAkhirParsed = false;
+            }
+
+            abort_if(
+                ! $tanggalAkhirParsed
+                    || $tanggalAkhirParsed->format('Y-m-d') !== $tanggalAkhirInput
+                    || $tanggalAkhirParsed->toDateString() >= $tanggalHariIni
+                    || $tanggalAkhirParsed->lt($batch->tanggal_mulai_berlaku),
+                404,
+                'Tanggal akhir periode arsip tidak valid.'
+            );
+
+            $tanggalAkhir = $tanggalAkhirParsed->toDateString();
+            $jplIds = DB::table('jadwal_ka_batch_jpl')
+                ->where('jadwal_ka_batch_id', $batch->id)
+                ->whereDate('tanggal_akhir_berlaku', $tanggalAkhir)
+                ->pluck('jpl_id');
+
+            abort_if($jplIds->isEmpty(), 404, 'Cakupan JPL pada periode arsip tidak ditemukan.');
+
+            $jadwal = JadwalKa::query()
+                ->with(['keretaApi', 'jpl'])
+                ->where('jadwal_ka_batch_id', $batch->id)
+                ->whereIn('jpl_id', $jplIds)
+                ->orderBy('jpl_id')
+                ->orderBy('jam_lewat')
+                ->paginate(50)
+                ->withQueryString();
+            $jenisArsip = 'batch';
+        } else {
+            $jadwal = JadwalKa::query()
+                ->with(['keretaApi', 'jpl'])
+                ->whereNull('jadwal_ka_batch_id')
+                ->whereDate('tanggal_berlaku', $tanggal)
+                ->orderBy('jpl_id')
+                ->orderBy('jam_lewat')
+                ->paginate(50)
+                ->withQueryString();
+            $jenisArsip = 'legacy';
+        }
 
         return view('admin.jadwal-ka.showarsip', compact(
             'jadwal',
             'tanggal',
-            'tanggalHariIni'
+            'tanggalHariIni',
+            'tanggalAkhir',
+            'jenisArsip'
         ));
     }
 
@@ -359,167 +587,21 @@ class JadwalKaController extends Controller
     public function downloadTemplate()
     {
         return Excel::download(
-            new JadwalKaTemplateExport(),
+            new JadwalKaTemplateExport,
             'template-jadwal-ka.xlsx'
         );
     }
 
     /**
-     * Menerima upload Excel dan menyimpan jadwal KA ke database.
-     *
-     * Menggunakan alur yang sama dengan JadwalKaImportController
-     * namun melalui endpoint resource controller (POST /admin/jadwal-ka/import).
+     * Menolak endpoint import lama agar semua impor melewati preview-konfirmasi.
      */
-    public function importExcel(Request $request)
+    public function importExcel(): RedirectResponse
     {
-        $validated = $request->validate([
-            'tanggal_berlaku' => [
-                'required',
-                'date_format:Y-m-d',
-            ],
-            'file' => [
-                'required',
-                'file',
-                'mimes:xlsx,xls',
-                'max:20480',
-            ],
-        ], [
-            'tanggal_berlaku.required' => 'Tanggal jadwal KA wajib dipilih.',
-            'tanggal_berlaku.date_format' => 'Format tanggal jadwal tidak valid.',
-            'file.required' => 'File Excel wajib dipilih.',
-            'file.mimes' => 'File harus berformat XLS atau XLSX.',
-            'file.max' => 'Ukuran file maksimal 20 MB.',
-        ]);
-
-        $tanggalBerlaku = $validated['tanggal_berlaku'];
-
-        $path = $request->file('file')->store('imports/jadwal-ka', 'local');
-
-        try {
-            $reader = IOFactory::createReaderForFile(
-                Storage::disk('local')->path($path)
-            );
-            $reader->setReadDataOnly(true);
-            $spreadsheet = $reader->load(Storage::disk('local')->path($path));
-
-            $parser = new JadwalKaWorkbookImport();
-            $batch = (string) Str::uuid();
-            $inserted = 0;
-            $skipped = 0;
-
-            DB::transaction(function () use (
-                $spreadsheet,
-                $parser,
-                $tanggalBerlaku,
-                $batch,
-                &$inserted,
-                &$skipped
-            ) {
-                $keretaCache = [];
-                $seenKeys    = [];
-
-                foreach ($spreadsheet->getWorksheetIterator() as $worksheet) {
-                    $result = $parser->parseSheet($worksheet);
-
-                    if (! $result['header_found']) {
-                        continue;
-                    }
-
-                    if (! empty($result['errors'])) {
-                        throw new \RuntimeException(
-                            'Terdapat baris tidak valid pada sheet ' . $result['sheet'] . '.'
-                        );
-                    }
-
-                    $jpl = Jpl::query()
-                        ->where('kode_jpl', trim($result['sheet']))
-                        ->where('is_active', true)
-                        ->first();
-
-                    if (! $jpl) {
-                        throw new \RuntimeException(
-                            'JPL untuk sheet ' . $result['sheet'] . ' tidak ditemukan atau tidak aktif.'
-                        );
-                    }
-
-                    foreach ($result['rows'] as $row) {
-                        if (! ($row['valid'] ?? false)) {
-                            throw new \RuntimeException(
-                                'Baris tidak valid pada sheet ' . $result['sheet'] . '.'
-                            );
-                        }
-
-                        $nomorKa = trim((string) $row['nomor_ka']);
-                        $jam     = $row['jam_lewat'];
-                        $key     = mb_strtolower($nomorKa) . '|' . $jpl->id . '|' . $jam . '|' . $tanggalBerlaku;
-
-                        if (isset($seenKeys[$key])) {
-                            $skipped++;
-                            continue;
-                        }
-
-                        $seenKeys[$key] = true;
-
-                        if (! array_key_exists($nomorKa, $keretaCache)) {
-                            $kereta = KeretaApi::firstOrCreate(
-                                ['nomor_ka' => $nomorKa],
-                                ['nama_ka' => $row['nama_ka'] ?? null]
-                            );
-                            $keretaCache[$nomorKa] = $kereta;
-                        }
-
-                        $kereta  = $keretaCache[$nomorKa];
-                        $exists = JadwalKa::query()
-                            ->where('kereta_api_id', $kereta->id)
-                            ->where('jpl_id', $jpl->id)
-                            ->where('jam_lewat', $jam)
-                            ->whereDate('tanggal_berlaku', $tanggalBerlaku)
-                            ->exists();
-
-                        if ($exists) {
-                            $skipped++;
-                            continue;
-                        }
-
-                        JadwalKa::create([
-                            'kereta_api_id'  => $kereta->id,
-                            'jpl_id'         => $jpl->id,
-                            'jam_lewat'      => $jam,
-                            'hari_berlaku'   => null,
-                            'tanggal_berlaku'=> $tanggalBerlaku,
-                            'dari'           => isset($row['dari']) && trim((string) $row['dari']) !== '' ? trim((string) $row['dari']) : null,
-                            'ke'             => isset($row['ke'])   && trim((string) $row['ke'])   !== '' ? trim((string) $row['ke'])   : null,
-                            'keterangan'     => $row['keterangan'] ?? null,
-                            'is_active'      => true,
-                            'batch_import'   => $batch,
-                        ]);
-
-                        $inserted++;
-                    }
-                }
-
-                $spreadsheet->disconnectWorksheets();
-            });
-
-            Storage::disk('local')->delete($path);
-
-            return redirect()
-                ->route('admin.jadwal-ka.index')
-                ->with('success', "Import selesai: {$inserted} jadwal ditambahkan, {$skipped} dilewati. Tanggal: " . Carbon::parse($tanggalBerlaku)->format('d-m-Y'));
-        } catch (Throwable $e) {
-            Storage::disk('local')->delete($path);
-            report($e);
-
-            $message = 'Import gagal. Periksa format file dan coba lagi.';
-            if (config('app.debug')) {
-                $message .= ' Detail: ' . class_basename($e) . ' — ' . $e->getMessage();
-            }
-
-            return redirect()
-                ->route('admin.jadwal-ka.import.form')
-                ->withErrors(['file' => $message])
-                ->withInput();
-        }
+        return redirect()
+            ->route('admin.jadwal-ka.import.form')
+            ->withErrors([
+                'file' => 'Endpoint impor langsung sudah dinonaktifkan. Gunakan alur preview dan konfirmasi agar jadwal tersimpan sebagai draft.',
+            ]);
     }
 
     /**
@@ -530,29 +612,131 @@ class JadwalKaController extends Controller
      */
     public function toggleStatus(JadwalKa $jadwal_ka)
     {
-        // Cegah nonaktifkan jadwal yang sedang dipakai dinas berlangsung.
-        if ($jadwal_ka->is_active) {
-            $adaDinasBerlangsung = \App\Models\RealisasiKa::query()
-                ->where('jadwal_ka_id', $jadwal_ka->id)
-                ->whereHas('dinas', fn ($q) => $q->where('status', 'berlangsung'))
-                ->exists();
+        $jadwalId = (int) $jadwal_ka->getKey();
+        $initialJadwal = JadwalKa::query()
+            ->with('batch:id,status')
+            ->select(['id', 'jpl_id', 'jadwal_ka_batch_id'])
+            ->findOrFail($jadwalId);
+        $initialBatchStatus = $initialJadwal->batch?->status;
 
-            if ($adaDinasBerlangsung) {
+        return DB::transaction(function () use ($initialJadwal, $initialBatchStatus, $jadwalId) {
+            Jpl::query()
+                ->whereKey($initialJadwal->jpl_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $batch = $initialJadwal->jadwal_ka_batch_id === null
+                ? null
+                : JadwalKaBatch::query()
+                    ->whereKey($initialJadwal->jadwal_ka_batch_id)
+                    ->lockForUpdate()
+                    ->first();
+
+            $jadwalTerkunci = JadwalKa::query()
+                ->whereKey($jadwalId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $batchIdTerkunci = $jadwalTerkunci->jadwal_ka_batch_id === null
+                ? null
+                : (int) $jadwalTerkunci->jadwal_ka_batch_id;
+            $batchIdAwal = $initialJadwal->jadwal_ka_batch_id === null
+                ? null
+                : (int) $initialJadwal->jadwal_ka_batch_id;
+
+            if (
+                (int) $jadwalTerkunci->jpl_id !== (int) $initialJadwal->jpl_id
+                || $batchIdTerkunci !== $batchIdAwal
+            ) {
                 return redirect()
                     ->back()
-                    ->with('error', "Jadwal KA #{$jadwal_ka->id} tidak dapat dinonaktifkan karena sedang digunakan dalam dinas yang berlangsung.");
+                    ->with('error', 'Konteks jadwal berubah selama proses. Muat ulang halaman sebelum mencoba kembali.');
             }
-        }
 
-        $jadwal_ka->update([
-            'is_active' => ! $jadwal_ka->is_active,
+            if (
+                in_array($initialBatchStatus, ['active', 'scheduled', 'archived'], true)
+                || in_array($batch?->status, ['active', 'scheduled', 'archived'], true)
+            ) {
+                $statusBatchTerlarang = in_array($batch?->status, ['active', 'scheduled', 'archived'], true)
+                    ? $batch->status
+                    : $initialBatchStatus;
+                $pesan = match ($statusBatchTerlarang) {
+                    'archived' => 'Jadwal dari batch yang sudah diarsipkan hanya dapat dibaca dan tidak dapat diubah.',
+                    default => 'Jadwal dalam batch aktif atau terjadwal tidak dapat diubah langsung. Koreksi harus dilakukan melalui impor batch baru.',
+                };
+
+                return redirect()
+                    ->back()
+                    ->with('error', $pesan);
+            }
+
+            if (! $jadwalTerkunci->is_active && $batch?->status === 'draft') {
+                return redirect()
+                    ->back()
+                    ->with('error', 'Jadwal dalam batch draft tidak dapat diaktifkan sebelum tanggal efektif batch.');
+            }
+
+            // Cegah nonaktifkan jadwal yang sedang dipakai dinas berlangsung.
+            if ($jadwalTerkunci->is_active) {
+                $adaDinasBerlangsung = RealisasiKa::query()
+                    ->where('jadwal_ka_id', $jadwalTerkunci->id)
+                    ->whereHas('dinas', fn ($q) => $q->where('status', 'berlangsung'))
+                    ->exists();
+
+                if ($adaDinasBerlangsung) {
+                    return redirect()
+                        ->back()
+                        ->with('error', "Jadwal KA #{$jadwalTerkunci->id} tidak dapat dinonaktifkan karena sedang digunakan dalam dinas yang berlangsung.");
+                }
+            }
+
+            $jadwalTerkunci->update([
+                'is_active' => ! $jadwalTerkunci->is_active,
+            ]);
+
+            $status = $jadwalTerkunci->is_active ? 'diaktifkan' : 'dinonaktifkan';
+
+            return redirect()
+                ->back()
+                ->with('success', "Jadwal KA #{$jadwalTerkunci->id} berhasil {$status}.");
+        }, 3);
+    }
+
+    /**
+     * Schedule a draft batch or activate it when its effective date is today.
+     */
+    public function scheduleBatch(
+        Request $request,
+        JadwalKaBatch $batch,
+        JadwalKaVersionService $versionService
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'tanggal_mulai_berlaku' => [
+                'required',
+                'date_format:Y-m-d',
+                'after_or_equal:today',
+            ],
         ]);
 
-        $status = $jadwal_ka->is_active ? 'diaktifkan' : 'dinonaktifkan';
+        try {
+            $scheduledBatch = $versionService->scheduleDraftBatch(
+                (int) $batch->getKey(),
+                CarbonImmutable::createFromFormat('!Y-m-d', $validated['tanggal_mulai_berlaku'])
+            );
+        } catch (LogicException $exception) {
+            return redirect()
+                ->back()
+                ->withErrors(['tanggal_mulai_berlaku' => $exception->getMessage()])
+                ->withInput();
+        }
+
+        $message = $scheduledBatch->status === 'active'
+            ? 'Batch jadwal KA berhasil diaktifkan.'
+            : 'Batch jadwal KA berhasil dijadwalkan.';
 
         return redirect()
-            ->back()
-            ->with('success', "Jadwal KA #{$jadwal_ka->id} berhasil {$status}.");
+            ->route('admin.jadwal-ka.index')
+            ->with('success', $message);
     }
 
     /**

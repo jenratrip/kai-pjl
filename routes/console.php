@@ -2,13 +2,12 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
-
 
 /*
 |--------------------------------------------------------------------------
@@ -50,7 +49,10 @@ Artisan::command('dinas:sinkronkan-status', function () {
     $this->info("Jadwal menjadi selesai: {$selesai}");
 })->purpose('Sinkronisasi otomatis status jadwal dinas');
 
-
 Schedule::command('dinas:sinkronkan-status')
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command('jadwal-ka:activate-due-batches')
     ->everyMinute()
     ->withoutOverlapping();

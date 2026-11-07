@@ -49,4 +49,19 @@
         placeholder="Tidak ada KA yang belum lewat"
         class="w-full rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
     >{{ $kaBelumLewatTeks !== '' ? $kaBelumLewatTeks : 'Tidak ada' }}</textarea>
+
+    <div class="mt-3 space-y-2">
+        @foreach ($ringkasanKA['belum'] ?? [] as $ka)
+            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p class="font-semibold text-slate-800">
+                    {{ $ka['nomor'] ?? '-' }}
+                    @if (! empty($ka['nama']))
+                        <span class="font-normal text-slate-600">— {{ $ka['nama'] }}</span>
+                    @endif
+                </p>
+
+                @include('user.serahterimacatatan.partials.ka-check-indicators', ['ka' => $ka])
+            </article>
+        @endforeach
+    </div>
 </section>
