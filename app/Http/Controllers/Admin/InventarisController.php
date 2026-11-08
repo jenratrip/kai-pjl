@@ -25,6 +25,7 @@ class InventarisController extends Controller
         'perlu_perbaikan',
         'rusak',
         'hilang',
+        'perlu_tinjauan',
     ];
 
     private function filterStatus(Request $request): string
@@ -44,6 +45,10 @@ class InventarisController extends Controller
 
         if ($status === 'nonaktif') {
             return $query->where('is_active', false);
+        }
+
+        if ($status === 'perlu_tinjauan') {
+            return $query->where('status_tinjauan', 'perlu_tinjauan');
         }
 
         if (in_array($status, self::KONDISI, true)) {
@@ -68,19 +73,27 @@ class InventarisController extends Controller
             'rusak' => Inventaris::where('kondisi_terakhir', 'rusak')->count(),
             'hilang' => Inventaris::where('kondisi_terakhir', 'hilang')->count(),
             'belum_diperiksa' => Inventaris::whereNull('kondisi_terakhir')->count(),
+            'perlu_tinjauan' => Inventaris::where('status_tinjauan', 'perlu_tinjauan')->count(),
         ];
 
         $query = Jpl::query()
             ->withCount([
                 'inventaris',
+
                 'inventaris as inventaris_aktif_count' => fn ($q) =>
                     $q->where('is_active', true),
+
                 'inventaris as inventaris_baik_count' => fn ($q) =>
                     $q->where('kondisi_terakhir', 'baik'),
+
                 'inventaris as inventaris_rusak_count' => fn ($q) =>
                     $q->where('kondisi_terakhir', 'rusak'),
+
                 'inventaris as inventaris_perbaikan_count' => fn ($q) =>
                     $q->where('kondisi_terakhir', 'perlu_perbaikan'),
+
+                'inventaris as inventaris_perlu_tinjauan_count' => fn ($q) =>
+                    $q->where('status_tinjauan', 'perlu_tinjauan'),
             ])
             ->withSum('inventaris as total_unit', 'jumlah');
 
@@ -127,6 +140,7 @@ class InventarisController extends Controller
             'perlu_perbaikan' => (clone $base)->where('kondisi_terakhir', 'perlu_perbaikan')->count(),
             'rusak' => (clone $base)->where('kondisi_terakhir', 'rusak')->count(),
             'hilang' => (clone $base)->where('kondisi_terakhir', 'hilang')->count(),
+            'perlu_tinjauan' => (clone $base)->where('status_tinjauan', 'perlu_tinjauan')->count(),
         ];
 
         $query = Inventaris::query()
@@ -157,9 +171,47 @@ class InventarisController extends Controller
 
     public function show(Inventaris $inventaris)
     {
-        $inventaris->load('jpl');
+        $inventaris->load([
+            'jpl',
+            'pelapor',
+            'peninjau',
+        ]);
 
         return view('admin.inventaris.show', compact('inventaris'));
+    }
+
+    /**
+     * Menyelesaikan tinjauan inventaris oleh admin.
+     */
+    public function review(Request $request, Inventaris $inventaris)
+    {
+        if ($inventaris->status_tinjauan !== 'perlu_tinjauan') {
+            return redirect()
+                ->route('admin.inventaris.show', $inventaris->id)
+                ->with('error', 'Inventaris ini tidak sedang menunggu tinjauan.');
+        }
+
+        $validated = $request->validate([
+            'catatan_tinjauan' => [
+                'required',
+                'string',
+                'max:2000',
+            ],
+        ], [
+            'catatan_tinjauan.required' => 'Catatan hasil tinjauan wajib diisi.',
+            'catatan_tinjauan.max' => 'Catatan tinjauan maksimal 2000 karakter.',
+        ]);
+
+        $inventaris->update([
+            'status_tinjauan' => 'normal',
+            'catatan_tinjauan' => $validated['catatan_tinjauan'],
+            'ditinjau_oleh' => $request->user()?->id,
+            'ditinjau_pada' => now(),
+        ]);
+
+        return redirect()
+            ->route('admin.inventaris.show', $inventaris->id)
+            ->with('success', 'Tinjauan inventaris berhasil diselesaikan.');
     }
 
     public function create()

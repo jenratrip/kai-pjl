@@ -3,10 +3,6 @@
 use App\Http\Controllers\Admin\CatatanDinasController as AdminCatatanDinasController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DinasController;
-// ======================================================
-// ADMIN CONTROLLERS
-// ======================================================
-
 use App\Http\Controllers\Admin\InventarisController as AdminInventarisController;
 use App\Http\Controllers\Admin\JadwalKaController;
 use App\Http\Controllers\Admin\JadwalKaImportController;
@@ -21,31 +17,28 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\UserImportController as AdminUserImportController;
 use App\Http\Controllers\Admin\WilayahController;
 use App\Http\Controllers\Admin\WilayahImportController;
+
 use App\Http\Controllers\Auth\LoginController;
+
 use App\Http\Controllers\Superadmin\ActivityLogController;
 use App\Http\Controllers\Superadmin\DashboardController as SuperadminDashboardController;
 use App\Http\Controllers\Superadmin\DinasController as SuperadminDinasController;
-// ======================================================
-// USER / PJL CONTROLLERS
-// ======================================================
-
 use App\Http\Controllers\Superadmin\InventarisController as SuperadminInventarisController;
 use App\Http\Controllers\Superadmin\JadwalKaController as SuperadminJadwalKaController;
 use App\Http\Controllers\Superadmin\JplController as SuperadminJplController;
 use App\Http\Controllers\Superadmin\SettingsController;
 use App\Http\Controllers\Superadmin\SystemMonitoringController;
-// ======================================================
-// SUPERADMIN CONTROLLERS
-// ======================================================
-
 use App\Http\Controllers\Superadmin\UserController as SuperadminUserController;
 use App\Http\Controllers\Superadmin\UserImportController as SuperadminUserImportController;
+
 use App\Http\Controllers\User\CatatanDinasController;
 use App\Http\Controllers\User\InventarisController as UserInventarisController;
 use App\Http\Controllers\User\RealisasiKaController;
 use App\Http\Controllers\User\SerahTerimaDinasController;
+
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+
 
 // ======================================================
 // ROOT / HALAMAN UTAMA
@@ -75,6 +68,7 @@ Route::get('/', function () {
     abort(403, 'Role pengguna tidak dikenali.');
 
 })->name('home');
+
 
 // ======================================================
 // AUTHENTICATION
@@ -111,6 +105,7 @@ Route::post('/logout', [
 ])->middleware('auth')
     ->name('logout');
 
+
 // ======================================================
 // USER / PJL
 // ======================================================
@@ -135,6 +130,7 @@ Route::middleware(['auth', 'role:pjl'])
         ])->middleware('throttle:30,1')
             ->name('realisasi-ka.store');
 
+
         // --------------------------------------------------
         // CATATAN DINAS
         // --------------------------------------------------
@@ -149,6 +145,7 @@ Route::middleware(['auth', 'role:pjl'])
             'store',
         ])->middleware('throttle:20,1')
             ->name('catatan-dinas.store');
+
 
         // --------------------------------------------------
         // SERAH TERIMA DINAS
@@ -215,6 +212,7 @@ Route::middleware(['auth', 'role:pjl'])
         ])->middleware('throttle:10,1')
             ->name('serah-terima-dinas.store');
 
+
         // --------------------------------------------------
         // INVENTARIS PJL
         // --------------------------------------------------
@@ -231,6 +229,7 @@ Route::middleware(['auth', 'role:pjl'])
             ->name('inventaris.update');
 
     });
+
 
 // ======================================================
 // ADMIN + SUPERADMIN
@@ -251,6 +250,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'index',
         ])->name('dashboard');
 
+
         // --------------------------------------------------
         // PENGATURAN REALISASI KA
         // --------------------------------------------------
@@ -265,6 +265,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'update',
         ])->name('realisasi-ka-settings.update');
 
+
         // --------------------------------------------------
         // DAFTAR REALISASI KA
         // --------------------------------------------------
@@ -273,6 +274,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             AdminRealisasiKaController::class,
             'index',
         ])->name('realisasi-ka.index');
+
 
         // --------------------------------------------------
         // MANAJEMEN USER
@@ -318,6 +320,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'toggleStatus',
         ])->name('users.toggle-status');
 
+
         // --------------------------------------------------
         // REVIEW CATATAN DINAS
         // --------------------------------------------------
@@ -336,6 +339,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             AdminCatatanDinasController::class,
             'update',
         ])->name('catatan-dinas.update');
+
 
         // --------------------------------------------------
         // REVIEW SERAH TERIMA DINAS
@@ -366,6 +370,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
         // Admin dan Superadmin hanya melakukan review.
         // Tanda tangan penerima dilakukan oleh PJL penerima.
 
+
         // --------------------------------------------------
         // MASTER DATA SHIFT
         // --------------------------------------------------
@@ -376,6 +381,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
                 'show',
                 'edit',
             ]);
+
 
         // --------------------------------------------------
         // JADWAL DINAS PJL
@@ -408,6 +414,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             ])
             ->names('dinas');
 
+
         // --------------------------------------------------
         // MASTER DATA RESORT
         // --------------------------------------------------
@@ -421,6 +428,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             ResortController::class,
             'toggleStatus',
         ])->name('resort.toggle-status');
+
 
         // --------------------------------------------------
         // IMPORT WILAYAH
@@ -446,6 +454,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'confirm',
         ])->name('wilayah.import.confirm');
 
+
         // --------------------------------------------------
         // MASTER DATA WILAYAH
         // --------------------------------------------------
@@ -463,6 +472,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
 
     });
 
+
 // ======================================================
 // JADWAL KA ADMIN
 // OPERASIONAL ADMIN SAJA
@@ -472,6 +482,7 @@ Route::middleware(['auth', 'role:admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
+
         Route::get('/jadwal-ka', [
             JadwalKaController::class,
             'index',
@@ -516,7 +527,10 @@ Route::middleware(['auth', 'role:admin'])
             ->name('jadwal-ka.show');
 
         Route::resource('jadwal-ka', JadwalKaController::class)
-            ->only(['edit', 'update']);
+            ->only([
+                'edit',
+                'update',
+            ]);
 
         Route::patch('/jadwal-ka/{jadwalKa}/toggle-status', [
             JadwalKaController::class,
@@ -532,7 +546,9 @@ Route::middleware(['auth', 'role:admin'])
             JadwalKaController::class,
             'importExcel',
         ])->name('jadwal-ka.import.store');
+
     });
+
 
 // ======================================================
 // INVENTARIS ADMIN
@@ -543,17 +559,41 @@ Route::middleware(['auth', 'role:admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
+
+        // --------------------------------------------------
+        // DAFTAR INVENTARIS PER JPL
+        // --------------------------------------------------
+
         Route::get('/inventaris/jpl/{jpl}', [
             AdminInventarisController::class,
             'showJpl',
         ])->whereNumber('jpl')
             ->name('inventaris.jpl.show');
 
+
+        // --------------------------------------------------
+        // REVIEW / TINJAUAN INVENTARIS
+        // --------------------------------------------------
+
+        Route::post('/inventaris/{inventaris}/review', [
+            AdminInventarisController::class,
+            'review',
+        ])->whereNumber('inventaris')
+            ->middleware('throttle:20,1')
+            ->name('inventaris.review');
+
+
+        // --------------------------------------------------
+        // MASTER INVENTARIS
+        // --------------------------------------------------
+
         Route::resource('inventaris', AdminInventarisController::class)
             ->parameters([
                 'inventaris' => 'inventaris',
             ]);
+
     });
+
 
 // ======================================================
 // MASTER DATA JPL ADMIN
@@ -564,6 +604,7 @@ Route::middleware(['auth', 'role:admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
+
         Route::get('/jpl/import', [
             JplImportController::class,
             'create',
@@ -591,7 +632,9 @@ Route::middleware(['auth', 'role:admin'])
             ->name('jpl.activate');
 
         Route::resource('jpl', JplController::class);
+
     });
+
 
 // ======================================================
 // SUPERADMIN
@@ -612,6 +655,7 @@ Route::middleware(['auth', 'superadmin'])
             'index',
         ])->name('dashboard');
 
+
         // --------------------------------------------------
         // DAFTAR DINASAN READ-ONLY
         // --------------------------------------------------
@@ -620,6 +664,7 @@ Route::middleware(['auth', 'superadmin'])
             SuperadminDinasController::class,
             'index',
         ])->name('dinas.index');
+
 
         // --------------------------------------------------
         // JADWAL KA READ-ONLY
@@ -646,6 +691,7 @@ Route::middleware(['auth', 'superadmin'])
             'show',
         ])->whereNumber('jpl')
             ->name('jadwal-ka.show');
+
 
         // --------------------------------------------------
         // MANAJEMEN USER SISTEM
@@ -713,6 +759,7 @@ Route::middleware(['auth', 'superadmin'])
             'toggleStatus',
         ])->name('users.toggle-status');
 
+
         // --------------------------------------------------
         // ACTIVITY LOG
         // --------------------------------------------------
@@ -727,6 +774,7 @@ Route::middleware(['auth', 'superadmin'])
             'show',
         ])->name('activities.show');
 
+
         // --------------------------------------------------
         // SYSTEM MONITORING
         // --------------------------------------------------
@@ -735,6 +783,7 @@ Route::middleware(['auth', 'superadmin'])
             SystemMonitoringController::class,
             'index',
         ])->name('monitoring.index');
+
 
         // --------------------------------------------------
         // PENGATURAN SUPERADMIN
@@ -755,6 +804,7 @@ Route::middleware(['auth', 'superadmin'])
             'updatePassword',
         ])->name('settings.password.update');
 
+
         // --------------------------------------------------
         // MASTER DATA JPL SUPERADMIN
         // --------------------------------------------------
@@ -763,6 +813,7 @@ Route::middleware(['auth', 'superadmin'])
             SuperadminJplController::class,
             'index',
         ])->name('jpl.index');
+
 
         // --------------------------------------------------
         // INVENTARIS SUPERADMIN

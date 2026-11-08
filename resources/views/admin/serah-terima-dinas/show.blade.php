@@ -104,6 +104,28 @@
         return $formatNilai($nilai);
     };
 
+    /*
+    |--------------------------------------------------------------------------
+    | KELAS INDIKATOR CENTANG / SILANG
+    |--------------------------------------------------------------------------
+    */
+
+    $kelasJawaban = function ($nilai) {
+        return match ($nilai) {
+            '✓' => 'bg-green-100 text-green-700 ring-1 ring-green-300',
+            '✗' => 'bg-red-100 text-red-700 ring-1 ring-red-300',
+            default => 'bg-slate-100 text-slate-500 ring-1 ring-slate-200',
+        };
+    };
+
+    $labelJawaban = function ($nilai) {
+        return match ($nilai) {
+            '✓' => 'Ya',
+            '✗' => 'Tidak',
+            default => 'Belum ada data',
+        };
+    };
+
     $labelKunci = function ($key) {
         return ucwords(str_replace(
             ['_', '-'],
@@ -221,11 +243,6 @@
     |--------------------------------------------------------------------------
     | IDENTITAS PPKA / PENYERAH DAN PENERIMA
     |--------------------------------------------------------------------------
-    |
-    | PPKA dan penyerah ditampilkan sebagai satu identitas.
-    | Data PPKA di ringkasan diprioritaskan, kemudian data penyerah
-    | dari dinas digunakan sebagai fallback.
-    |
     */
 
     $namaPpka = $ambil($ringkasan, [
@@ -255,10 +272,6 @@
     |--------------------------------------------------------------------------
     | INFORMASI TAMBAHAN
     |--------------------------------------------------------------------------
-    |
-    | Semua kunci yang sudah ditampilkan pada bagian khusus tidak
-    | ditampilkan ulang sebagai informasi tambahan.
-    |
     */
 
     $keysDikenal = [
@@ -371,10 +384,10 @@
     };
 @endphp
 
-<div class="mx-auto max-w-7xl px-5 py-8 sm:px-8">
+<div class="mx-auto min-w-0 max-w-7xl px-5 py-8 sm:px-8">
 
     {{-- HEADER --}}
-    <div class="mb-6">
+    <div class="mb-6 min-w-0">
         <a
             href="{{ route('admin.serah-terima-dinas.index') }}"
             class="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-blue-900"
@@ -383,8 +396,8 @@
             Kembali ke daftar pengajuan
         </a>
 
-        <div class="mt-4 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <div>
+        <div class="mt-4 flex min-w-0 flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div class="min-w-0">
                 <h1 class="text-3xl font-bold text-[#1d2d50]">
                     Detail Serah Terima Dinas
                 </h1>
@@ -395,7 +408,7 @@
                 </p>
             </div>
 
-            <span class="inline-flex w-fit rounded-full px-4 py-2 text-sm font-semibold {{ $statusClass }}">
+            <span class="inline-flex w-fit shrink-0 rounded-full px-4 py-2 text-sm font-semibold {{ $statusClass }}">
                 {{ $statusLabel }}
             </span>
         </div>
@@ -427,14 +440,13 @@
     @endif
 
     {{-- INFORMASI PENGAJUAN --}}
-    <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section class="mb-6 min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 class="mb-5 text-lg font-bold text-[#1d2d50]">
             Informasi Pengajuan
         </h2>
 
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
 
-            {{-- PPKA / PENYERAH --}}
             <div>
                 <p class="text-sm text-slate-500">PPKA / Petugas Penyerah</p>
 
@@ -447,7 +459,6 @@
                 </p>
             </div>
 
-            {{-- JPL --}}
             <div>
                 <p class="text-sm text-slate-500">JPL</p>
 
@@ -458,7 +469,6 @@
                 </p>
             </div>
 
-            {{-- WAKTU SERAH TERIMA --}}
             <div>
                 <p class="text-sm text-slate-500">Waktu Serah Terima</p>
 
@@ -467,7 +477,6 @@
                 </p>
             </div>
 
-            {{-- SHIFT --}}
             <div>
                 <p class="text-sm text-slate-500">Shift Penyerah</p>
 
@@ -476,7 +485,6 @@
                 </p>
             </div>
 
-            {{-- PENERIMA --}}
             <div>
                 <p class="text-sm text-slate-500">Petugas Penerima</p>
 
@@ -489,7 +497,6 @@
                 </p>
             </div>
 
-            {{-- ID PENGAJUAN --}}
             <div>
                 <p class="text-sm text-slate-500">ID Pengajuan</p>
 
@@ -501,7 +508,7 @@
     </section>
 
     {{-- RINGKASAN --}}
-    <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section class="mb-6 min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="mb-6">
             <h2 class="text-lg font-bold text-[#1d2d50]">
                 Ringkasan Serah Terima
@@ -512,7 +519,7 @@
             </p>
         </div>
 
-        <div class="space-y-6">
+        <div class="min-w-0 space-y-6">
 
             {{-- KONDISI ALAT --}}
             <section>
@@ -571,7 +578,7 @@
             <div class="border-t border-slate-100"></div>
 
             {{-- DETAIL PERJALANAN KA --}}
-            <section>
+            <section class="min-w-0">
                 <div class="mb-3">
                     <h3 class="font-semibold text-slate-800">
                         3. Detail Perjalanan Kereta Api
@@ -584,8 +591,10 @@
                 </div>
 
                 @if (count($keretaApi) && is_array(reset($keretaApi)))
-                    <div class="overflow-x-auto rounded-xl border border-slate-200">
-                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+
+                    {{-- SCROLL KHUSUS TABEL KA --}}
+                    <div class="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-slate-200">
+                        <table class="min-w-max w-full divide-y divide-slate-200 text-sm">
                             <thead class="bg-slate-50">
                                 <tr>
                                     <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">No.</th>
@@ -596,10 +605,10 @@
                                     <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Jadwal</th>
                                     <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Jam Aktual</th>
                                     <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Status</th>
-                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">SEMBOYAN 21</th>
-                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">GENTA</th>
-                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">PINTU PERLINTASAN</th>
-                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">SEMBOYAN 35</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-700">SEMBOYAN 21</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-700">GENTA</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-700">PINTU PERLINTASAN</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-700">SEMBOYAN 35</th>
                                     <th class="min-w-40 px-4 py-3 text-left font-semibold text-slate-700">Keterangan</th>
                                 </tr>
                             </thead>
@@ -810,26 +819,50 @@
                                                 </span>
                                             </td>
 
-                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
-                                                <span @if ($semboyan21Tampil === '✓') role="img" aria-label="Ya" title="Ya" @elseif ($semboyan21Tampil === '✗') role="img" aria-label="Tidak" title="Tidak" @endif>
+                                            {{-- SEMBOYAN 21 --}}
+                                            <td class="whitespace-nowrap px-4 py-3 text-center">
+                                                <span
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-full text-base font-extrabold {{ $kelasJawaban($semboyan21Tampil) }}"
+                                                    role="img"
+                                                    aria-label="{{ $labelJawaban($semboyan21Tampil) }}"
+                                                    title="{{ $labelJawaban($semboyan21Tampil) }}"
+                                                >
                                                     {{ $semboyan21Tampil }}
                                                 </span>
                                             </td>
 
-                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
-                                                <span @if ($gentaTampil === '✓') role="img" aria-label="Ya" title="Ya" @elseif ($gentaTampil === '✗') role="img" aria-label="Tidak" title="Tidak" @endif>
+                                            {{-- GENTA --}}
+                                            <td class="whitespace-nowrap px-4 py-3 text-center">
+                                                <span
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-full text-base font-extrabold {{ $kelasJawaban($gentaTampil) }}"
+                                                    role="img"
+                                                    aria-label="{{ $labelJawaban($gentaTampil) }}"
+                                                    title="{{ $labelJawaban($gentaTampil) }}"
+                                                >
                                                     {{ $gentaTampil }}
                                                 </span>
                                             </td>
 
-                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
-                                                <span @if ($pintuTampil === '✓') role="img" aria-label="Ya" title="Ya" @elseif ($pintuTampil === '✗') role="img" aria-label="Tidak" title="Tidak" @endif>
+                                            {{-- PINTU PERLINTASAN --}}
+                                            <td class="whitespace-nowrap px-4 py-3 text-center">
+                                                <span
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-full text-base font-extrabold {{ $kelasJawaban($pintuTampil) }}"
+                                                    role="img"
+                                                    aria-label="{{ $labelJawaban($pintuTampil) }}"
+                                                    title="{{ $labelJawaban($pintuTampil) }}"
+                                                >
                                                     {{ $pintuTampil }}
                                                 </span>
                                             </td>
 
-                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
-                                                <span @if ($semboyan35Tampil === '✓') role="img" aria-label="Ya" title="Ya" @elseif ($semboyan35Tampil === '✗') role="img" aria-label="Tidak" title="Tidak" @endif>
+                                            {{-- SEMBOYAN 35 --}}
+                                            <td class="whitespace-nowrap px-4 py-3 text-center">
+                                                <span
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-full text-base font-extrabold {{ $kelasJawaban($semboyan35Tampil) }}"
+                                                    role="img"
+                                                    aria-label="{{ $labelJawaban($semboyan35Tampil) }}"
+                                                    title="{{ $labelJawaban($semboyan35Tampil) }}"
+                                                >
                                                     {{ $semboyan35Tampil }}
                                                 </span>
                                             </td>
@@ -843,6 +876,25 @@
                             </tbody>
                         </table>
                     </div>
+
+                    {{-- KETERANGAN INDIKATOR --}}
+                    <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500">
+                        <span class="inline-flex items-center gap-2">
+                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-100 font-extrabold text-green-700 ring-1 ring-green-300">✓</span>
+                            Ya
+                        </span>
+
+                        <span class="inline-flex items-center gap-2">
+                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-100 font-extrabold text-red-700 ring-1 ring-red-300">✗</span>
+                            Tidak
+                        </span>
+
+                        <span class="inline-flex items-center gap-2">
+                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 font-extrabold text-slate-500 ring-1 ring-slate-200">—</span>
+                            Belum ada data
+                        </span>
+                    </div>
+
                 @else
                     <div class="space-y-4">
                         @foreach ([
@@ -875,51 +927,53 @@
             </section>
 
             {{-- INVENTARIS --}}
-            <section>
+            <section class="min-w-0">
                 <h3 class="mb-3 font-semibold text-slate-800">
                     4. Kondisi Inventaris
                 </h3>
 
                 @if (count($inventaris) && is_array(reset($inventaris)))
-                    <div class="overflow-x-auto rounded-xl border border-slate-200">
-                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+
+                    {{-- SCROLL KHUSUS TABEL INVENTARIS --}}
+                    <div class="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-slate-200">
+                        <table class="min-w-max w-full divide-y divide-slate-200 text-sm">
                             <thead class="bg-slate-50">
                                 <tr>
-                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">No.</th>
-                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">Kode Barang</th>
-                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">Nama Barang</th>
-                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">Kategori</th>
-                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">Jumlah</th>
-                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">Kondisi</th>
-                                    <th class="px-4 py-3 text-left font-semibold text-slate-700">Catatan</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">No.</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Kode Barang</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Nama Barang</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Kategori</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Jumlah</th>
+                                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700">Kondisi</th>
+                                    <th class="min-w-40 px-4 py-3 text-left font-semibold text-slate-700">Catatan</th>
                                 </tr>
                             </thead>
 
                             <tbody class="divide-y divide-slate-100 bg-white">
                                 @foreach ($inventaris as $index => $barang)
                                     @if (is_array($barang))
-                                        <tr>
-                                            <td class="px-4 py-3 text-slate-600">
+                                        <tr class="transition hover:bg-slate-50">
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-600">
                                                 {{ $index + 1 }}
                                             </td>
 
-                                            <td class="px-4 py-3 text-slate-700">
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
                                                 {{ $nilaiPertama($barang, ['kode_barang']) }}
                                             </td>
 
-                                            <td class="px-4 py-3 font-medium text-slate-800">
+                                            <td class="whitespace-nowrap px-4 py-3 font-medium text-slate-800">
                                                 {{ $nilaiPertama($barang, ['nama_barang', 'nama']) }}
                                             </td>
 
-                                            <td class="px-4 py-3 text-slate-700">
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
                                                 {{ $nilaiPertama($barang, ['kategori']) }}
                                             </td>
 
-                                            <td class="px-4 py-3 text-slate-700">
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
                                                 {{ $nilaiPertama($barang, ['jumlah_aktual', 'jumlah_master', 'jumlah']) }}
                                             </td>
 
-                                            <td class="px-4 py-3 text-slate-700">
+                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
                                                 {{ $nilaiPertama($barang, ['kondisi', 'status']) }}
                                             </td>
 

@@ -4,7 +4,10 @@
 
 @section('content')
     @php
-        // [teks, kelas badge, kelas titik, kelas garis kiri kartu HP]
+        /*
+         * Data status:
+         * [teks, kelas badge, kelas titik, kelas garis kiri kartu HP]
+         */
         $label = [
             'draft' => [
                 'Draft',
@@ -33,12 +36,19 @@
             'border-l-slate-300',
         ];
 
+        /*
+         * Membentuk data yang digunakan oleh tabel desktop dan kartu HP.
+         *
+         * $sebagaiPenerima:
+         * true  = dokumen masuk
+         * false = dokumen keluar
+         */
         $buatBaris = function ($item, $sebagaiPenerima = false) use ($label, $labelDefault) {
-            $status = (string) $item->status;
+            $status = (string) ($item->status ?? '');
             $statusReview = (string) ($item->status_review ?? 'menunggu_review');
 
             /*
-             * Penentuan label status
+             * Penentuan label status.
              */
             if ($statusReview === 'disetujui') {
                 $teks = 'Disetujui admin';
@@ -65,21 +75,40 @@
             }
 
             /*
-             * Tanggal dinas
+             * Tanggal dinas.
              */
             $tgl = $item->dinas?->tanggal_dinas
                 ? \Carbon\Carbon::parse($item->dinas->tanggal_dinas)->locale('id')
                 : null;
 
             $waktuSimpan = $item->waktu_serah_terima ?? $item->updated_at;
+
             $tanggal = $tgl?->translatedFormat('d M Y') ?? '-';
 
             /*
-             * KUNCI DATA:
+             * Penentuan pihak yang ditampilkan.
+             */
+            $namaPenyerah = $item->dinas?->user?->name
+                ?? data_get($item->ringkasan, 'nama_penyerah')
+                ?? '-';
+
+            $namaPenerima = data_get($item->ringkasan, 'nama_penerima')
+                ?: ($item->penerima?->name ?? '-');
+
+            $namaPihak = $sebagaiPenerima
+                ? $namaPenyerah
+                : $namaPenerima;
+
+            $keteranganPihak = $sebagaiPenerima
+                ? 'Dari'
+                : 'Kepada';
+
+            /*
+             * Dokumen dikunci apabila:
              * 1. Sudah disetujui admin.
-             * 2. Penerima sudah konfirmasi dan menunggu review admin.
+             * 2. Sudah selesai dan belum diminta revisi.
              *
-             * Jika perlu_revisi, penyerah masih boleh mengedit.
+             * Status perlu_revisi tetap dapat diedit oleh penyerah.
              */
             $terkunci = (
                 $statusReview === 'disetujui'
@@ -91,7 +120,6 @@
 
             /*
              * Catatan revisi dari admin.
-             * Field yang digunakan: catatan_review.
              */
             $catatanRevisi = $statusReview === 'perlu_revisi'
                 ? (
@@ -102,6 +130,26 @@
                 )
                 : null;
 
+            /*
+             * Penerima hanya perlu konfirmasi jika belum menandatangani.
+             */
+            $menungguKonfirmasi = $sebagaiPenerima
+                && $status === 'menunggu_penerima'
+                && empty($item->tanda_tangan_penerima);
+
+            $labelAksi = $terkunci
+                ? 'Lihat'
+                : ($sebagaiPenerima
+                    ? 'Konfirmasi & tanda tangan'
+                    : 'Edit');
+
+            $waktuDitampilkan = $waktuSimpan
+                ? \Carbon\Carbon::parse($waktuSimpan)
+                    ->timezone('Asia/Jakarta')
+                    ->locale('id')
+                    ->translatedFormat('d M Y, H:i') . ' WIB'
+                : '-';
+
             return [
                 'tanggal' => $tanggal,
                 'hari' => $tgl?->translatedFormat('l'),
@@ -109,21 +157,12 @@
                 'jpl' => $item->dinas?->jpl?->kode_jpl ?? '-',
                 'namaJpl' => $item->dinas?->jpl?->nama_jpl,
 
-                'penerima' => $sebagaiPenerima
-                    ? ($item->dinas?->user?->name ?? '-')
-                    : (
-                        data_get($item->ringkasan, 'nama_penerima')
-                        ?: ($item->penerima?->name ?? '-')
-                    ),
+                'namaPihak' => $namaPihak,
+                'keteranganPihak' => $keteranganPihak,
+                'namaPenyerah' => $namaPenyerah,
+                'namaPenerima' => $namaPenerima,
 
-                'namaPenyerah' => $item->dinas?->user?->name ?? '-',
-
-                'disimpan' => $waktuSimpan
-                    ? \Carbon\Carbon::parse($waktuSimpan)
-                        ->timezone('Asia/Jakarta')
-                        ->locale('id')
-                        ->translatedFormat('d M Y, H:i') . ' WIB'
-                    : '-',
+                'disimpan' => $waktuDitampilkan,
 
                 'teks' => $teks,
                 'kelas' => $kelas,
@@ -132,12 +171,9 @@
 
                 'terkunci' => $terkunci,
                 'sebagaiPenerima' => $sebagaiPenerima,
-
                 'catatanRevisi' => $catatanRevisi,
-
-                'menungguKonfirmasi' => $sebagaiPenerima
-                    && $status === 'menunggu_penerima'
-                    && empty($item->tanda_tangan_penerima),
+                'menungguKonfirmasi' => $menungguKonfirmasi,
+                'labelAksi' => $labelAksi,
 
                 'urlEdit' => route('user.serah-terima-dinas.edit', $item),
                 'urlLihat' => route('user.serah-terima-dinas.show', $item),
@@ -146,13 +182,19 @@
             ];
         };
 
-        $baris = $riwayat->getCollection()
-            ->map(fn ($item) => $buatBaris($item, false));
-
+        /*
+         * Data pengajuan masuk.
+         */
         $barisMasuk = isset($pengajuanMasuk)
             ? $pengajuanMasuk->getCollection()
                 ->map(fn ($item) => $buatBaris($item, true))
             : collect();
+
+        /*
+         * Data riwayat keluar.
+         */
+        $baris = $riwayat->getCollection()
+            ->map(fn ($item) => $buatBaris($item, false));
     @endphp
 
     <div class="mx-auto min-h-[70vh] w-full max-w-7xl px-4 py-8 sm:px-8 lg:py-10">
@@ -164,7 +206,7 @@
                     Riwayat Serah Terima Dinas
                 </h1>
 
-                <p class="mt-1 max-w-xl text-sm leading-relaxed text-slate-500">
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
                     Lihat serah terima yang kamu kirim dan pengajuan yang ditujukan
                     kepadamu. Penerima dapat membuka detail dan memberikan tanda tangan.
                 </p>
@@ -310,6 +352,7 @@
                                                 <p class="text-xs font-bold text-red-800">
                                                     Catatan revisi admin
                                                 </p>
+
                                                 <p class="mt-1 whitespace-pre-line break-words text-xs leading-relaxed text-red-700">
                                                     {{ $b['catatanRevisi'] }}
                                                 </p>
@@ -318,12 +361,23 @@
                                     </td>
 
                                     <td class="whitespace-nowrap px-4 py-4 text-right">
-                                        <a
-                                            href="{{ $b['urlLihat'] }}"
-                                            class="inline-flex items-center justify-center rounded-lg bg-[#1d2d50] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-slate-700"
-                                        >
-                                            {{ $b['menungguKonfirmasi'] ? 'Periksa & tanda tangan' : 'Lihat' }}
-                                        </a>
+                                        @if ($b['terkunci'])
+                                            <a
+                                                href="{{ $b['urlLihat'] }}"
+                                                aria-label="Lihat {{ $b['aria'] }}"
+                                                class="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-[#1d2d50] transition hover:bg-slate-50"
+                                            >
+                                                Lihat
+                                            </a>
+                                        @else
+                                            <a
+                                                href="{{ $b['urlEdit'] }}"
+                                                aria-label="Konfirmasi dan tanda tangan {{ $b['aria'] }}"
+                                                class="inline-flex items-center justify-center rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-amber-600"
+                                            >
+                                                Konfirmasi & tanda tangan
+                                            </a>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach
@@ -381,6 +435,7 @@
                                     <p class="text-xs font-bold text-red-800">
                                         Catatan revisi admin
                                     </p>
+
                                     <p class="mt-1 whitespace-pre-line break-words text-sm leading-relaxed text-red-700">
                                         {{ $b['catatanRevisi'] }}
                                     </p>
@@ -388,17 +443,27 @@
                             @endif
 
                             <div class="mt-3 border-t border-slate-100 pt-3">
-                                <a
-                                    href="{{ $b['urlLihat'] }}"
-                                    class="block w-full rounded-lg bg-[#1d2d50] px-4 py-2.5 text-center text-sm font-bold text-white transition hover:bg-slate-700"
-                                >
-                                    {{ $b['menungguKonfirmasi'] ? 'Periksa & tanda tangan' : 'Lihat serah terima' }}
-                                </a>
+                                @if ($b['terkunci'])
+                                    <a
+                                        href="{{ $b['urlLihat'] }}"
+                                        class="block w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-center text-sm font-semibold text-[#1d2d50] transition hover:bg-slate-50"
+                                    >
+                                        Lihat serah terima
+                                    </a>
+                                @else
+                                    <a
+                                        href="{{ $b['urlEdit'] }}"
+                                        class="block w-full rounded-lg bg-amber-500 px-4 py-2.5 text-center text-sm font-bold text-white transition hover:bg-amber-600"
+                                    >
+                                        Konfirmasi & tanda tangan
+                                    </a>
+                                @endif
                             </div>
                         </article>
                     @endforeach
                 </div>
 
+                {{-- Paginasi pengajuan masuk --}}
                 <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
                     <p class="text-xs text-slate-500">
                         Menampilkan {{ $pengajuanMasuk->firstItem() }}–{{ $pengajuanMasuk->lastItem() }}
@@ -439,8 +504,7 @@
                     </p>
 
                     <p class="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-slate-500">
-                        Riwayat muncul setelah Anda menekan tombol
-                        <strong>Simpan serah terima</strong> di halaman serah terima.
+                        Riwayat muncul setelah kamu menyimpan serah terima.
                         Menyimpan catatan dinas atau inventaris saja tidak membuat riwayat.
                     </p>
 
@@ -452,7 +516,7 @@
                     </a>
                 </div>
             @else
-                {{-- Tabel desktop --}}
+                {{-- Tabel desktop riwayat keluar --}}
                 <div class="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
                     <table class="w-full min-w-[760px] text-left text-sm">
                         <caption class="sr-only">
@@ -505,7 +569,7 @@
                                     </td>
 
                                     <td class="px-4 py-4 text-slate-700">
-                                        {{ $b['penerima'] }}
+                                        {{ $b['namaPenerima'] }}
                                     </td>
 
                                     <td class="whitespace-nowrap px-4 py-4 text-[13px] text-slate-500">
@@ -523,6 +587,7 @@
                                                 <p class="text-xs font-bold text-red-800">
                                                     Catatan revisi admin
                                                 </p>
+
                                                 <p class="mt-1 whitespace-pre-line break-words text-xs leading-relaxed text-red-700">
                                                     {{ $b['catatanRevisi'] }}
                                                 </p>
@@ -534,6 +599,7 @@
                                         @if ($b['terkunci'])
                                             <a
                                                 href="{{ $b['urlLihat'] }}"
+                                                aria-label="Lihat {{ $b['aria'] }}"
                                                 class="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-[#1d2d50] transition hover:bg-slate-50"
                                             >
                                                 Lihat
@@ -541,6 +607,7 @@
                                         @else
                                             <a
                                                 href="{{ $b['urlEdit'] }}"
+                                                aria-label="Edit {{ $b['aria'] }}"
                                                 class="inline-flex items-center justify-center rounded-lg bg-[#1d2d50] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-slate-700"
                                             >
                                                 Edit
@@ -553,7 +620,7 @@
                     </table>
                 </div>
 
-                {{-- Kartu HP --}}
+                {{-- Kartu HP riwayat keluar --}}
                 <div class="space-y-3 md:hidden">
                     @foreach ($baris as $b)
                         <article class="rounded-xl border border-l-4 border-slate-200 bg-white p-4 shadow-sm {{ $b['garis'] }}">
@@ -594,7 +661,7 @@
                                 <div class="col-span-2">
                                     <dt class="text-xs text-slate-500">Penerima</dt>
                                     <dd class="font-semibold text-slate-800">
-                                        {{ $b['penerima'] }}
+                                        {{ $b['namaPenerima'] }}
                                     </dd>
                                 </div>
 
@@ -611,6 +678,7 @@
                                     <p class="text-xs font-bold text-red-800">
                                         Catatan revisi admin
                                     </p>
+
                                     <p class="mt-1 whitespace-pre-line break-words text-sm leading-relaxed text-red-700">
                                         {{ $b['catatanRevisi'] }}
                                     </p>
@@ -638,6 +706,7 @@
                     @endforeach
                 </div>
 
+                {{-- Paginasi riwayat keluar --}}
                 <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
                     <p class="text-xs text-slate-500">
                         Menampilkan {{ $riwayat->firstItem() }}–{{ $riwayat->lastItem() }}

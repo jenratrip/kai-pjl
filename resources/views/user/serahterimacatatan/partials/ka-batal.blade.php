@@ -55,8 +55,8 @@
         value="{{ $daftarNomorKA }}"
     >
 
-    {{-- Daftar KA batal dari realisasi --}}
-    <div class="space-y-2">
+    {{-- Daftar KA batal: hanya bagian ini yang dapat di-scroll --}}
+    <div class="max-h-[360px] space-y-2 overflow-y-auto overscroll-contain pr-2">
         @forelse($kaBatal as $ka)
             <div
                 class="rounded-lg border border-slate-200 bg-slate-50 p-3"
@@ -80,7 +80,9 @@
                     </span>
                 </div>
 
-                @include('user.serahterimacatatan.partials.ka-check-indicators', ['ka' => $ka])
+                @include('user.serahterimacatatan.partials.ka-check-indicators', [
+                    'ka' => $ka,
+                ])
             </div>
         @empty
             <div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center">
@@ -95,6 +97,7 @@
         @endforelse
     </div>
 
+    {{-- Informasi bawah: tetap diam, tidak ikut scroll --}}
     <p class="mt-3 flex items-start gap-2 text-xs leading-relaxed text-slate-500">
         <span aria-hidden="true">ⓘ</span>
 
