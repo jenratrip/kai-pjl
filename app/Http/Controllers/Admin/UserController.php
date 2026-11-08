@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use App\Models\Role;
 use App\Models\ActivityLog;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
@@ -41,9 +41,9 @@ class UserController extends Controller
             $search = trim($request->input('search'));
 
             $query->where(function ($q) use ($search) {
-                $q->where('nip', 'like', '%' . $search . '%')
-                    ->orWhere('name', 'like', '%' . $search . '%')
-                    ->orWhere('email', 'like', '%' . $search . '%');
+                $q->where('nip', 'like', '%'.$search.'%')
+                    ->orWhere('name', 'like', '%'.$search.'%')
+                    ->orWhere('email', 'like', '%'.$search.'%');
             });
         }
 
@@ -55,12 +55,10 @@ class UserController extends Controller
 
         $users = $query->latest()->paginate(10)->withQueryString();
 
-        $totalUsers = User::whereHas('role', fn ($q) =>
-            $q->whereIn('name', ['pjl', 'admin'])
+        $totalUsers = User::whereHas('role', fn ($q) => $q->whereIn('name', ['pjl', 'admin'])
         )->count();
 
-        $totalActive = User::whereHas('role', fn ($q) =>
-            $q->whereIn('name', ['pjl', 'admin'])
+        $totalActive = User::whereHas('role', fn ($q) => $q->whereIn('name', ['pjl', 'admin'])
         )->where('is_active', true)->count();
 
         $totalInactive = $totalUsers - $totalActive;
@@ -112,7 +110,6 @@ class UserController extends Controller
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('users', 'email')->ignore($user->id),
             ],
             'phone' => ['nullable', 'string', 'max:20'],
             'role' => ['required', Rule::in(['pjl', 'admin'])],
@@ -120,7 +117,7 @@ class UserController extends Controller
 
         $role = Role::where('name', $validated['role'])->first();
 
-        if (!$role) {
+        if (! $role) {
             throw ValidationException::withMessages([
                 'role' => 'Role yang dipilih tidak tersedia.',
             ]);
@@ -149,7 +146,7 @@ class UserController extends Controller
                 'user_id' => Auth::id(),
                 'action' => 'update',
                 'module' => 'manajemen_user',
-                'description' => 'Mengubah data dan role user: ' . $user->name,
+                'description' => 'Mengubah data dan role user: '.$user->name,
                 'subject_type' => User::class,
                 'subject_id' => $user->id,
                 'old_values' => $oldValues,
@@ -178,7 +175,7 @@ class UserController extends Controller
         $user = $this->findManagedUser($id);
 
         $oldStatus = (bool) $user->is_active;
-        $newStatus = !$oldStatus;
+        $newStatus = ! $oldStatus;
         $roleName = strtoupper($user->role->name);
 
         DB::transaction(function () use (
@@ -192,7 +189,7 @@ class UserController extends Controller
                 'module' => 'manajemen_user',
                 'description' => (
                     $newStatus ? 'Mengaktifkan akun ' : 'Menonaktifkan akun '
-                ) . $roleName . ': ' . $user->name,
+                ).$roleName.': '.$user->name,
                 'subject_type' => User::class,
                 'subject_id' => $user->id,
                 'old_values' => ['is_active' => $oldStatus],

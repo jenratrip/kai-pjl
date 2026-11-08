@@ -136,31 +136,9 @@
                 </h3>
 
                 <p class="mt-1 text-sm text-gray-500">
-                    Data perlintasan yang dapat ditinjau dan dikoreksi oleh Superadmin.
+                    Data perlintasan untuk pemantauan Superadmin.
                 </p>
             </div>
-
-            <a
-                href="{{ route('superadmin.jpl.import') }}"
-                class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0b1f3a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-900 sm:w-auto"
-            >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M12 16V4m0 0L8 8m4-4l4 4M5 16v4h14v-4"
-                    />
-                </svg>
-
-                Import JPL
-            </a>
 
         </div>
 
@@ -199,9 +177,6 @@
                             Status
                         </th>
 
-                        <th class="whitespace-nowrap px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Aksi
-                        </th>
                     </tr>
                 </thead>
 
@@ -246,20 +221,11 @@
                                 @endif
                             </td>
 
-                            <td class="whitespace-nowrap px-6 py-4 text-center">
-                                <a
-                                    href="{{ route('superadmin.jpl.edit', $jpl) }}"
-                                    class="inline-flex items-center rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-                                >
-                                    Koreksi
-                                </a>
-                            </td>
-
                         </tr>
 
                     @empty
                         <tr>
-                            <td colspan="8" class="px-6 py-12 text-center">
+                            <td colspan="7" class="px-6 py-12 text-center">
                                 <p class="text-sm font-medium text-gray-600">
                                     Data JPL tidak ditemukan.
                                 </p>

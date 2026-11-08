@@ -117,7 +117,7 @@
                 {{ $duplicateCount }}
             </p>
             <p class="mt-1 text-xs text-gray-500">
-                Akan dilewati saat konfirmasi.
+                Duplikat di workbook ini dilewati. Jadwal yang sama dari versi sebelumnya tetap dapat masuk batch baru.
             </p>
         </div>
 
@@ -154,7 +154,7 @@
                     <p class="mt-1 text-sm text-green-800">
                         Tidak ditemukan kesalahan parser, baris tidak valid, atau ketidakcocokan JPL.
                         Periksa kembali tanggal dan data sebelum melanjutkan.
-                        Baris duplikat akan dilewati.
+                        Hanya duplikat di workbook ini yang dilewati; jadwal yang sama dari versi sebelumnya tetap dapat diimpor.
                     </p>
                 </div>
             </div>
@@ -393,7 +393,8 @@
 
         <div class="border-t border-gray-200 bg-gray-50 px-5 py-3">
             <p class="text-xs text-gray-500">
-                Baris valid akan diproses untuk ditambahkan. Duplikat akan dilewati.
+                Baris valid akan diproses untuk ditambahkan. Duplikat di workbook ini akan dilewati;
+                jadwal yang sama dari versi sebelumnya tetap dapat diimpor sebagai batch baru.
                 Baris tidak valid menghalangi proses import.
             </p>
         </div>
@@ -421,7 +422,7 @@
                 <form
                     action="{{ route('admin.jadwal-ka.import.confirm') }}"
                     method="POST"
-                    onsubmit="return confirm('Konfirmasi import jadwal KA untuk tanggal {{ \Illuminate\Support\Carbon::parse($tanggalBerlaku)->format('d-m-Y') }}? Data yang lolos validasi akan disimpan. Duplikat akan dilewati.');"
+                    onsubmit="return confirm('Konfirmasi import jadwal KA untuk tanggal {{ \Illuminate\Support\Carbon::parse($tanggalBerlaku)->format('d-m-Y') }}? Data yang lolos validasi akan disimpan. Hanya duplikat dalam workbook ini yang dilewati; jadwal yang sama dari versi sebelumnya tetap dapat diimpor.');"
                 >
                     @csrf
 

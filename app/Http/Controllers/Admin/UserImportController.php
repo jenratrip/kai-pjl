@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
 use App\Exports\UserImportTemplateExport;
+use App\Http\Controllers\Controller;
 use App\Imports\UsersImport;
 use App\Models\Role;
 use App\Models\User;
@@ -23,7 +23,7 @@ class UserImportController extends Controller
     public function downloadTemplate()
     {
         return Excel::download(
-            new UserImportTemplateExport(),
+            new UserImportTemplateExport,
             'template-import-user-pjl.xlsx'
         );
     }
@@ -42,7 +42,7 @@ class UserImportController extends Controller
             ],
         ]);
 
-        $import = new UsersImport();
+        $import = new UsersImport;
 
         Excel::import($import, $request->file('file'));
 
@@ -59,7 +59,6 @@ class UserImportController extends Controller
         $validRows = [];
         $errors = [];
         $seenNips = [];
-        $seenEmails = [];
 
         foreach ($rows as $index => $row) {
             $rowNumber = $index + 2;
@@ -106,21 +105,7 @@ class UserImportController extends Controller
                 }
             }
 
-            if ($row['email'] !== '') {
-                $email = strtolower($row['email']);
-
-                if (isset($seenEmails[$email])) {
-                    $messages[] = 'Email duplikat di dalam file.';
-                }
-
-                $seenEmails[$email] = true;
-
-                if (User::where('email', $email)->exists()) {
-                    $messages[] = 'Email sudah terdaftar di database.';
-                }
-            }
-
-            if (!empty($messages)) {
+            if (! empty($messages)) {
                 $errors[] = [
                     'row' => $rowNumber,
                     'nip' => $row['nip'],
@@ -140,7 +125,7 @@ class UserImportController extends Controller
         $token = (string) Str::uuid();
 
         Cache::put(
-            'admin_user_import_' . $token,
+            'admin_user_import_'.$token,
             $validRows,
             now()->addMinutes(10)
         );
@@ -161,10 +146,10 @@ class UserImportController extends Controller
             'token' => ['required', 'uuid'],
         ]);
 
-        $cacheKey = 'admin_user_import_' . $request->input('token');
+        $cacheKey = 'admin_user_import_'.$request->input('token');
         $rows = Cache::get($cacheKey);
 
-        if (!is_array($rows)) {
+        if (! is_array($rows)) {
             return redirect()
                 ->route('admin.users.index')
                 ->with('error', 'Data preview sudah kedaluwarsa. Silakan unggah ulang file.');
@@ -178,7 +163,7 @@ class UserImportController extends Controller
 
         $role = Role::where('name', 'pjl')->first();
 
-        if (!$role) {
+        if (! $role) {
             return redirect()
                 ->route('admin.users.index')
                 ->with('error', 'Role PJL tidak ditemukan di database.');
@@ -191,13 +176,10 @@ class UserImportController extends Controller
                 foreach ($rows as $row) {
                     // Periksa ulang untuk menghindari data duplikat
                     // yang masuk setelah proses preview.
-                    if (
-                        User::where('nip', $row['nip'])->exists()
-                        || User::where('email', $row['email'])->exists()
-                    ) {
+                    if (User::where('nip', $row['nip'])->exists()) {
                         throw new \RuntimeException(
-                            'NIP atau email ' . $row['nip']
-                            . ' sudah terdaftar. Silakan unggah ulang file.'
+                            'NIP '.$row['nip']
+                            .' sudah terdaftar. Silakan unggah ulang file.'
                         );
                     }
 
@@ -225,6 +207,6 @@ class UserImportController extends Controller
 
         return redirect()
             ->route('admin.users.index')
-            ->with('success', $created . ' akun PJL berhasil diimpor.');
+            ->with('success', $created.' akun PJL berhasil diimpor.');
     }
 }

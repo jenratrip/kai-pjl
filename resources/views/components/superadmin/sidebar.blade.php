@@ -156,6 +156,28 @@
         </a>
 
         {{-- =========================================================
+        | Jadwal KA
+        ========================================================== --}}
+
+        <a
+            href="{{ route('superadmin.jadwal-ka.index') }}"
+            class="
+                flex items-center gap-3 rounded-lg px-4 py-3
+                text-sm font-medium transition
+                {{ request()->routeIs('superadmin.jadwal-ka.*')
+                    ? 'bg-white/10 text-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }}
+            "
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 15h3m2 0h3" />
+            </svg>
+            <span>Jadwal KA</span>
+        </a>
+
+        {{-- =========================================================
         | Activity Log
         ========================================================== --}}
 
@@ -233,11 +255,14 @@
         ========================================================== --}}
 
         <a
-            href="#"
+            href="{{ route('superadmin.settings.index') }}"
             class="
                 flex items-center gap-3 rounded-lg px-4 py-3
-                text-sm font-medium text-white/70
-                transition hover:bg-white/10 hover:text-white
+                text-sm font-medium transition
+                {{ request()->routeIs('superadmin.settings.*')
+                    ? 'bg-white/10 text-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }}
             "
         >
 

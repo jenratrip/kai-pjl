@@ -7,6 +7,7 @@ use App\Models\Dinas;
 use App\Models\Jpl;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\DinasJadwalSnapshotService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -166,7 +167,7 @@ class DinasController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function store(Request $request)
+    public function store(Request $request, DinasJadwalSnapshotService $snapshotService)
     {
         $validated = $this->validateSchedule($request);
 
@@ -193,10 +194,35 @@ class DinasController extends Controller
             $validated,
             $request,
             $mulai,
-            $selesai
+            $selesai,
+            $snapshotService
         ) {
+            $lockedJpl = Jpl::query()
+                ->whereKey($jpl->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $lockedJpl->is_active) {
+                throw ValidationException::withMessages([
+                    'jpl_id' => 'JPL sudah tidak aktif. Jadwal dinas tidak dapat ditambahkan.',
+                ]);
+            }
+
+            $lockedPetugas = User::query()
+                ->whereKey($petugas->id)
+                ->where('is_active', true)
+                ->whereHas('role', fn ($query) => $query->where('name', 'pjl'))
+                ->lockForUpdate()
+                ->first();
+
+            if (! $lockedPetugas) {
+                throw ValidationException::withMessages([
+                    'user_id' => 'Petugas sudah tidak aktif atau bukan PJL. Jadwal dinas tidak dapat ditambahkan.',
+                ]);
+            }
+
             $this->ensureNoConflict(
-                $petugas->id,
+                $lockedPetugas->id,
                 $mulai,
                 $selesai
             );
@@ -206,9 +232,9 @@ class DinasController extends Controller
                 $selesai
             );
 
-            Dinas::create([
-                'user_id' => $petugas->id,
-                'jpl_id' => $jpl->id,
+            $dinas = Dinas::create([
+                'user_id' => $lockedPetugas->id,
+                'jpl_id' => $lockedJpl->id,
                 'shift_id' => $shift->id,
                 'tanggal_dinas' => $validated['tanggal_dinas'],
                 'jam_mulai' => $mulai,
@@ -225,6 +251,8 @@ class DinasController extends Controller
                     ? $validated['user_digantikan_id']
                     : null,
             ]);
+
+            $snapshotService->resolveAndStore((int) $dinas->id);
         });
 
         return redirect()
@@ -316,6 +344,30 @@ class DinasController extends Controller
 
             $this->ensureCanModify($lockedDinas);
 
+            $userDigantikanId = $request->boolean('is_pengganti')
+                ? ($validated['user_digantikan_id'] ?? null)
+                : null;
+
+            if (
+                $lockedDinas->jadwal_ka_snapshot !== null
+                && (
+                    (int) $validated['user_id'] !== (int) $lockedDinas->user_id
+                    || (int) $validated['jpl_id'] !== (int) $lockedDinas->jpl_id
+                    || (int) $validated['shift_id'] !== (int) $lockedDinas->shift_id
+                    || $validated['tanggal_dinas'] !== $lockedDinas->tanggal_dinas->toDateString()
+                    || $request->boolean('is_pengganti') !== (bool) $lockedDinas->is_pengganti
+                    || ($userDigantikanId === null
+                        ? null
+                        : (int) $userDigantikanId) !== ($lockedDinas->user_digantikan_id === null
+                        ? null
+                        : (int) $lockedDinas->user_digantikan_id)
+                )
+            ) {
+                throw ValidationException::withMessages([
+                    'dinas' => 'Petugas, status pengganti, petugas yang digantikan, JPL, shift, dan tanggal tidak dapat diubah karena snapshot Jadwal KA sudah terkunci.',
+                ]);
+            }
+
             $this->ensureNoConflict(
                 $petugas->id,
                 $mulai,
@@ -360,9 +412,21 @@ class DinasController extends Controller
 
     public function destroy(Dinas $dina)
     {
-        $this->ensureCanModify($dina);
+        DB::transaction(function () use ($dina): void {
+            $lockedDinas = Dinas::query()
+                ->whereKey($dina->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $dina->delete();
+            if ($lockedDinas->jadwal_ka_snapshot !== null) {
+                throw ValidationException::withMessages([
+                    'dinas' => 'Dinas tidak dapat dihapus karena snapshot Jadwal KA sudah terkunci.',
+                ]);
+            }
+
+            $this->ensureCanModify($lockedDinas);
+            $lockedDinas->delete();
+        });
 
         return redirect()
             ->route('admin.dinas.index')
@@ -392,8 +456,8 @@ class DinasController extends Controller
             ->orderBy('jam_mulai')
             ->get();
 
-        $filename = 'jadwal-dinas-' .
-            now()->format('Ymd-His') .
+        $filename = 'jadwal-dinas-'.
+            now()->format('Ymd-His').
             '.csv';
 
         return response()->streamDownload(
@@ -515,7 +579,7 @@ class DinasController extends Controller
 
             $header[0] = (string) $header[0];
 
-            foreach (["\xEF\xBB\xBF", "\u{FEFF}", "ï»¿"] as $bom) {
+            foreach (["\xEF\xBB\xBF", "\u{FEFF}", 'ï»¿'] as $bom) {
                 if (str_starts_with($header[0], $bom)) {
                     $header[0] = substr(
                         $header[0],
@@ -534,8 +598,8 @@ class DinasController extends Controller
             if ($header !== $this->csvHeaders()) {
                 return back()->with(
                     'error',
-                    'Header CSV tidak sesuai template. ' .
-                    'Unduh template terbaru dan jangan ' .
+                    'Header CSV tidak sesuai template. '.
+                    'Unduh template terbaru dan jangan '.
                     'mengubah nama atau urutan 8 kolom.'
                 );
             }
@@ -552,8 +616,7 @@ class DinasController extends Controller
                 if (
                     count(array_filter(
                         $data,
-                        fn ($value) =>
-                            trim((string) $value) !== ''
+                        fn ($value) => trim((string) $value) !== ''
                     )) === 0
                 ) {
                     continue;
@@ -586,7 +649,7 @@ class DinasController extends Controller
 
                 if ($tanggal === null) {
                     $errors[] =
-                        "Baris {$line}: tanggal harus " .
+                        "Baris {$line}: tanggal harus ".
                         'YYYY-MM-DD atau DD/MM/YYYY.';
 
                     continue;
@@ -634,7 +697,7 @@ class DinasController extends Controller
 
                 if ($validator->fails()) {
                     $errors[] =
-                        "Baris {$line}: " .
+                        "Baris {$line}: ".
                         implode(
                             ' ',
                             $validator->errors()->all()
@@ -657,10 +720,10 @@ class DinasController extends Controller
 
                 $shift = Shift::find($shiftId);
 
-                if (!$petugas || !$jpl || !$shift) {
+                if (! $petugas || ! $jpl || ! $shift) {
                     $errors[] =
-                        "Baris {$line}: NIP petugas, kode " .
-                        'JPL, atau shift tidak ditemukan ' .
+                        "Baris {$line}: NIP petugas, kode ".
+                        'JPL, atau shift tidak ditemukan '.
                         'atau tidak aktif.';
 
                     continue;
@@ -681,18 +744,18 @@ class DinasController extends Controller
                         ->first();
 
                     if (
-                        !$digantikan ||
+                        ! $digantikan ||
                         $digantikan->id === $petugas->id
                     ) {
                         $errors[] =
-                            "Baris {$line}: NIP petugas " .
+                            "Baris {$line}: NIP petugas ".
                             'yang digantikan tidak valid.';
 
                         continue;
                     }
                 } elseif ($nipDigantikan !== '') {
                     $errors[] =
-                        "Baris {$line}: nip_digantikan " .
+                        "Baris {$line}: nip_digantikan ".
                         'harus kosong jika is_pengganti bernilai 0.';
 
                     continue;
@@ -714,7 +777,7 @@ class DinasController extends Controller
                     )
                 ) {
                     $errors[] =
-                        "Baris {$line}: jam tidak sesuai " .
+                        "Baris {$line}: jam tidak sesuai ".
                         'dengan konfigurasi shift.';
 
                     continue;
@@ -744,7 +807,7 @@ class DinasController extends Controller
 
                 if ($bentrokDatabase || $bentrokFile) {
                     $errors[] =
-                        "Baris {$line}: jadwal petugas " .
+                        "Baris {$line}: jadwal petugas ".
                         'bentrok dengan jadwal lain.';
 
                     continue;
@@ -787,7 +850,7 @@ class DinasController extends Controller
                 ->route('admin.dinas.index')
                 ->with(
                     'success',
-                    count($validRows) .
+                    count($validRows).
                     ' jadwal dinas berhasil diimpor.'
                 );
         } catch (Throwable $e) {
@@ -795,7 +858,7 @@ class DinasController extends Controller
 
             return back()->with(
                 'error',
-                'Impor gagal diproses. Periksa format file ' .
+                'Impor gagal diproses. Periksa format file '.
                 'dan log aplikasi.'
             );
         } finally {
@@ -859,7 +922,7 @@ class DinasController extends Controller
         foreach (['Y-m-d', 'd/m/Y', 'd-m-Y'] as $format) {
             try {
                 $date = Carbon::createFromFormat(
-                    '!' . $format,
+                    '!'.$format,
                     $value
                 );
 
@@ -945,10 +1008,9 @@ class DinasController extends Controller
                 )
                 ->exists();
 
-            if (!$pengganti) {
+            if (! $pengganti) {
                 throw ValidationException::withMessages([
-                    'user_digantikan_id' =>
-                        'Petugas yang digantikan harus ' .
+                    'user_digantikan_id' => 'Petugas yang digantikan harus '.
                         'merupakan PJL aktif.',
                 ]);
             }
@@ -968,11 +1030,11 @@ class DinasController extends Controller
         Shift $shift
     ): array {
         $mulai = Carbon::parse(
-            $tanggal . ' ' . $shift->jam_mulai
+            $tanggal.' '.$shift->jam_mulai
         );
 
         $selesai = Carbon::parse(
-            $tanggal . ' ' . $shift->jam_selesai
+            $tanggal.' '.$shift->jam_selesai
         );
 
         // Mendukung shift lintas tengah malam.
@@ -1005,8 +1067,7 @@ class DinasController extends Controller
 
         if ($query->exists()) {
             throw ValidationException::withMessages([
-                'user_id' =>
-                    'Petugas tersebut sudah memiliki ' .
+                'user_id' => 'Petugas tersebut sudah memiliki '.
                     'jadwal dinas pada rentang waktu ini.',
             ]);
         }
@@ -1023,11 +1084,11 @@ class DinasController extends Controller
         if (
             $dina->catatanDinas()->exists() ||
             $dina->serahTerima()->exists() ||
-            $dina->realisasiInventaris()->exists()
+            $dina->realisasiInventaris()->exists() ||
+            $dina->realisasiKa()->exists()
         ) {
             throw ValidationException::withMessages([
-                'dinas' =>
-                    'Jadwal tidak dapat diubah atau dihapus ' .
+                'dinas' => 'Jadwal tidak dapat diubah atau dihapus '.
                     'karena sudah memiliki riwayat operasional.',
             ]);
         }

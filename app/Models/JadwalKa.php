@@ -21,12 +21,17 @@ class JadwalKa extends Model
         'keterangan',
         'is_active',
         'batch_import',
+        'jadwal_ka_batch_id',
     ];
 
-    protected $casts = [
-        'tanggal_berlaku' => 'date',
-        'is_active' => 'boolean',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'hari_berlaku' => 'array',
+            'tanggal_berlaku' => 'date',
+            'is_active' => 'boolean',
+        ];
+    }
 
     public function keretaApi(): BelongsTo
     {
@@ -36,6 +41,11 @@ class JadwalKa extends Model
     public function jpl(): BelongsTo
     {
         return $this->belongsTo(Jpl::class, 'jpl_id');
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(JadwalKaBatch::class, 'jadwal_ka_batch_id');
     }
 
     public function realisasiKa(): HasMany

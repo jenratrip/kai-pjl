@@ -20,8 +20,7 @@
                 </h1>
 
                 <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                    Lihat jadwal perjalanan KA dari tanggal selain hari ini.
-                    Pilih tanggal untuk membuka detail jadwal.
+                    Lihat periode versi batch yang telah berakhir serta arsip tanggal jadwal legacy.
                 </p>
             </div>
 
@@ -48,12 +47,12 @@
             </div>
 
             <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p class="text-sm font-medium text-slate-500">Tanggal dalam Arsip</p>
+                <p class="text-sm font-medium text-slate-500">Periode / tanggal arsip</p>
                 <p class="mt-2 text-3xl font-bold text-slate-900">
                     {{ $arsip->total() }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500">
-                    Jumlah tanggal arsip yang ditemukan.
+                    Jumlah periode batch dan tanggal legacy yang ditemukan.
                 </p>
             </div>
         </div>
@@ -97,7 +96,7 @@
 
                     <div>
                         <label for="tanggal" class="mb-1.5 block text-xs font-semibold text-slate-600">
-                            Filter Tanggal
+                    Tanggal mulai efektif / tanggal legacy
                         </label>
                         <input
                             id="tanggal"
@@ -130,7 +129,7 @@
                                 No.
                             </th>
                             <th class="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
-                                Tanggal Jadwal
+                                Periode Efektif / Tanggal Legacy
                             </th>
                             <th class="px-5 py-4 text-center text-xs font-bold uppercase tracking-wider text-slate-500">
                                 Jumlah JPL
@@ -152,12 +151,23 @@
                                 </td>
 
                                 <td class="whitespace-nowrap px-5 py-4">
-                                    <p class="text-sm font-semibold text-slate-900">
-                                        {{ \Carbon\Carbon::parse($item->tanggal)->translatedFormat('d F Y') }}
-                                    </p>
-                                    <p class="mt-1 text-xs text-slate-500">
-                                        {{ \Carbon\Carbon::parse($item->tanggal)->translatedFormat('l') }}
-                                    </p>
+                                    @if ($item->source === 'batch')
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                                            Batch #{{ $item->batch_id }}
+                                        </p>
+                                        <p class="mt-1 text-sm font-semibold text-slate-900">
+                                            {{ \Carbon\Carbon::parse($item->tanggal)->translatedFormat('d M Y') }} –
+                                            {{ \Carbon\Carbon::parse($item->tanggal_akhir)->translatedFormat('d M Y') }}
+                                        </p>
+                                        <p class="mt-1 text-xs text-slate-500">Periode efektif untuk cakupan JPL ini</p>
+                                    @else
+                                        <p class="text-sm font-semibold text-slate-900">
+                                            {{ \Carbon\Carbon::parse($item->tanggal)->translatedFormat('d F Y') }}
+                                        </p>
+                                        <p class="mt-1 text-xs text-slate-500">
+                                            Legacy · {{ \Carbon\Carbon::parse($item->tanggal)->translatedFormat('l') }}
+                                        </p>
+                                    @endif
                                 </td>
 
                                 <td class="whitespace-nowrap px-5 py-4 text-center">
@@ -173,7 +183,9 @@
                                 </td>
 
                                 <td class="whitespace-nowrap px-5 py-4 text-right">
-                                    <a href="{{ route('admin.jadwal-ka.arsip.show', ['tanggal' => $item->tanggal]) }}"
+                                    <a href="{{ route('admin.jadwal-ka.arsip.show', $item->source === 'batch'
+                                        ? ['tanggal' => $item->tanggal, 'batch_id' => $item->batch_id, 'tanggal_akhir' => $item->tanggal_akhir]
+                                        : ['tanggal' => $item->tanggal]) }}"
                                        class="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-blue-800">
                                         Lihat Arsip
                                         <svg class="h-4 w-4" viewBox="0 0 24 24"
