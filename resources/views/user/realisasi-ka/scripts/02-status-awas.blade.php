@@ -30,11 +30,13 @@ function getSelisihMenit(ka) {
 ===================================================== */
 
 function getStatusColor(ka) {
-    if (ka.status === 'BATAL') {
+    const status = String(ka.status ?? '').trim().toUpperCase();
+
+    if (status === 'BATAL') {
         return 'batal';
     }
 
-    if (ka.status !== 'JALAN') {
+    if (status !== 'JALAN') {
         return 'belum';
     }
 
@@ -130,25 +132,53 @@ function getParitas(ka) {
         : 'GANJIL';
 }
 
+
+// Normalisasi dan fallback arah berdasarkan nomor KA.
+function getArahKA(ka) {
+    const arah = String(ka.arah ?? '')
+        .trim()
+        .toUpperCase();
+
+    // Prioritaskan arah yang sudah tersedia.
+    if (arah === 'HULU' || arah === 'HILIR') {
+        return arah;
+    }
+
+    // Fallback berdasarkan paritas nomor KA.
+    const paritas = getParitas(ka);
+
+    if (paritas === 'GENAP') {
+        return 'HULU';
+    }
+
+    if (paritas === 'GANJIL') {
+        return 'HILIR';
+    }
+
+    return '';
+}
+
+
 function getLabelArah(ka) {
-    if (ka.arah === 'HULU' || ka.arah === 'HILIR') {
-        return `dari ${ka.arah.toLowerCase()}`;
+    const arah = getArahKA(ka);
+
+    if (arah === 'HULU' || arah === 'HILIR') {
+        return `dari ${arah.toLowerCase()}`;
     }
 
     return 'arah tidak diketahui';
 }
 
-function isBerlawananArah(a, b) {
-    const arahValid = ['HULU', 'HILIR'];
 
-    if (
-        !arahValid.includes(a.arah) ||
-        !arahValid.includes(b.arah)
-    ) {
+function isBerlawananArah(a, b) {
+    const arahA = getArahKA(a);
+    const arahB = getArahKA(b);
+
+    if (!arahA || !arahB) {
         return false;
     }
 
-    return a.arah !== b.arah;
+    return arahA !== arahB;
 }
 
 
@@ -157,7 +187,16 @@ function isBerlawananArah(a, b) {
 ===================================================== */
 
 function getWaktuRujukan(ka) {
-    if (ka.status === 'JALAN') {
+    const status = String(ka.status ?? '')
+        .trim()
+        .toUpperCase();
+
+    if (status === 'BATAL') {
+        return null;
+    }
+
+    // KA yang sudah berjalan menggunakan waktu aktual.
+    if (status === 'JALAN') {
         if (!ka.aktual) {
             return null;
         }
@@ -165,11 +204,8 @@ function getWaktuRujukan(ka) {
         return timeToMinutes(ka.aktual);
     }
 
-    if (ka.status === 'BELUM') {
-        return timeToMinutes(ka.jadwal);
-    }
-
-    return null;
+    // KA yang belum berjalan menggunakan waktu jadwal.
+    return timeToMinutes(ka.jadwal);
 }
 
 
@@ -196,6 +232,7 @@ function getPosisiWaktuAwas(waktu, shiftInfo) {
 
     return waktu - shiftInfo.start;
 }
+
 
 function getJarakWaktuAwas(a, b, shiftInfo) {
     const posisiA = getPosisiWaktuAwas(
@@ -228,10 +265,16 @@ function getKandidatAwas() {
             index,
             waktu: getWaktuRujukan(ka)
         }))
-        .filter(item =>
-            item.ka.status !== 'BATAL' &&
-            item.waktu !== null
-        );
+        .filter(item => {
+            const status = String(item.ka.status ?? '')
+                .trim()
+                .toUpperCase();
+
+            return (
+                status !== 'BATAL' &&
+                item.waktu !== null
+            );
+        });
 }
 
 
@@ -265,15 +308,24 @@ function cariAwas2Arah() {
             const a = kandidat[i];
             const b = kandidat[j];
 
+            const statusA = String(a.ka.status ?? '')
+                .trim()
+                .toUpperCase();
+
+            const statusB = String(b.ka.status ?? '')
+                .trim()
+                .toUpperCase();
+
             // Harus berlawanan arah.
             if (!isBerlawananArah(a.ka, b.ka)) {
                 continue;
             }
 
             // Minimal satu KA belum dikonfirmasi.
+            // Jika keduanya sudah JALAN, tidak ditampilkan.
             if (
-                a.ka.status !== 'BELUM' &&
-                b.ka.status !== 'BELUM'
+                statusA === 'JALAN' &&
+                statusB === 'JALAN'
             ) {
                 continue;
             }
@@ -329,6 +381,7 @@ function updateAwasBanner(info) {
     // Sembunyikan banner jika tidak ada pasangan berbahaya.
     if (!info || !info.pairs || !info.pairs.length) {
         banner.hidden = true;
+        banner.classList.add('hidden');
         banner.innerHTML = '';
         return;
     }
@@ -368,5 +421,7 @@ function updateAwasBanner(info) {
         </ul>
     `;
 
+    // Hapus class hidden dan atribut hidden.
+    banner.classList.remove('hidden');
     banner.hidden = false;
 }

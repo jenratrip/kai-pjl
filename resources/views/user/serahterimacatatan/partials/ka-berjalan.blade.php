@@ -1,26 +1,4 @@
 <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
-    @php
-        $kaBerjalanTeks = collect($ringkasanKA['berjalan'] ?? [])
-            ->map(function ($ka) {
-                $nomor = trim((string) ($ka['nomor'] ?? '-'));
-                $nama = trim((string) ($ka['nama'] ?? ''));
-
-                if ($nomor === '' || $nomor === '-') {
-                    return $nama !== '' && $nama !== '-'
-                        ? $nama
-                        : '-';
-                }
-
-                if ($nama !== '' && $nama !== '-') {
-                    return $nomor . ' - ' . $nama;
-                }
-
-                return $nomor;
-            })
-            ->unique()
-            ->implode("\n");
-    @endphp
-
     {{-- Header bagian --}}
     <div class="mb-4 flex items-center gap-3">
         <span
@@ -34,27 +12,8 @@
         </h2>
     </div>
 
-    {{-- Label --}}
-    <label
-        for="ka_berjalan"
-        class="mb-2 block text-sm font-medium text-[#1d2d50]"
-    >
-        Nomor dan nama KA yang berjalan selama dinas.
-    </label>
-
-    {{-- Ringkasan KA: tetap diam, tidak ikut scroll --}}
-    <textarea
-        id="ka_berjalan"
-        name="ka_berjalan"
-        data-summary="ka_berjalan"
-        rows="4"
-        readonly
-        placeholder="Tidak ada KA berjalan"
-        class="w-full rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-    >{{ $kaBerjalanTeks !== '' ? $kaBerjalanTeks : 'Tidak ada' }}</textarea>
-
-    {{-- Daftar KA: hanya bagian ini yang dapat di-scroll --}}
-    <div class="mt-3 max-h-[360px] space-y-2 overflow-y-auto overscroll-contain pr-2">
+    {{-- Daftar KA --}}
+    <div class="max-h-[360px] space-y-2 overflow-y-auto overscroll-contain pr-2">
         @forelse ($ringkasanKA['berjalan'] ?? [] as $ka)
             <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <p class="font-semibold text-slate-800">

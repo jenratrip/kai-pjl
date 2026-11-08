@@ -476,11 +476,7 @@ function renderTable(forPrint = false) {
         row.dataset.index = index;
 
         row.className =
-            'border-b border-gray-200 hover:bg-gray-50';
-
-        if (awasInfo.indexSet.has(index)) {
-            row.classList.add('awas-row');
-        }
+            'border-b border-gray-200 hover:bg-gray-50 transition-colors';
 
         row.innerHTML = `
             <!-- NOMOR KA -->
@@ -520,7 +516,7 @@ function renderTable(forPrint = false) {
                 ${
                     awasInfo.indexSet.has(index)
                         ? `
-                            <div class="awas-badge mt-1 text-[9px]">
+                            <div class="mt-1 inline-block rounded-md border border-rose-300 bg-rose-200 px-1.5 py-1 text-[9px] font-bold text-rose-800">
                                 ⚠ AWAS 2 ARAH
                             </div>
                         `
@@ -616,6 +612,20 @@ function renderTable(forPrint = false) {
                 ${createRowAction(index)}
             </td>
         `;
+
+        /* =================================================
+   WARNA KOLOM KA AWAS 2 ARAH
+================================================= */
+
+if (awasInfo.indexSet.has(index)) {
+    row.querySelectorAll('td').forEach(td => {
+        td.style.setProperty(
+            'background-color',
+            '#fff1f2',
+            'important'
+        );
+    });
+}
 
         tbody.appendChild(row);
     });

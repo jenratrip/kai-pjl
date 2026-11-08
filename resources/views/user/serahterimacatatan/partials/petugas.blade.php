@@ -45,7 +45,7 @@
             </p>
 
             <p class="mt-1 text-sm text-slate-500">
-                NIP: {{ auth()->user()->nip ?: '-' }}
+                NIPP / NIPKWT: {{ auth()->user()->nip ?: '-' }}
             </p>
         </div>
 
@@ -53,7 +53,7 @@
         <div class="rounded-lg bg-slate-50 p-4">
             <label for="penerima_search"
                    class="block text-xs font-semibold text-slate-600">
-                Cari PJL penerima berdasarkan nama atau NIP
+                Cari PJL penerima berdasarkan nama atau NIPP / NIPKWT
             </label>
 
             <input id="penerima_search"
@@ -61,7 +61,7 @@
                    value="{{ $namaPenerimaLama }}"
                    maxlength="100"
                    autocomplete="off"
-                   placeholder="Ketik nama atau NIP..."
+                   placeholder="Ketik nama atau NIPP / NIPKWT..."
                    aria-describedby="penerima_search_help"
                    aria-controls="penerima_search_results"
                    class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-[#1d2d50] focus:outline-none focus:ring-2 focus:ring-[#1d2d50]/20">
@@ -99,7 +99,7 @@
                 </p>
 
                 <p class="mt-1 text-sm text-slate-600">
-                    NIP: <span id="penerima_selected_nip">{{ $nipPenerimaLama ?: '-' }}</span>
+                    NIPP / NIPKWT: <span id="penerima_selected_nip">{{ $nipPenerimaLama ?: '-' }}</span>
                 </p>
 
                 <button type="button"

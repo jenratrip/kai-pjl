@@ -71,7 +71,7 @@
                 </p>
 
                 <p class="text-xs text-slate-500">
-                    NIP:
+                    NIPP / NIPKWT:
                     {{ data_get($serahTerima, 'ringkasan.nip_penyerah') ?: ($serahTerima?->dinas?->user?->nip ?? auth()->user()->nip ?? '-') }}
                 </p>
 
@@ -181,7 +181,7 @@
                 </p>
 
                 <p class="text-xs text-slate-500">
-                    NIP:
+                    NIPP / NIPKWT:
                     {{ data_get($serahTerima, 'ringkasan.nip_penerima') ?: ($serahTerima?->penerima?->nip ?? '-') }}
                 </p>
 

@@ -17,6 +17,10 @@ function refreshTimeFilter() {
         lastVisibleIds = currentVisibleIds;
         renderTable();
     }
+
+    // Perbarui deteksi dan tampilan AWAS 2 ARAH.
+    const infoAwas = cariAwas2Arah();
+    updateAwasBanner(infoAwas);
 }
 
 /* =====================================================
@@ -29,6 +33,10 @@ function initRealisasiKA() {
     lastVisibleIds = getVisibleIds();
 
     updateWindowRange();
+
+    // Jalankan deteksi AWAS 2 ARAH saat halaman pertama dibuka.
+    const infoAwas = cariAwas2Arah();
+    updateAwasBanner(infoAwas);
 
     setSaveStatus('idle', 'Penyimpanan otomatis aktif');
 
