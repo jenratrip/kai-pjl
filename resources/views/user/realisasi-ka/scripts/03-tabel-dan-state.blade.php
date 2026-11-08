@@ -1,5 +1,5 @@
 /* =====================================================
-STATUS PENYIMPANAN PER BARIS
+   STATUS PENYIMPANAN PER BARIS
 ===================================================== */
 
 let dirtyRows = new Set();
@@ -26,7 +26,10 @@ function stateBaris(index) {
 
     if (
         savedRows.has(index) ||
-        (dataKA[index] && dataKA[index].realisasi_ka_id)
+        (
+            dataKA[index] &&
+            dataKA[index].realisasi_ka_id
+        )
     ) {
         return 'saved';
     }
@@ -45,19 +48,19 @@ function refreshRowButtons() {
             saved: '✓ Tersimpan'
         };
 
-        button.className = `row-save-btn ${state}`;
-
         const styles = {
             dirty: 'background:#2563eb;color:#fff;border:1px solid #2563eb;',
             saving: 'background:#64748b;color:#fff;border:1px solid #64748b;',
             saved: 'background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;'
         };
 
+        button.className = `row-save-btn ${state}`;
+
         button.style.cssText = `
             ${styles[state] || styles.dirty}
-            padding:7px 12px;
+            padding:6px 7px;
             border-radius:7px;
-            font-size:12px;
+            font-size:10px;
             font-weight:600;
             white-space:nowrap;
             cursor:pointer;
@@ -73,6 +76,10 @@ function simpanBaris(index) {
         return;
     }
 
+    if (savingRows.has(index)) {
+        return;
+    }
+
     dirtyRows.add(index);
     isDirty = true;
 
@@ -83,97 +90,242 @@ function simpanBaris(index) {
     });
 }
 
+
 /* =====================================================
-KOMPONEN TABEL
+   KOMPONEN INDIKATOR CENTANG / SILANG
+
+   KOSONG -> ✓ -> ✕ -> ✓
 ===================================================== */
 
 function createCheckGroup(value, index, field) {
-    const yesClass = value === 'yes' ?
-        'bg-green-100 text-green-700 border-green-300' :
-        'bg-white text-slate-500 border-slate-300 hover:bg-green-50 hover:text-green-700';
+    const currentState =
+        value === 'yes'
+            ? 'yes'
+            : value === 'no'
+                ? 'no'
+                : 'empty';
 
-    const noClass = value === 'no' ?
-        'bg-red-100 text-red-700 border-red-300' :
-        'bg-white text-slate-500 border-slate-300 hover:bg-red-50 hover:text-red-700';
+    const styles = {
+        yes: 'background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;',
+        no: 'background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;',
+        empty: 'background:#f8fafc;color:#94a3b8;border:1px solid #cbd5e1;'
+    };
 
-    const buttonBase = [
-        'inline-flex items-center justify-center',
-        'h-8 w-8 rounded-md border',
-        'text-sm font-semibold transition-colors',
-        'focus:outline-none focus:ring-2 focus:ring-offset-1'
-    ].join(' ');
+    const icons = {
+        yes: '✓',
+        no: '✕',
+        empty: '—'
+    };
 
     return `
-        <div class="check-group flex items-center justify-center gap-1">
-            <button
-                type="button"
-                class="check ${buttonBase} ${yesClass}"
-                onclick="setCheck(this, ${index}, '${field}', 'yes')"
-                aria-label="Ya"
-                title="Ya"
-            >✓</button>
-
-            <button
-                type="button"
-                class="check ${buttonBase} ${noClass}"
-                onclick="setCheck(this, ${index}, '${field}', 'no')"
-                aria-label="Tidak"
-                title="Tidak"
-            >×</button>
-        </div>
+        <button
+            type="button"
+            class="check-toggle inline-flex items-center justify-center w-full max-w-[42px] min-w-0 rounded-md px-1 py-2 text-sm font-bold transition-colors"
+            style="${styles[currentState]}"
+            onclick="toggleCheck(${index}, '${field}')"
+            aria-label="Ubah indikator ${field}"
+            title="Klik untuk mengubah centang atau silang"
+        >
+            ${icons[currentState]}
+        </button>
     `;
 }
+
+function getNextCheckValue(currentValue) {
+    if (currentValue === '') {
+        return 'yes';
+    }
+
+    if (currentValue === 'yes') {
+        return 'no';
+    }
+
+    return 'yes';
+}
+
+function toggleCheck(index, field) {
+    const ka = dataKA[index];
+
+    if (!ka) {
+        return;
+    }
+
+    const nextValue = getNextCheckValue(
+        ka[field] ?? ''
+    );
+
+    setCheck(
+        null,
+        index,
+        field,
+        nextValue
+    );
+}
+
+
+/* =====================================================
+   JAM AKTUAL
+
+   KOSONG -> IKON JAM
+   KLIK   -> INPUT WAKTU
+   TERISI -> TAMPILKAN WAKTU
+===================================================== */
+
+function createActualTime(ka, index) {
+    if (ka.aktual) {
+        return `
+            <button
+                type="button"
+                class="inline-flex w-full min-w-0 items-center justify-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-1 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+                onclick="showActualTimeInput(${index})"
+                title="Klik untuk mengubah jam aktual"
+            >
+                <span>${escapeHtml(ka.aktual)}</span>
+                <span class="text-[10px]">✎</span>
+            </button>
+        `;
+    }
+
+    return `
+        <button
+            type="button"
+            class="inline-flex w-full items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
+            onclick="showActualTimeInput(${index})"
+            title="Isi jam aktual"
+            aria-label="Isi jam aktual"
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+        </button>
+    `;
+}
+
+function showActualTimeInput(index) {
+    if (!dataKA[index]) {
+        return;
+    }
+
+    const row = document.querySelector(
+        `tr[data-index="${index}"]`
+    );
+
+    if (!row) {
+        return;
+    }
+
+    const cell = row.querySelector('[data-actual-time]');
+
+    if (!cell || cell.querySelector('input[type="time"]')) {
+        return;
+    }
+
+    const input = document.createElement('input');
+
+    input.type = 'time';
+
+    input.className = [
+        'actual-time',
+        'w-full',
+        'min-w-0',
+        'rounded-md',
+        'border',
+        'border-blue-400',
+        'px-1',
+        'py-2',
+        'text-xs',
+        'text-center',
+        'focus:outline-none',
+        'focus:ring-1',
+        'focus:ring-blue-500'
+    ].join(' ');
+
+    input.value = dataKA[index].aktual || '';
+
+    cell.replaceChildren(input);
+
+    input.focus();
+
+    input.addEventListener('change', function () {
+        updateActualTime(index, this.value);
+    });
+
+    input.addEventListener('blur', function () {
+        if (!dataKA[index]) {
+            return;
+        }
+
+        const currentValue = dataKA[index].aktual || '';
+
+        if (this.value === currentValue) {
+            renderTable();
+        }
+    });
+}
+
+
+/* =====================================================
+   STATUS KA
+
+   JALAN: SELALU HIJAU
+   BATAL: SELALU MERAH
+===================================================== */
 
 function createStatus(ka, index) {
     const color = getStatusColor(ka);
 
-    const labelMap = {
-        tepat: 'JALAN',
-        telat: 'TERLAMBAT',
-        'telat-tinggi': 'TELAT TINGGI',
-        cepat: 'LEBIH CEPAT',
-        batal: 'BATAL'
-    };
-
-    const badgeStyleMap = {
-        tepat: 'background:#f0fdf4;color:#15803d;border-color:#bbf7d0;',
-        telat: 'background:#fefce8;color:#a16207;border-color:#fde68a;',
-        'telat-tinggi': 'background:#fefce8;color:#a16207;border-color:#fde68a;',
-        cepat: 'background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;',
-        batal: 'background:#fef2f2;color:#b91c1c;border-color:#fecaca;'
-    };
-
     const jalanActive = ka.status === 'JALAN';
     const batalActive = ka.status === 'BATAL';
 
-    const buttonBaseStyle =
-        'flex:1;min-width:0;height:36px;padding:0 8px;' +
-        'border:1px solid #d5dce5;border-radius:9px;' +
-        'box-shadow:none;font-size:12px;font-weight:500;' +
-        'line-height:1.2;white-space:nowrap;cursor:pointer;' +
-        'display:flex;align-items:center;justify-content:center;';
+    const buttonBaseStyle = [
+        'flex:1',
+        'min-width:0',
+        'height:34px',
+        'padding:0 5px',
+        'border:1px solid',
+        'border-radius:7px',
+        'font-size:11px',
+        'font-weight:700',
+        'line-height:1.2',
+        'white-space:nowrap',
+        'cursor:pointer',
+        'display:flex',
+        'align-items:center',
+        'justify-content:center',
+        'transition:all .15s ease'
+    ].join(';');
 
-    const jalanStyle = buttonBaseStyle + (
-        jalanActive ?
-        'background:#f0fdf4;color:#15803d;border-color:#bbf7d0;' :
-        'background:#f8fafc;color:#64748b;'
+    const jalanStyle = buttonBaseStyle + ';' + (
+        jalanActive
+            ? 'background:#15803d;color:#fff;border-color:#15803d;'
+            : 'background:#dcfce7;color:#166534;border-color:#86efac;'
     );
 
-    const batalStyle = buttonBaseStyle + (
-        batalActive ?
-        'background:#fef2f2;color:#b91c1c;border-color:#fecaca;' :
-        'background:#f8fafc;color:#64748b;'
+    const batalStyle = buttonBaseStyle + ';' + (
+        batalActive
+            ? 'background:#b91c1c;color:#fff;border-color:#b91c1c;'
+            : 'background:#fee2e2;color:#991b1b;border-color:#fca5a5;'
     );
 
     const note = getStatusNote(ka, color);
 
     return `
-
         <div style="
             display:flex;
             width:100%;
             min-width:0;
-            gap:6px;
+            gap:5px;
             align-items:center;
         ">
             <button
@@ -181,7 +333,8 @@ function createStatus(ka, index) {
                 data-print-status="jalan"
                 style="${jalanStyle}"
                 onclick="setStatus(${index}, 'JALAN')"
-                aria-pressed="${jalanActive}">
+                aria-pressed="${jalanActive}"
+            >
                 JALAN
             </button>
 
@@ -190,16 +343,34 @@ function createStatus(ka, index) {
                 data-print-status="batal"
                 style="${batalStyle}"
                 onclick="setStatus(${index}, 'BATAL')"
-                aria-pressed="${batalActive}">
+                aria-pressed="${batalActive}"
+            >
                 BATAL
             </button>
         </div>
 
-        ${note
-            ? `<div style="margin-top:6px;white-space:normal;overflow-wrap:anywhere;font-size:12px;color:#6b7280;">${escapeHtml(note)}</div>`
-            : ''}
+        ${
+            note
+                ? `
+                    <div style="
+                        margin-top:4px;
+                        white-space:normal;
+                        overflow-wrap:anywhere;
+                        font-size:9px;
+                        color:#6b7280;
+                    ">
+                        ${escapeHtml(note)}
+                    </div>
+                `
+                : ''
+        }
     `;
 }
+
+
+/* =====================================================
+   TOMBOL AKSI BARIS
+===================================================== */
 
 function createRowAction(index) {
     const state = stateBaris(index);
@@ -220,7 +391,15 @@ function createRowAction(index) {
         <button
             type="button"
             class="row-save-btn ${state}"
-            style="${styles[state] || styles.dirty} padding:7px 12px; border-radius:7px; font-size:12px; font-weight:600; white-space:nowrap; cursor:pointer;"
+            style="
+                ${styles[state] || styles.dirty}
+                padding:6px 7px;
+                border-radius:7px;
+                font-size:10px;
+                font-weight:600;
+                white-space:nowrap;
+                cursor:pointer;
+            "
             data-save-row="${index}"
             onclick="simpanBaris(${index})"
             ${state === 'saving' ? 'disabled' : ''}
@@ -230,29 +409,55 @@ function createRowAction(index) {
     `;
 }
 
+
+/* =====================================================
+   RENDER TABEL REALISASI KA
+
+   1. Nomor KA
+   2. Nama KA
+   3. Relasi
+   4. Jam Jadwal
+   5. Jam Aktual
+   6. Status
+   7. Semboyan 21
+   8. Genta
+   9. Pintu Perlintasan
+   10. Semboyan 35
+   11. Keterangan
+   12. Aksi
+===================================================== */
+
 function renderTable(forPrint = false) {
     const tbody = document.getElementById('kaTableBody');
 
-    if (!tbody) return;
+    if (!tbody) {
+        return;
+    }
 
     const awasInfo = cariAwas2Arah();
+
     updateAwasBanner(awasInfo);
 
     const visibleKA = forPrint
-        ? dataKA.map((ka, index) => ({ ka, index }))
+        ? dataKA.map((ka, index) => ({
+            ka,
+            index
+        }))
         : getVisibleKA();
 
     tbody.innerHTML = '';
 
     if (!visibleKA.length) {
-        const message = dataKA.length === 0 ?
-            'Belum ada jadwal KA untuk dinas aktif ini.' :
-            'Tidak ada KA dalam rentang jam ini.';
+        const message = dataKA.length === 0
+            ? 'Belum ada jadwal KA untuk dinas aktif ini.'
+            : 'Tidak ada KA dalam rentang jam ini.';
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="${JUMLAH_KOLOM_TABEL}"
-                    class="px-4 py-8 text-center text-sm text-gray-500">
+                <td
+                    colspan="${JUMLAH_KOLOM_TABEL}"
+                    class="px-2 py-8 text-center text-xs text-gray-500"
+                >
                     ${escapeHtml(message)}
                 </td>
             </tr>
@@ -265,92 +470,149 @@ function renderTable(forPrint = false) {
         return;
     }
 
-    visibleKA.forEach(({
-        ka,
-        index
-    }, visibleIndex) => {
+    visibleKA.forEach(({ ka, index }) => {
         const row = document.createElement('tr');
 
         row.dataset.index = index;
-        row.className = 'border-b border-gray-200 hover:bg-gray-50';
+
+        row.className =
+            'border-b border-gray-200 hover:bg-gray-50';
 
         if (awasInfo.indexSet.has(index)) {
             row.classList.add('awas-row');
         }
 
         row.innerHTML = `
-            <td class="whitespace-nowrap px-3 py-3 text-center text-sm text-gray-600">
-                ${visibleIndex + 1}
-            </td>
-
-            <td class="whitespace-nowrap px-3 py-3 text-sm font-semibold text-gray-800">
+            <!-- NOMOR KA -->
+            <td class="
+                break-words
+                px-1
+                py-2
+                text-center
+                text-xs
+                font-semibold
+                text-gray-800
+            ">
                 ${escapeHtml(ka.nomor)}
-                ${ka.is_manual
-                    ? '<div class="mt-1 text-xs font-medium text-amber-600">MANUAL</div>'
-                    : ''}
+
+                ${
+                    ka.is_manual
+                        ? `
+                            <div class="mt-1 text-[9px] font-medium text-amber-600">
+                                MANUAL
+                            </div>
+                        `
+                        : ''
+                }
             </td>
 
-            <td class="min-w-36 px-3 py-3 text-sm text-gray-800">
+            <!-- NAMA KA -->
+            <td class="
+                break-words
+                px-1
+                py-2
+                text-xs
+                font-medium
+                text-gray-800
+            ">
                 ${escapeHtml(ka.nama)}
-                ${awasInfo.indexSet.has(index)
-                    ? '<div class="awas-badge">⚠ AWAS 2 ARAH</div>'
-                    : ''}
+
+                ${
+                    awasInfo.indexSet.has(index)
+                        ? `
+                            <div class="awas-badge mt-1 text-[9px]">
+                                ⚠ AWAS 2 ARAH
+                            </div>
+                        `
+                        : ''
+                }
             </td>
 
-            <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">
-                ${escapeHtml(ka.hulu || '-')}
-            </td>
-
-            <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">
-                ${escapeHtml(ka.hilir || '-')}
-            </td>
-
-            <td class="min-w-28 px-3 py-3 text-sm text-gray-600">
+            <!-- RELASI -->
+            <td class="
+                break-words
+                px-1
+                py-2
+                text-xs
+                text-gray-600
+            ">
                 ${escapeHtml(ka.relasi || '-')}
             </td>
 
-            <td class="whitespace-nowrap px-3 py-3 text-center text-sm font-medium text-gray-700">
-                ${escapeHtml(ka.jadwal)}
+            <!-- JAM JADWAL -->
+            <td class="
+                whitespace-nowrap
+                px-1
+                py-2
+                text-center
+                text-xs
+                font-medium
+                text-gray-700
+            ">
+                ${escapeHtml(ka.jadwal || '-')}
             </td>
 
-            <td class="min-w-32 px-3 py-3">
-                <input
-                    type="time"
-                    class="actual-time w-full min-w-24 rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    value="${escapeHtml(ka.aktual)}"
-                    onchange="updateActualTime(${index}, this.value)">
+            <!-- JAM AKTUAL -->
+            <td
+                class="px-1 py-2 text-center"
+                data-actual-time
+            >
+                ${createActualTime(ka, index)}
             </td>
 
-            <td class="min-w-28 px-3 py-3 text-center">
+            <!-- STATUS -->
+            <td class="px-1 py-2 text-center">
                 ${createStatus(ka, index)}
             </td>
 
-            <td class="min-w-28 px-3 py-3 text-center">
+            <!-- SEMBOYAN 21 -->
+            <td class="px-1 py-2 text-center">
                 ${createCheckGroup(ka.semboyan21, index, 'semboyan21')}
             </td>
 
-            <td class="min-w-24 px-3 py-3 text-center">
+            <!-- GENTA -->
+            <td class="px-1 py-2 text-center">
                 ${createCheckGroup(ka.genta, index, 'genta')}
             </td>
 
-            <td class="min-w-36 px-3 py-3 text-center">
+            <!-- PINTU PERLINTASAN -->
+            <td class="px-1 py-2 text-center">
                 ${createCheckGroup(ka.pintu, index, 'pintu')}
             </td>
 
-            <td class="min-w-28 px-3 py-3 text-center">
+            <!-- SEMBOYAN 35 -->
+            <td class="px-1 py-2 text-center">
                 ${createCheckGroup(ka.semboyan35, index, 'semboyan35')}
             </td>
 
-            <td class="min-w-44 px-3 py-3">
+            <!-- KETERANGAN -->
+            <td class="px-1 py-1">
                 <input
                     type="text"
-                    class="note-input w-full min-w-36 rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    value="${escapeHtml(ka.keterangan)}"
-                    placeholder="Keterangan"
-                    oninput="updateKeterangan(${index}, this.value)">
+                    class="
+                        note-input
+                        w-full
+                        min-w-0
+                        rounded
+                        border
+                        border-gray-300
+                        px-1
+                        py-1.5
+                        text-[9px]
+                        focus:border-blue-500
+                        focus:outline-none
+                        focus:ring-1
+                        focus:ring-blue-500
+                    "
+                    value="${escapeHtml(ka.keterangan || '')}"
+                    placeholder="Catatan"
+                    maxlength="${BATAS_KARAKTER_CATATAN}"
+                    oninput="updateKeterangan(${index}, this.value)"
+                >
             </td>
 
-            <td class="whitespace-nowrap px-3 py-3 text-center">
+            <!-- AKSI -->
+            <td class="px-1 py-2 text-center">
                 ${createRowAction(index)}
             </td>
         `;

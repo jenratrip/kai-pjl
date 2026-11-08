@@ -1,4 +1,3 @@
-
 @extends('layouts.user')
 
 @section('title', 'Riwayat Serah Terima Dinas - Sistem PJL')
@@ -14,13 +13,13 @@
                 'border-l-slate-300',
             ],
             'menunggu_penerima' => [
-                'Menunggu persetujuan admin',
+                'Menunggu tanda tangan penerima',
                 'bg-amber-100 text-amber-800',
                 'bg-amber-500',
                 'border-l-amber-400',
             ],
             'selesai' => [
-                'Disetujui',
+                'Sudah ditandatangani',
                 'bg-green-100 text-green-800',
                 'bg-green-500',
                 'border-l-green-500',
@@ -34,7 +33,15 @@
             'border-l-slate-300',
         ];
 
-        // Data disiapkan sekali untuk tabel desktop dan kartu HP.
+        /*
+         * Data disiapkan sekali untuk tabel desktop dan kartu HP.
+         *
+         * Dokumen masuk:
+         * penerima_user_id = akun yang sedang login.
+         *
+         * Dokumen keluar:
+         * dokumen dibuat oleh akun yang sedang login.
+         */
         $baris = $riwayat->getCollection()->map(function ($item) use ($label, $labelDefault) {
             $status = (string) $item->status;
 
@@ -54,8 +61,41 @@
 
             $tanggal = $tgl?->translatedFormat('d M Y') ?? '-';
 
-            // Status selesai berarti sudah disetujui dan dikunci.
+            $isPenerima = (int) $item->penerima_user_id === (int) auth()->id();
+
+            $namaPenyerah = $item->dinas?->user?->name
+                ?? data_get($item->ringkasan, 'nama_penyerah')
+                ?? '-';
+
+            $namaPenerima = data_get($item->ringkasan, 'nama_penerima')
+                ?: ($item->penerima?->name ?? '-');
+
+            /*
+             * Status selesai berarti kedua tanda tangan sudah tersedia.
+             * Status ini belum tentu berarti admin sudah menyetujui.
+             */
             $terkunci = $status === 'selesai';
+
+            /*
+             * Untuk dokumen masuk, tampilkan nama penyerah.
+             * Untuk dokumen keluar, tampilkan nama penerima.
+             */
+            $namaPihak = $isPenerima
+                ? $namaPenyerah
+                : $namaPenerima;
+
+            $keteranganPihak = $isPenerima
+                ? 'Dari'
+                : 'Kepada';
+
+            /*
+             * Penerima membuka dokumen yang sama melalui halaman edit.
+             * Controller harus membatasi penerima agar hanya dapat
+             * mengisi tanda tangan penerima, bukan mengedit isi dokumen.
+             */
+            $labelAksi = $terkunci
+                ? 'Lihat'
+                : ($isPenerima ? 'Konfirmasi & tanda tangan' : 'Edit');
 
             return [
                 'tanggal' => $tanggal,
@@ -63,21 +103,29 @@
                 'shift' => $item->dinas?->shift?->nama_shift ?? '-',
                 'jpl' => $item->dinas?->jpl?->kode_jpl ?? '-',
                 'namaJpl' => $item->dinas?->jpl?->nama_jpl,
-                'penerima' => data_get($item->ringkasan, 'nama_penerima')
-                    ?: ($item->penerima?->name ?? '-'),
+
+                'namaPihak' => $namaPihak,
+                'keteranganPihak' => $keteranganPihak,
+
                 'disimpan' => $waktuSimpan
                     ? \Carbon\Carbon::parse($waktuSimpan)
                         ->timezone('Asia/Jakarta')
                         ->locale('id')
                         ->translatedFormat('d M Y, H:i') . ' WIB'
                     : '-',
+
                 'teks' => $teks,
                 'kelas' => $kelas,
                 'titik' => $titik,
                 'garis' => $garis,
+
+                'isPenerima' => $isPenerima,
                 'terkunci' => $terkunci,
+                'labelAksi' => $labelAksi,
+
                 'urlEdit' => route('user.serah-terima-dinas.edit', $item),
                 'urlLihat' => route('user.serah-terima-dinas.show', $item),
+
                 'aria' => 'serah terima dinas tanggal ' . $tanggal,
             ];
         });
@@ -92,10 +140,11 @@
                     Riwayat Serah Terima Dinas
                 </h1>
 
-                <p class="mt-1 max-w-xl text-sm leading-relaxed text-slate-500">
-                    Setiap serah terima yang kamu simpan tercatat di sini dan
-                    dikirim ke admin. Data yang belum disetujui masih bisa diedit.
-                    Data yang sudah disetujui hanya bisa dilihat.
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
+                    Riwayat menampilkan serah terima yang kamu buat maupun
+                    dokumen yang ditujukan kepadamu sebagai penerima.
+                    Dokumen yang menunggu tanda tangan penerima dapat dikonfirmasi
+                    oleh petugas yang ditunjuk.
                 </p>
             </div>
 
@@ -145,14 +194,13 @@
                 </p>
 
                 <p class="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-slate-500">
-                    Riwayat muncul setelah Anda menekan tombol
-                    <strong>Simpan serah terima</strong> di halaman serah terima.
-                    Menyimpan catatan dinas atau inventaris saja tidak membuat riwayat.
+                    Riwayat akan muncul setelah kamu menyimpan serah terima
+                    atau setelah petugas lain menunjuk akunmu sebagai penerima.
                 </p>
 
                 <a
                     href="{{ route('user.serah-terima-dinas') }}"
-                    class="mt-4 inline-flex items-center justify-center rounded-lg bg-[#1d2d50] px-4 py-2 text-xs font-bold text-white transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d2d50] focus-visible:ring-offset-2 max-sm:text-xs"
+                    class="mt-4 inline-flex items-center justify-center rounded-lg bg-[#1d2d50] px-4 py-2 text-xs font-bold text-white transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d2d50] focus-visible:ring-offset-2"
                 >
                     Buat serah terima
                 </a>
@@ -161,19 +209,37 @@
 
             {{-- Tabel desktop --}}
             <div class="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
-                <table class="w-full min-w-[760px] text-left text-sm">
+                <table class="w-full min-w-[800px] text-left text-sm">
                     <caption class="sr-only">
                         Daftar riwayat serah terima dinas
                     </caption>
 
                     <thead class="bg-[#1d2d50] text-white">
                         <tr>
-                            <th scope="col" class="px-4 py-4 text-[15px] font-bold">Tanggal dinas</th>
-                            <th scope="col" class="px-4 py-4 text-[15px] font-bold">Shift</th>
-                            <th scope="col" class="px-4 py-4 text-[15px] font-bold">JPL</th>
-                            <th scope="col" class="px-4 py-4 text-[15px] font-bold">Penerima</th>
-                            <th scope="col" class="px-4 py-4 text-[15px] font-bold">Terakhir disimpan</th>
-                            <th scope="col" class="px-4 py-4 text-[15px] font-bold">Status</th>
+                            <th scope="col" class="px-4 py-4 text-[15px] font-bold">
+                                Tanggal dinas
+                            </th>
+
+                            <th scope="col" class="px-4 py-4 text-[15px] font-bold">
+                                Shift
+                            </th>
+
+                            <th scope="col" class="px-4 py-4 text-[15px] font-bold">
+                                JPL
+                            </th>
+
+                            <th scope="col" class="px-4 py-4 text-[15px] font-bold">
+                                Penyerah / Penerima
+                            </th>
+
+                            <th scope="col" class="px-4 py-4 text-[15px] font-bold">
+                                Terakhir disimpan
+                            </th>
+
+                            <th scope="col" class="px-4 py-4 text-[15px] font-bold">
+                                Status
+                            </th>
+
                             <th scope="col" class="px-4 py-4 text-right text-[15px] font-bold">
                                 <span class="sr-only">Aksi</span>
                             </th>
@@ -214,8 +280,24 @@
                                     @endif
                                 </td>
 
-                                <td class="px-4 py-4 align-middle text-slate-700">
-                                    {{ $b['penerima'] }}
+                                <td class="px-4 py-4 align-middle">
+                                    <p class="text-xs text-slate-500">
+                                        {{ $b['keteranganPihak'] }}
+                                    </p>
+
+                                    <p class="font-medium text-slate-700">
+                                        {{ $b['namaPihak'] }}
+                                    </p>
+
+                                    @if ($b['isPenerima'])
+                                        <span class="mt-1 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                                            Dokumen masuk
+                                        </span>
+                                    @else
+                                        <span class="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                            Dokumen dibuat
+                                        </span>
+                                    @endif
                                 </td>
 
                                 <td class="whitespace-nowrap px-4 py-4 align-middle text-[13px] text-slate-500">
@@ -228,13 +310,13 @@
                                             class="h-1.5 w-1.5 rounded-full {{ $b['titik'] }}"
                                             aria-hidden="true"
                                         ></span>
+
                                         {{ $b['teks'] }}
                                     </span>
                                 </td>
 
                                 <td class="whitespace-nowrap px-4 py-4 text-right align-middle">
                                     @if ($b['terkunci'])
-                                        {{-- Sudah disetujui: hanya boleh melihat --}}
                                         <a
                                             href="{{ $b['urlLihat'] }}"
                                             aria-label="Lihat {{ $b['aria'] }}"
@@ -242,8 +324,15 @@
                                         >
                                             Lihat
                                         </a>
+                                    @elseif ($b['isPenerima'])
+                                        <a
+                                            href="{{ $b['urlEdit'] }}"
+                                            aria-label="Konfirmasi dan tanda tangan {{ $b['aria'] }}"
+                                            class="inline-flex items-center justify-center rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-amber-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                                        >
+                                            Konfirmasi & tanda tangan
+                                        </a>
                                     @else
-                                        {{-- Belum disetujui: masih bisa diedit --}}
                                         <a
                                             href="{{ $b['urlEdit'] }}"
                                             aria-label="Edit {{ $b['aria'] }}"
@@ -281,34 +370,57 @@
                                     class="h-1.5 w-1.5 rounded-full {{ $b['titik'] }}"
                                     aria-hidden="true"
                                 ></span>
+
                                 {{ $b['teks'] }}
                             </span>
                         </div>
 
                         <dl class="mt-3 grid grid-cols-2 gap-x-3 gap-y-2.5 text-sm">
                             <div>
-                                <dt class="text-xs text-slate-500">Shift</dt>
+                                <dt class="text-xs text-slate-500">
+                                    Shift
+                                </dt>
+
                                 <dd class="font-semibold text-slate-800">
                                     {{ $b['shift'] }}
                                 </dd>
                             </div>
 
                             <div>
-                                <dt class="text-xs text-slate-500">JPL</dt>
+                                <dt class="text-xs text-slate-500">
+                                    JPL
+                                </dt>
+
                                 <dd class="font-semibold text-slate-800">
                                     {{ $b['jpl'] }}
                                 </dd>
                             </div>
 
                             <div class="col-span-2">
-                                <dt class="text-xs text-slate-500">Penerima</dt>
+                                <dt class="text-xs text-slate-500">
+                                    {{ $b['keteranganPihak'] }}
+                                </dt>
+
                                 <dd class="font-semibold text-slate-800">
-                                    {{ $b['penerima'] }}
+                                    {{ $b['namaPihak'] }}
                                 </dd>
+
+                                @if ($b['isPenerima'])
+                                    <span class="mt-1 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                                        Dokumen masuk
+                                    </span>
+                                @else
+                                    <span class="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                        Dokumen dibuat
+                                    </span>
+                                @endif
                             </div>
 
                             <div class="col-span-2">
-                                <dt class="text-xs text-slate-500">Terakhir disimpan</dt>
+                                <dt class="text-xs text-slate-500">
+                                    Terakhir disimpan
+                                </dt>
+
                                 <dd class="text-slate-700">
                                     {{ $b['disimpan'] }}
                                 </dd>
@@ -317,7 +429,6 @@
 
                         <div class="mt-3 border-t border-slate-100 pt-3">
                             @if ($b['terkunci'])
-                                {{-- Sudah disetujui: tidak ada tombol edit --}}
                                 <a
                                     href="{{ $b['urlLihat'] }}"
                                     aria-label="Lihat {{ $b['aria'] }}"
@@ -325,12 +436,19 @@
                                 >
                                     Lihat serah terima
                                 </a>
+                            @elseif ($b['isPenerima'])
+                                <a
+                                    href="{{ $b['urlEdit'] }}"
+                                    aria-label="Konfirmasi dan tanda tangan {{ $b['aria'] }}"
+                                    class="block w-full rounded-lg bg-amber-500 px-4 py-2.5 text-center text-sm font-bold text-white transition hover:bg-amber-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                                >
+                                    Konfirmasi & tanda tangan
+                                </a>
                             @else
-                                {{-- Belum disetujui: tombol edit tersedia --}}
                                 <a
                                     href="{{ $b['urlEdit'] }}"
                                     aria-label="Edit {{ $b['aria'] }}"
-                                    class="block w-full rounded-lg bg-[#1d2d50] px-4 py-2.5 text-center text-[15px] font-bold text-white transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d2d50] focus-visible:ring-offset-2 max-sm:text-sm"
+                                    class="block w-full rounded-lg bg-[#1d2d50] px-4 py-2.5 text-center text-sm font-bold text-white transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d2d50] focus-visible:ring-offset-2"
                                 >
                                     Edit serah terima
                                 </a>
