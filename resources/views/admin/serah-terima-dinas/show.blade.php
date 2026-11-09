@@ -1112,6 +1112,7 @@
                     Pastikan seluruh informasi telah diperiksa sebelum memilih keputusan.
                 </p>
 
+                @if (auth()->user()?->role?->name === 'admin')
                 <div class="flex flex-col gap-3 sm:flex-row">
                     <form
                         action="{{ route('admin.serah-terima-dinas.update', $serahTerima->id) }}"
@@ -1141,12 +1142,15 @@
                         ✕ Tolak / Minta Revisi
                     </button>
                 </div>
+                @else
+                    <p class="text-sm text-slate-600">Keputusan review hanya dapat dilakukan oleh Admin.</p>
+                @endif
             </div>
         @endif
     </section>
 
     {{-- MODAL REVISI --}}
-    @if ($penerimaanTerkonfirmasi && !$reviewSudahDisetujui)
+    @if ($penerimaanTerkonfirmasi && !$reviewSudahDisetujui && auth()->user()?->role?->name === 'admin')
         <div
             id="modalRevisi"
             class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto bg-slate-950/60 p-4"
@@ -1262,7 +1266,7 @@
 @endsection
 
 {{-- JAVASCRIPT MODAL --}}
-@if ($penerimaanTerkonfirmasi && !$reviewSudahDisetujui)
+@if ($penerimaanTerkonfirmasi && !$reviewSudahDisetujui && auth()->user()?->role?->name === 'admin')
     @push('scripts')
         <script>
         document.addEventListener('DOMContentLoaded', function () {

@@ -249,7 +249,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
         Route::get('/dashboard', [
             AdminDashboardController::class,
             'index',
-        ])->name('dashboard');
+        ])->middleware('role:admin')->name('dashboard');
 
         // --------------------------------------------------
         // PENGATURAN REALISASI KA
@@ -258,12 +258,12 @@ Route::middleware(['auth', 'role:admin,superadmin'])
         Route::get('/pengaturan-realisasi-ka', [
             RealisasiKaSettingController::class,
             'index',
-        ])->name('realisasi-ka-settings.index');
+        ])->middleware('role:admin')->name('realisasi-ka-settings.index');
 
         Route::put('/pengaturan-realisasi-ka', [
             RealisasiKaSettingController::class,
             'update',
-        ])->name('realisasi-ka-settings.update');
+        ])->middleware('role:admin')->name('realisasi-ka-settings.update');
 
         // --------------------------------------------------
         // DAFTAR REALISASI KA
@@ -278,45 +278,47 @@ Route::middleware(['auth', 'role:admin,superadmin'])
         // MANAJEMEN USER
         // --------------------------------------------------
 
-        Route::get('/users', [
-            AdminUserController::class,
-            'index',
-        ])->name('users.index');
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/users', [
+                AdminUserController::class,
+                'index',
+            ])->name('users.index');
 
-        Route::get('/users/import/template', [
-            AdminUserImportController::class,
-            'downloadTemplate',
-        ])->name('users.import.template');
+            Route::get('/users/import/template', [
+                AdminUserImportController::class,
+                'downloadTemplate',
+            ])->name('users.import.template');
 
-        Route::post('/users/import/preview', [
-            AdminUserImportController::class,
-            'preview',
-        ])->name('users.import.preview');
+            Route::post('/users/import/preview', [
+                AdminUserImportController::class,
+                'preview',
+            ])->name('users.import.preview');
 
-        Route::post('/users/import/confirm', [
-            AdminUserImportController::class,
-            'confirm',
-        ])->name('users.import.confirm');
+            Route::post('/users/import/confirm', [
+                AdminUserImportController::class,
+                'confirm',
+            ])->name('users.import.confirm');
 
-        Route::get('/users/{id}/edit', [
-            AdminUserController::class,
-            'edit',
-        ])->name('users.edit');
+            Route::get('/users/{id}/edit', [
+                AdminUserController::class,
+                'edit',
+            ])->name('users.edit');
 
-        Route::get('/users/{id}', [
-            AdminUserController::class,
-            'show',
-        ])->name('users.show');
+            Route::get('/users/{id}', [
+                AdminUserController::class,
+                'show',
+            ])->name('users.show');
 
-        Route::put('/users/{id}', [
-            AdminUserController::class,
-            'update',
-        ])->name('users.update');
+            Route::put('/users/{id}', [
+                AdminUserController::class,
+                'update',
+            ])->name('users.update');
 
-        Route::patch('/users/{id}/status', [
-            AdminUserController::class,
-            'toggleStatus',
-        ])->name('users.toggle-status');
+            Route::patch('/users/{id}/status', [
+                AdminUserController::class,
+                'toggleStatus',
+            ])->name('users.toggle-status');
+        });
 
         // --------------------------------------------------
         // REVIEW CATATAN DINAS
@@ -363,7 +365,7 @@ Route::middleware(['auth', 'role:admin,superadmin'])
         ])->whereNumber('serahTerima')
             ->name('serah-terima-dinas.update');
 
-        // Admin dan Superadmin hanya melakukan review.
+        // Review operasional hanya untuk Admin; Superadmin bersifat baca saja.
         // Tanda tangan penerima dilakukan oleh PJL penerima.
 
         // --------------------------------------------------
@@ -381,85 +383,89 @@ Route::middleware(['auth', 'role:admin,superadmin'])
         // JADWAL DINAS PJL
         // --------------------------------------------------
 
-        Route::get('/dinas/export', [
-            DinasController::class,
-            'export',
-        ])->name('dinas.export');
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/dinas/export', [
+                DinasController::class,
+                'export',
+            ])->name('dinas.export');
 
-        Route::get('/dinas/template', [
-            DinasController::class,
-            'template',
-        ])->name('dinas.template');
+            Route::get('/dinas/template', [
+                DinasController::class,
+                'template',
+            ])->name('dinas.template');
 
-        Route::post('/dinas/import', [
-            DinasController::class,
-            'import',
-        ])->name('dinas.import');
+            Route::post('/dinas/import', [
+                DinasController::class,
+                'import',
+            ])->name('dinas.import');
 
-        Route::get('/dinas/updates', [
-            DinasController::class,
-            'updates',
-        ])->name('dinas.updates');
+            Route::get('/dinas/updates', [
+                DinasController::class,
+                'updates',
+            ])->name('dinas.updates');
 
-        Route::resource('dinas', DinasController::class)
-            ->except([
-                'create',
-                'show',
-            ])
-            ->names('dinas');
+            Route::resource('dinas', DinasController::class)
+                ->except([
+                    'create',
+                    'show',
+                ])
+                ->names('dinas');
+        });
 
         // --------------------------------------------------
         // MASTER DATA RESORT
         // --------------------------------------------------
 
-        Route::resource('resort', ResortController::class)
-            ->except([
-                'destroy',
-            ]);
+        Route::middleware('role:admin')->group(function () {
+            Route::resource('resort', ResortController::class)
+                ->except([
+                    'destroy',
+                ]);
 
-        Route::patch('/resort/{resort}/toggle-status', [
-            ResortController::class,
-            'toggleStatus',
-        ])->name('resort.toggle-status');
+            Route::patch('/resort/{resort}/toggle-status', [
+                ResortController::class,
+                'toggleStatus',
+            ])->name('resort.toggle-status');
 
-        // --------------------------------------------------
-        // IMPORT WILAYAH
-        // --------------------------------------------------
+            // --------------------------------------------------
+            // IMPORT WILAYAH
+            // --------------------------------------------------
 
-        Route::get('/wilayah/import/template', [
-            WilayahController::class,
-            'downloadTemplate',
-        ])->name('wilayah.import.template');
+            Route::get('/wilayah/import/template', [
+                WilayahController::class,
+                'downloadTemplate',
+            ])->name('wilayah.import.template');
 
-        Route::post('/wilayah/import/preview', [
-            WilayahImportController::class,
-            'preview',
-        ])->name('wilayah.import.preview.store');
+            Route::post('/wilayah/import/preview', [
+                WilayahImportController::class,
+                'preview',
+            ])->name('wilayah.import.preview.store');
 
-        Route::get('/wilayah/import/preview', [
-            WilayahImportController::class,
-            'showPreview',
-        ])->name('wilayah.import.preview');
+            Route::get('/wilayah/import/preview', [
+                WilayahImportController::class,
+                'showPreview',
+            ])->name('wilayah.import.preview');
 
-        Route::post('/wilayah/import/confirm', [
-            WilayahImportController::class,
-            'confirm',
-        ])->name('wilayah.import.confirm');
+            Route::post('/wilayah/import/confirm', [
+                WilayahImportController::class,
+                'confirm',
+            ])->name('wilayah.import.confirm');
 
-        // --------------------------------------------------
-        // MASTER DATA WILAYAH
-        // --------------------------------------------------
+            // --------------------------------------------------
+            // MASTER DATA WILAYAH
+            // --------------------------------------------------
 
-        Route::patch('/wilayah/{wilayah}/toggle-status', [
-            WilayahController::class,
-            'toggleStatus',
-        ])->name('wilayah.toggle-status');
+            Route::patch('/wilayah/{wilayah}/toggle-status', [
+                WilayahController::class,
+                'toggleStatus',
+            ])->name('wilayah.toggle-status');
 
-        Route::resource('wilayah', WilayahController::class)
-            ->except([
-                'show',
-                'destroy',
-            ]);
+            Route::resource('wilayah', WilayahController::class)
+                ->except([
+                    'show',
+                    'destroy',
+                ]);
+        });
 
     });
 
@@ -676,11 +682,6 @@ Route::middleware(['auth', 'superadmin'])
         Route::post('/users/import/preview', [
             SuperadminUserImportController::class,
             'preview',
-        ])->name('users.import.preview.store');
-
-        Route::get('/users/import/preview', [
-            SuperadminUserImportController::class,
-            'showPreview',
         ])->name('users.import.preview');
 
         // Konfirmasi import user.

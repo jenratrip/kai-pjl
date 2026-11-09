@@ -3,6 +3,7 @@
 @section('title', 'Manajemen Shift - Sistem PJL')
 
 @section('content')
+@php($isAdmin = auth()->user()?->role?->name === 'admin')
 <div
     class="p-4 md:p-6 lg:p-8"
     x-data="{
@@ -48,14 +49,16 @@
             </p>
         </div>
 
-        <button
-            type="button"
-            @click="showAdd = true"
-            class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1d2d50] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#2e4674]"
-        >
-            <span class="text-lg leading-none">+</span>
-            Tambah Shift
-        </button>
+        @if ($isAdmin)
+            <button
+                type="button"
+                @click="showAdd = true"
+                class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1d2d50] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#2e4674]"
+            >
+                <span class="text-lg leading-none">+</span>
+                Tambah Shift
+            </button>
+        @endif
     </div>
 
     {{-- NOTIFIKASI --}}
@@ -123,7 +126,9 @@
                         <th class="px-5 py-4 font-semibold">Jam Mulai</th>
                         <th class="px-5 py-4 font-semibold">Jam Selesai</th>
                         <th class="px-5 py-4 font-semibold">Jadwal Terkait</th>
-                        <th class="px-5 py-4 text-right font-semibold">Aksi</th>
+                        @if ($isAdmin)
+                            <th class="px-5 py-4 text-right font-semibold">Aksi</th>
+                        @endif
                     </tr>
                 </thead>
 
@@ -165,8 +170,9 @@
                                 @endif
                             </td>
 
-                            <td class="px-5 py-4">
-                                <div class="flex justify-end gap-2">
+                            @if ($isAdmin)
+                                <td class="px-5 py-4">
+                                    <div class="flex justify-end gap-2">
 
                                     <button
                                         type="button"
@@ -204,13 +210,17 @@
                                         </button>
                                     @endif
 
-                                </div>
-                            </td>
+                                    </div>
+                                </td>
+                            @endif
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-5 py-12 text-center text-slate-500">
-                                Belum ada data shift. Klik Tambah Shift untuk membuat konfigurasi pertama.
+                            <td colspan="{{ $isAdmin ? 6 : 5 }}" class="px-5 py-12 text-center text-slate-500">
+                                Belum ada data shift.
+                                @if ($isAdmin)
+                                    Klik Tambah Shift untuk membuat konfigurasi pertama.
+                                @endif
                             </td>
                         </tr>
                     @endforelse
@@ -229,6 +239,7 @@
         </p>
     </div>
 
+    @if ($isAdmin)
     {{-- MODAL TAMBAH --}}
     <div
         x-show="showAdd"
@@ -478,5 +489,6 @@
         </div>
     </div>
 
+    @endif
 </div>
 @endsection

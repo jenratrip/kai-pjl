@@ -222,6 +222,7 @@
             Setujui catatan jika sudah sesuai, atau minta revisi dengan memberikan alasan yang jelas.
         </p>
 
+        @if (auth()->user()?->role?->name === 'admin')
         <form method="POST"
               action="{{ route('admin.catatan-dinas.update', $catatanDinas->id) }}">
             @csrf
@@ -281,13 +282,16 @@
                         class="rounded-lg bg-gray-900 px-5 py-2.5 font-medium text-white transition hover:bg-gray-700">
                     Simpan Keputusan
                 </button>
-
-                <a href="{{ route('admin.catatan-dinas.index') }}"
-                   class="rounded-lg border border-gray-300 px-5 py-2.5 font-medium text-gray-700 transition hover:bg-gray-50">
-                    Kembali
-                </a>
             </div>
         </form>
+        @else
+            <p class="text-sm text-gray-600">Keputusan review hanya dapat dilakukan oleh Admin.</p>
+        @endif
+
+        <a href="{{ route('admin.catatan-dinas.index') }}"
+           class="mt-4 inline-flex rounded-lg border border-gray-300 px-5 py-2.5 font-medium text-gray-700 transition hover:bg-gray-50">
+            Kembali
+        </a>
     </section>
 
 </div>

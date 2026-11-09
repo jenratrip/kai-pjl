@@ -105,6 +105,32 @@ test('logging in to an existing Dinas with an empty snapshot keeps the empty sna
     Carbon::setTestNow();
 });
 
+test('a regular PJL login selects only the matching JPL and shift Dinas context', function () {
+    Carbon::setTestNow('2026-11-05 09:00:00');
+    $role = $this->kaiRole('pjl');
+    $user = $this->kaiUser($role, 'PJL-MULTI-CONTEXT', ['password' => bcrypt('secret123')]);
+    $shift = $this->kaiShift('06:00:00', '14:00:00');
+    $otherJpl = $this->kaiJpl('JPL-OTHER');
+    $selectedJpl = $this->kaiJpl('JPL-SELECTED');
+    $otherDinas = $this->kaiDinas($user, $otherJpl, $shift);
+    $selectedDinas = $this->kaiDinas($user, $selectedJpl, $shift);
+
+    $this->post(route('login.store'), [
+        'nip' => $user->nip,
+        'password' => 'secret123',
+        'nomor_pjl' => $selectedJpl->kode_jpl,
+        'dinasan' => $shift->id,
+        'jenis_petugas' => 'reguler',
+    ])->assertRedirect(route('user.realisasi-ka'));
+
+    expect(session('dinas_id'))->toBe($selectedDinas->id)
+        ->and($otherDinas->fresh()->status)->toBe('berlangsung')
+        ->and($otherDinas->fresh()->jpl_id)->toBe($otherJpl->id)
+        ->and($selectedDinas->fresh()->status)->toBe('berlangsung');
+
+    Carbon::setTestNow();
+});
+
 test('Admin and Superadmin still log in without PJL operational fields', function () {
     $adminRole = $this->kaiRole('admin');
     $superadminRole = $this->kaiRole('superadmin');
