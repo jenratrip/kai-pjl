@@ -1,4 +1,4 @@
-@extends('layouts.admin')
+@extends(auth()->user()?->isSuperadmin() ? 'layouts.superadmin' : 'layouts.admin')
 
 @section('content')
 <div class="mx-auto max-w-7xl space-y-6 px-4 py-6">
@@ -27,12 +27,14 @@
             </p>
         </div>
 
-        <a
-            href="{{ route('admin.jadwal-ka.import') }}"
-            class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
-        >
-            Import Excel
-        </a>
+        @unless (auth()->user()?->isSuperadmin())
+            <a
+                href="{{ route('admin.jadwal-ka.import') }}"
+                class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
+            >
+                Import Excel
+            </a>
+        @endunless
     </div>
 
     {{-- Total jadwal --}}
@@ -210,9 +212,9 @@
                             Batch Import
                         </th>
 
-                        <th class="whitespace-nowrap px-4 py-3">
-                            Aksi
-                        </th>
+                        @unless (auth()->user()?->isSuperadmin())
+                            <th class="whitespace-nowrap px-4 py-3">Aksi</th>
+                        @endunless
                     </tr>
                 </thead>
 
@@ -276,20 +278,22 @@
                                     : '—' }}
                             </td>
 
-                            {{-- Aksi --}}
-                            <td class="whitespace-nowrap px-4 py-3">
-                                <a
-                                    href="{{ route('admin.jadwal-ka.edit', $item->id) }}"
-                                    class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-800"
-                                >
-                                    Edit
-                                </a>
-                            </td>
+                            @unless (auth()->user()?->isSuperadmin())
+                                {{-- Aksi --}}
+                                <td class="whitespace-nowrap px-4 py-3">
+                                    <a
+                                        href="{{ route('admin.jadwal-ka.edit', $item->id) }}"
+                                        class="inline-flex items-center rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-800"
+                                    >
+                                        Edit
+                                    </a>
+                                </td>
+                            @endunless
                         </tr>
                     @empty
                         <tr>
                             <td
-                                colspan="9"
+                                colspan="{{ auth()->user()?->isSuperadmin() ? 8 : 9 }}"
                                 class="px-4 py-12 text-center"
                             >
                                 <div class="flex flex-col items-center">

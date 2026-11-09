@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
@@ -211,37 +212,30 @@ class UserController extends Controller
             ],
         ]);
 
-        $user = User::create([
-            'nip' => $validated['nip'],
-            'name' => $validated['name'],
-            'email' => $validated['email'] ?? null,
-            'phone' => $validated['phone'] ?? null,
-            'role_id' => $validated['role_id'],
-            'is_active' => $validated['is_active'],
-            'password' => Hash::make($validated['password']),
-        ]);
+        DB::transaction(function () use ($validated): void {
+            $role = Role::query()->findOrFail($validated['role_id']);
+            $user = User::create([
+                'nip' => $validated['nip'],
+                'name' => $validated['name'],
+                'email' => $validated['email'] ?? null,
+                'phone' => $validated['phone'] ?? null,
+                'role_id' => $role->id,
+                'is_active' => $validated['is_active'],
+                'password' => Hash::make($validated['password']),
+            ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Activity Log
-        |--------------------------------------------------------------------------
-        */
-
-        $this->activityLogService->log(
-            'create',
-            'users',
-            'Superadmin membuat pengguna baru: '.$user->name,
-            $user,
-            null,
-            [
-                'nip' => $user->nip,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'role_id' => $user->role_id,
-                'is_active' => $user->is_active,
-            ]
-        );
+            $this->activityLogService->log(
+                'create',
+                'users',
+                'Superadmin membuat akun pengguna.',
+                $user,
+                null,
+                [
+                    'role' => $role->name,
+                    'is_active' => (bool) $user->is_active,
+                ]
+            );
+        });
 
         return redirect()
             ->route('superadmin.users.index')
@@ -359,79 +353,67 @@ class UserController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $oldValues = [
-            'nip' => $user->nip,
-            'name' => $user->name,
-            'email' => $user->email,
-            'phone' => $user->phone,
-            'role_id' => $user->role_id,
-            'is_active' => $user->is_active,
-        ];
+        DB::transaction(function () use ($user, $validated, $isOwnAccount): void {
+            $lockedUser = User::query()
+                ->with('role')
+                ->lockForUpdate()
+                ->findOrFail($user->id);
+            $oldRole = $lockedUser->role?->name;
+            $lockedUser->nip = $validated['nip'];
+            $lockedUser->name = $validated['name'];
+            $lockedUser->email = $validated['email'] ?? null;
+            $lockedUser->phone = $validated['phone'] ?? null;
 
-        /*
-        |--------------------------------------------------------------------------
-        | Update Data
-        |--------------------------------------------------------------------------
-        */
+            if (! $isOwnAccount) {
+                $lockedUser->role_id = $validated['role_id'];
+                $lockedUser->is_active = $validated['is_active'];
+            }
 
-        $user->nip = $validated['nip'];
-        $user->name = $validated['name'];
-        $user->email = $validated['email'] ?? null;
-        $user->phone = $validated['phone'] ?? null;
+            $passwordChanged = ! empty($validated['password'])
+                && ! Hash::check($validated['password'], $lockedUser->password);
 
-        if (! $isOwnAccount) {
-            $user->role_id = $validated['role_id'];
-            $user->is_active = $validated['is_active'];
-        }
+            if ($passwordChanged) {
+                $lockedUser->password = Hash::make($validated['password']);
+            }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Update Password Jika Diisi
-        |--------------------------------------------------------------------------
-        */
+            $changedFields = array_keys($lockedUser->getDirty());
+            $lockedUser->save();
 
-        if (! empty($validated['password'])) {
-            $user->password = Hash::make(
-                $validated['password']
-            );
-        }
+            if ($changedFields !== []) {
+                $oldValues = [];
+                $newValues = [
+                    'changed_fields' => array_map(
+                        static fn (string $field): string => match ($field) {
+                            'role_id' => 'role',
+                            'password' => 'password_changed',
+                            default => $field,
+                        },
+                        $changedFields
+                    ),
+                ];
 
-        $user->save();
+                if (in_array('role_id', $changedFields, true)) {
+                    $oldValues['role'] = $oldRole;
+                    $newValues['role'] = Role::query()
+                        ->findOrFail($lockedUser->role_id)
+                        ->name;
+                }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Nilai Baru Untuk Activity Log
-        |--------------------------------------------------------------------------
-        */
+                if (in_array('is_active', $changedFields, true)) {
+                    $oldValues['is_active'] = ! (bool) $lockedUser->is_active;
+                    $newValues['is_active'] = (bool) $lockedUser->is_active;
+                }
 
-        $newValues = [
-            'nip' => $user->nip,
-            'name' => $user->name,
-            'email' => $user->email,
-            'phone' => $user->phone,
-            'role_id' => $user->role_id,
-            'is_active' => $user->is_active,
-        ];
-
-        /*
-        |--------------------------------------------------------------------------
-        | Activity Log
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            $oldValues !== $newValues ||
-            ! empty($validated['password'])
-        ) {
-            $this->activityLogService->log(
-                'update',
-                'users',
-                'Superadmin memperbarui pengguna: '.$user->name,
-                $user,
-                $oldValues,
-                $newValues
-            );
-        }
+                $this->activityLogService->log(
+                    'update',
+                    'users',
+                    'Superadmin memperbarui akun pengguna.',
+                    $lockedUser,
+                    $oldValues === [] ? null : $oldValues,
+                    $newValues
+                );
+            }
+        });
 
         $redirect = redirect()
             ->route('superadmin.users.index')
@@ -486,53 +468,31 @@ class UserController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $oldStatus = $user->is_active;
-
         /*
         |--------------------------------------------------------------------------
         | Toggle Status
         |--------------------------------------------------------------------------
         */
 
-        $user->update([
-            'is_active' => ! $user->is_active,
-        ]);
+        $newStatus = DB::transaction(function () use ($user): bool {
+            $lockedUser = User::query()
+                ->lockForUpdate()
+                ->findOrFail($user->id);
+            $oldStatus = (bool) $lockedUser->is_active;
+            $newStatus = ! (bool) $lockedUser->is_active;
+            $lockedUser->update(['is_active' => $newStatus]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Tentukan Action Log
-        |--------------------------------------------------------------------------
-        */
+            $this->activityLogService->log(
+                $newStatus ? 'activate' : 'deactivate',
+                'users',
+                $newStatus ? 'Superadmin mengaktifkan akun pengguna.' : 'Superadmin menonaktifkan akun pengguna.',
+                $lockedUser,
+                ['is_active' => $oldStatus],
+                ['is_active' => $newStatus]
+            );
 
-        $action = $user->is_active
-            ? 'activate'
-            : 'deactivate';
-
-        $statusText = $user->is_active
-            ? 'mengaktifkan'
-            : 'menonaktifkan';
-
-        /*
-        |--------------------------------------------------------------------------
-        | Activity Log
-        |--------------------------------------------------------------------------
-        */
-
-        $this->activityLogService->log(
-            $action,
-            'users',
-            'Superadmin '.
-                $statusText.
-                ' pengguna: '.
-                $user->name,
-            $user,
-            [
-                'is_active' => $oldStatus,
-            ],
-            [
-                'is_active' => $user->is_active,
-            ]
-        );
+            return $newStatus;
+        });
 
         /*
         |--------------------------------------------------------------------------
@@ -544,7 +504,7 @@ class UserController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Status pengguna berhasil diperbarui.',
-                'is_active' => $user->is_active,
+                'is_active' => $newStatus,
             ]);
         }
 
@@ -558,7 +518,7 @@ class UserController extends Controller
             'success',
             'Pengguna berhasil '.
                 (
-                    $user->is_active
+                    $newStatus
                         ? 'diaktifkan.'
                         : 'dinonaktifkan.'
                 )

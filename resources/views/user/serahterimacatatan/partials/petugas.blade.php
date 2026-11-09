@@ -24,6 +24,11 @@
             'penerima_user_id',
             $serahTerima?->penerima_user_id ?? ''
         );
+
+        $fotoBuktiPath = data_get($serahTerima?->ringkasan, 'foto_bukti_path');
+        $fotoBuktiUrl = $serahTerima && $fotoBuktiPath
+            ? route('user.serah-terima-dinas.foto-bukti', $serahTerima)
+            : null;
     @endphp
 
     @if (!empty($modeEdit) && $serahTerima)
@@ -123,7 +128,114 @@
                    form="serahTerimaSubmitForm">
         </div>
     </div>
+
+    <div class="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+        <h3 class="text-sm font-bold text-[#1d2d50]">Foto bukti serah terima</h3>
+        <p class="mt-1 text-sm text-slate-600">
+            Wajib melampirkan foto bersama Pihak Penyerah dan Pihak Penerima saat serah terima dinas.
+            Format JPEG, PNG, atau WebP; ukuran maksimal 5 MB.
+        </p>
+
+        @if ($fotoBuktiUrl)
+            <div class="mt-3">
+                <p class="mb-2 text-xs font-semibold text-slate-600">Foto yang tersimpan</p>
+                <img
+                    src="{{ $fotoBuktiUrl }}"
+                    alt="Foto bukti serah terima bersama penyerah dan penerima"
+                    class="max-h-72 w-full rounded-lg border border-slate-200 object-contain"
+                    loading="lazy"
+                >
+            </div>
+        @endif
+
+        @unless ($modeLihat)
+            <label for="foto_bersama" class="mt-3 block text-xs font-semibold text-slate-600">
+                {{ $fotoBuktiUrl ? 'Ganti foto (opsional)' : 'Unggah foto bersama (wajib)' }}
+            </label>
+            <input
+                id="foto_bersama"
+                name="foto_bersama"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                form="serahTerimaSubmitForm"
+                @required(! $fotoBuktiUrl)
+                aria-describedby="foto_bersama_help foto_bersama_error"
+                class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-slate-700"
+            >
+            <p id="foto_bersama_help" class="mt-1 text-xs text-slate-500">
+                Foto lama tidak berubah jika tidak memilih file pengganti.
+            </p>
+            @error('foto_bersama')
+                <p id="foto_bersama_error" class="mt-1 text-sm text-red-600" role="alert">{{ $message }}</p>
+            @enderror
+
+            <div id="foto_bersama_preview_wrap" class="mt-3 hidden">
+                <p class="mb-2 text-xs font-semibold text-slate-600">Pratinjau foto baru</p>
+                <img
+                    id="foto_bersama_preview"
+                    alt="Pratinjau foto bukti serah terima"
+                    class="max-h-72 w-full rounded-lg border border-slate-200 object-contain"
+                >
+            </div>
+        @endunless
+    </div>
 </section>
+
+@if (! $modeLihat)
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const input = document.getElementById('foto_bersama');
+            const preview = document.getElementById('foto_bersama_preview');
+            const previewWrap = document.getElementById('foto_bersama_preview_wrap');
+            let previewUrl = null;
+
+            if (!input || !preview || !previewWrap) {
+                return;
+            }
+
+            input.addEventListener('change', function () {
+                if (previewUrl) {
+                    URL.revokeObjectURL(previewUrl);
+                    previewUrl = null;
+                }
+
+                const file = input.files && input.files[0];
+
+                if (!file) {
+                    preview.removeAttribute('src');
+                    previewWrap.classList.add('hidden');
+                    return;
+                }
+
+                previewUrl = URL.createObjectURL(file);
+                preview.src = previewUrl;
+                previewWrap.classList.remove('hidden');
+            });
+
+            window.addEventListener('pagehide', function () {
+                if (previewUrl) {
+                    URL.revokeObjectURL(previewUrl);
+                }
+            }, { once: true });
+        });
+    </script>
+@endif
+
+@if ($serahTerima?->status === 'selesai' && $serahTerima?->tanda_tangan_penerima)
+    <div class="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900" role="status">
+        <p class="font-semibold">
+            Serah terima berstatus <strong>Sudah Diterima</strong> oleh {{ $serahTerima->penerima?->name ?? data_get($serahTerima->ringkasan, 'nama_penerima', 'Pihak Penerima') }}.
+        </p>
+        @if ($waktuPenerimaan)
+            <p class="mt-1">
+                Waktu konfirmasi:
+                {{ \Carbon\Carbon::parse($waktuPenerimaan)->timezone('Asia/Jakarta')->locale('id')->translatedFormat('d M Y, H:i') }} WIB
+            </p>
+        @else
+            <p class="mt-1">Waktu konfirmasi historis belum tersedia pada Activity Log.</p>
+        @endif
+    </div>
+@endif
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {

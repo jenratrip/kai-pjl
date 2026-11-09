@@ -9,6 +9,7 @@ use App\Models\JadwalKaBatch;
 use App\Models\Jpl;
 use App\Models\KeretaApi;
 use App\Models\RealisasiKa;
+use App\Services\ActivityLogService;
 use App\Services\JadwalKaVersionService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -232,8 +233,11 @@ class JadwalKaController extends Controller
     /**
      * Memperbarui jadwal KA.
      */
-    public function update(Request $request, JadwalKa $jadwal_ka)
-    {
+    public function update(
+        Request $request,
+        JadwalKa $jadwal_ka,
+        ActivityLogService $activityLogService
+    ) {
         $validated = $request->validate([
             'kereta_api_id' => [
                 'required',
@@ -285,7 +289,13 @@ class JadwalKaController extends Controller
             ->findOrFail($jadwalId);
         $initialBatchStatus = $initialJadwal->batch?->status;
 
-        $hasil = DB::transaction(function () use ($initialJadwal, $initialBatchStatus, $jadwalId, $validated) {
+        $hasil = DB::transaction(function () use (
+            $initialJadwal,
+            $initialBatchStatus,
+            $jadwalId,
+            $validated,
+            $activityLogService
+        ) {
             Jpl::query()
                 ->whereKey($initialJadwal->jpl_id)
                 ->lockForUpdate()
@@ -364,7 +374,24 @@ class JadwalKaController extends Controller
                     ->withInput();
             }
 
-            $jadwalTerkunci->update($validated);
+            $oldValues = $this->activityValues($jadwalTerkunci);
+            $jadwalTerkunci->fill($validated);
+            $changedFields = array_keys($jadwalTerkunci->getDirty());
+            $jadwalTerkunci->save();
+
+            if ($changedFields !== []) {
+                $newValues = $this->activityValues($jadwalTerkunci);
+                $newValues['changed_fields'] = $changedFields;
+
+                $activityLogService->log(
+                    'update',
+                    'jadwal_ka',
+                    'Jadwal KA diperbarui.',
+                    $jadwalTerkunci,
+                    $oldValues,
+                    $newValues
+                );
+            }
 
             return $jadwalTerkunci;
         }, 3);
@@ -587,7 +614,12 @@ class JadwalKaController extends Controller
     public function downloadTemplate()
     {
         return Excel::download(
-            new JadwalKaTemplateExport,
+            new JadwalKaTemplateExport(
+                Jpl::query()
+                    ->where('is_active', true)
+                    ->orderBy('kode_jpl')
+                    ->get()
+            ),
             'template-jadwal-ka.xlsx'
         );
     }
@@ -610,16 +642,23 @@ class JadwalKaController extends Controller
      * Jadwal tidak dapat dinonaktifkan jika ada dinas yang sedang
      * berlangsung dan jadwal tersebut sudah masuk dalam realisasi dinas itu.
      */
-    public function toggleStatus(JadwalKa $jadwal_ka)
-    {
-        $jadwalId = (int) $jadwal_ka->getKey();
+    public function toggleStatus(
+        JadwalKa $jadwalKa,
+        ActivityLogService $activityLogService
+    ) {
+        $jadwalId = (int) $jadwalKa->getKey();
         $initialJadwal = JadwalKa::query()
             ->with('batch:id,status')
             ->select(['id', 'jpl_id', 'jadwal_ka_batch_id'])
             ->findOrFail($jadwalId);
         $initialBatchStatus = $initialJadwal->batch?->status;
 
-        return DB::transaction(function () use ($initialJadwal, $initialBatchStatus, $jadwalId) {
+        return DB::transaction(function () use (
+            $initialJadwal,
+            $initialBatchStatus,
+            $jadwalId,
+            $activityLogService
+        ) {
             Jpl::query()
                 ->whereKey($initialJadwal->jpl_id)
                 ->lockForUpdate()
@@ -690,9 +729,19 @@ class JadwalKaController extends Controller
                 }
             }
 
+            $oldStatus = (bool) $jadwalTerkunci->is_active;
             $jadwalTerkunci->update([
                 'is_active' => ! $jadwalTerkunci->is_active,
             ]);
+
+            $activityLogService->log(
+                $jadwalTerkunci->is_active ? 'activate' : 'deactivate',
+                'jadwal_ka',
+                'Status jadwal KA diubah.',
+                $jadwalTerkunci,
+                ['is_active' => $oldStatus],
+                ['is_active' => (bool) $jadwalTerkunci->is_active]
+            );
 
             $status = $jadwalTerkunci->is_active ? 'diaktifkan' : 'dinonaktifkan';
 
@@ -755,5 +804,23 @@ class JadwalKaController extends Controller
         ];
 
         return $hari[$tanggal->dayOfWeekIso];
+    }
+
+    /**
+     * @return array<string, array<int, string>|bool|int|null|string>
+     */
+    private function activityValues(JadwalKa $jadwal): array
+    {
+        return [
+            'kereta_api_id' => $jadwal->kereta_api_id === null ? null : (int) $jadwal->kereta_api_id,
+            'jpl_id' => (int) $jadwal->jpl_id,
+            'jadwal_ka_batch_id' => $jadwal->jadwal_ka_batch_id === null
+                ? null
+                : (int) $jadwal->jadwal_ka_batch_id,
+            'jam_lewat' => $jadwal->jam_lewat,
+            'hari_berlaku' => $jadwal->hari_berlaku ?? [],
+            'tanggal_berlaku' => $jadwal->tanggal_berlaku?->toDateString(),
+            'is_active' => (bool) $jadwal->is_active,
+        ];
     }
 }

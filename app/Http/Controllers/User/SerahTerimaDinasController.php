@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\CatatanDinas;
 use App\Models\Dinas;
 use App\Models\Inventaris;
@@ -10,12 +11,14 @@ use App\Models\RealisasiInventaris;
 use App\Models\RealisasiKa;
 use App\Models\SerahTerima;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class SerahTerimaDinasController extends Controller
 {
@@ -27,7 +30,7 @@ class SerahTerimaDinasController extends Controller
         return Dinas::with([
             'user',
             'userDigantikan',
-            'jpl.resort.wilayah',
+            'jpl.resort',
             'shift',
         ])
             ->where('user_id', auth()->id())
@@ -45,6 +48,19 @@ class SerahTerimaDinasController extends Controller
             ->where('dinas_id', $dinas->id)
             ->whereIn('status_review', SerahTerima::STATUS_TERKUNCI)
             ->exists();
+    }
+
+    /**
+     * Apakah penyerah masih boleh mengubah serah terima.
+     */
+    private function bolehDiedit(SerahTerima $serahTerima): bool
+    {
+        if ($serahTerima->isTerkunci()) {
+            return false;
+        }
+
+        return $serahTerima->status_review === 'perlu_revisi'
+            || $serahTerima->status === 'menunggu_penerima';
     }
 
     /**
@@ -111,29 +127,36 @@ class SerahTerimaDinasController extends Controller
     }
 
     /**
-     * Riwayat serah terima milik user yang login.
+     * Riwayat serah terima keluar dan masuk milik user yang login.
      */
     public function riwayat()
     {
-        // Dinas aktif tetap digunakan untuk header,
-        // bukan dinas historis yang tercatat di riwayat.
         $dinasAktif = $this->dinasAktif();
+        $userId = auth()->id();
 
-        $riwayat = SerahTerima::with([
+        $relasi = [
             'dinas.user',
             'dinas.userDigantikan',
-            'dinas.jpl.resort.wilayah',
+            'dinas.jpl.resort',
             'dinas.shift',
             'penerima',
-        ])
-            ->milikUser(auth()->id())
+        ];
+
+        $riwayat = SerahTerima::with($relasi)
+            ->milikUser($userId)
             ->latest('waktu_serah_terima')
             ->latest('id')
-            ->paginate(10);
+            ->paginate(10, ['*'], 'riwayat_page');
+
+        $pengajuanMasuk = SerahTerima::with($relasi)
+            ->where('penerima_user_id', $userId)
+            ->latest('waktu_serah_terima')
+            ->latest('id')
+            ->paginate(10, ['*'], 'masuk_page');
 
         return view(
             'user.serahterimacatatan.riwayat',
-            compact('riwayat', 'dinasAktif')
+            compact('riwayat', 'pengajuanMasuk', 'dinasAktif')
         );
     }
 
@@ -146,14 +169,14 @@ class SerahTerimaDinasController extends Controller
         $data = SerahTerima::with([
             'dinas.user',
             'dinas.userDigantikan',
-            'dinas.jpl.resort.wilayah',
+            'dinas.jpl.resort',
             'dinas.shift',
             'penerima',
         ])
             ->milikUser(auth()->id())
             ->findOrFail($serahTerima);
 
-        if ($data->isTerkunci()) {
+        if (! $this->bolehDiedit($data)) {
             return redirect()->route(
                 'user.serah-terima-dinas.show',
                 $data
@@ -168,33 +191,168 @@ class SerahTerimaDinasController extends Controller
     }
 
     /**
-     * Menampilkan detail serah terima yang sudah disetujui.
+     * Menampilkan detail serah terima kepada penyerah atau penerima yang ditunjuk.
      */
     public function show($serahTerima)
     {
         $data = SerahTerima::with([
             'dinas.user',
             'dinas.userDigantikan',
-            'dinas.jpl.resort.wilayah',
+            'dinas.jpl.resort',
             'dinas.shift',
             'penerima',
         ])
-            ->milikUser(auth()->id())
+            ->where(function ($query) {
+                $query->milikUser(auth()->id())
+                    ->orWhere('penerima_user_id', auth()->id());
+            })
             ->findOrFail($serahTerima);
 
-        if (! $data->isTerkunci()) {
+        $isPenyerah = (int) $data->dinas->user_id === (int) auth()->id();
+        $isPenerima = (int) $data->penerima_user_id === (int) auth()->id();
+
+        abort_unless($isPenyerah || $isPenerima, 403);
+
+        if ($isPenyerah && ! $isPenerima && $this->bolehDiedit($data)) {
             return redirect()->route(
                 'user.serah-terima-dinas.edit',
                 $data
             );
         }
 
+        $modeLihat = ($isPenerima && ! $isPenyerah)
+            || ! $this->bolehDiedit($data);
+
         return $this->tampilkanHalaman(
             $data->dinas,
             $data,
-            true,
-            true
+            false,
+            $modeLihat,
+            $isPenerima && ! $isPenyerah
         );
+    }
+
+    /**
+     * Menampilkan foto bukti hanya kepada penyerah atau penerima.
+     */
+    public function fotoBukti(SerahTerima $serahTerima): BinaryFileResponse
+    {
+        $serahTerima->loadMissing('dinas');
+
+        $isPenyerah = (int) $serahTerima->dinas?->user_id === (int) auth()->id();
+        $isPenerima = (int) $serahTerima->penerima_user_id === (int) auth()->id();
+
+        abort_unless($isPenyerah || $isPenerima, 404);
+
+        $path = data_get($serahTerima->ringkasan, 'foto_bukti_path');
+
+        abort_unless(
+            is_string($path)
+                && str_starts_with($path, 'serah-terima/bukti/')
+                && ! str_contains($path, '..')
+                && Storage::disk('local')->exists($path),
+            404
+        );
+
+        $mimeType = Storage::disk('local')->mimeType($path);
+
+        abort_unless(
+            in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'], true),
+            404
+        );
+
+        $response = response()->file(
+            Storage::disk('local')->path($path),
+            [
+                'Content-Type' => $mimeType,
+                'X-Content-Type-Options' => 'nosniff',
+            ]
+        );
+
+        $response->setPrivate();
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
+    }
+
+    /**
+     * Menyajikan bukti foto inventaris dari snapshot Serah Terima kepada para pihak.
+     */
+    public function fotoBuktiInventaris(
+        SerahTerima $serahTerima,
+        int $inventarisId
+    ): BinaryFileResponse {
+        $serahTerima->loadMissing('dinas');
+
+        $isPenyerah = (int) $serahTerima->dinas?->user_id === (int) auth()->id();
+        $isPenerima = (int) $serahTerima->penerima_user_id === (int) auth()->id();
+
+        abort_unless($isPenyerah || $isPenerima, 404);
+
+        $snapshotItem = collect(data_get($serahTerima->ringkasan, 'inventaris', []))
+            ->first(fn ($item) => (int) data_get($item, 'inventaris_id') === $inventarisId);
+        $path = data_get($snapshotItem, 'bukti_foto_path');
+
+        abort_unless($this->isInventarisEvidencePath($path), 404);
+        abort_unless(Storage::disk('local')->exists($path), 404);
+
+        $mimeType = Storage::disk('local')->mimeType($path);
+        abort_unless(
+            in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'], true),
+            404
+        );
+
+        $response = response()->file(Storage::disk('local')->path($path), [
+            'Content-Type' => $mimeType,
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+        $response->setPrivate();
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
+    }
+
+    /**
+     * Menyajikan tanda tangan hanya kepada pihak terkait dan petugas administrasi.
+     */
+    public function tandaTangan(SerahTerima $serahTerima, string $jenis): BinaryFileResponse
+    {
+        abort_unless(in_array($jenis, ['penyerah', 'penerima'], true), 404);
+
+        $serahTerima->loadMissing('dinas');
+        $user = auth()->user();
+        $isPihakTerkait = (int) $serahTerima->dinas?->user_id === (int) $user?->id
+            || (int) $serahTerima->penerima_user_id === (int) $user?->id;
+        $isAdministrator = $user?->hasRole('admin') || $user?->hasRole('superadmin');
+
+        abort_unless($isPihakTerkait || $isAdministrator, 404);
+
+        $path = $jenis === 'penyerah'
+            ? $serahTerima->tanda_tangan_penyerah
+            : $serahTerima->tanda_tangan_penerima;
+
+        abort_unless(
+            is_string($path) && $this->isSignaturePath($path),
+            404
+        );
+
+        $disk = str_starts_with($path, 'serah-terima/signatures/')
+            ? Storage::disk('local')
+            : Storage::disk('public');
+
+        abort_unless($disk->exists($path), 404);
+
+        $mimeType = $disk->mimeType($path);
+        abort_unless($mimeType === 'image/png', 404);
+
+        $response = response()->file($disk->path($path), [
+            'Content-Type' => $mimeType,
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+        $response->setPrivate();
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
     }
 
     /**
@@ -210,7 +368,8 @@ class SerahTerimaDinasController extends Controller
         ?Dinas $dinas,
         ?SerahTerima $serahTerima = null,
         bool $modeEdit = false,
-        bool $modeLihat = false
+        bool $modeLihat = false,
+        bool $modePenerima = false
     ) {
         $dataRealisasiKA = collect();
 
@@ -223,6 +382,7 @@ class SerahTerimaDinasController extends Controller
         $catatan = collect();
         $inventaris = collect();
         $realisasi = collect();
+        $waktuPenerimaan = null;
 
         if ($dinas) {
             if (! $serahTerima) {
@@ -261,8 +421,23 @@ class SerahTerimaDinasController extends Controller
         }
 
         // Jika sudah disetujui admin, halaman apa pun hanya mode lihat.
-        if ($serahTerima?->isTerkunci()) {
+        if ($serahTerima && ! $this->bolehDiedit($serahTerima)) {
             $modeLihat = true;
+        }
+
+        if (
+            $serahTerima
+            && $serahTerima->status === 'selesai'
+            && $serahTerima->tanda_tangan_penerima
+        ) {
+            $waktuPenerimaan = ActivityLog::query()
+                ->where('module', 'serah_terima')
+                ->where('action', 'confirm_recipient')
+                ->where('subject_type', SerahTerima::class)
+                ->where('subject_id', $serahTerima->id)
+                ->where('user_id', $serahTerima->penerima_user_id)
+                ->latest('id')
+                ->value('created_at');
         }
 
         /*
@@ -280,10 +455,12 @@ class SerahTerimaDinasController extends Controller
             'inventaris' => $inventaris,
             'realisasi' => $realisasi,
             'serahTerima' => $serahTerima,
+            'waktuPenerimaan' => $waktuPenerimaan,
             'dataRealisasiKA' => $dataRealisasiKA,
             'ringkasanKA' => $ringkasanKA,
             'modeEdit' => $modeEdit,
             'modeLihat' => $modeLihat,
+            'modePenerima' => $modePenerima,
         ]);
     }
 
@@ -572,7 +749,7 @@ class SerahTerimaDinasController extends Controller
     /**
      * Menyimpan pemeriksaan inventaris.
      */
-    public function storeInventaris(Request $request)
+    public function storeInventaris(Request $request, ActivityLogService $activityLogService)
     {
         $validated = $request->validate([
             'inventaris_id' => [
@@ -595,7 +772,33 @@ class SerahTerimaDinasController extends Controller
                 'min:0',
             ],
             'catatan' => ['nullable', 'string', 'max:2000'],
+            'bukti_foto' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:5120',
+            ],
         ]);
+
+        $validated['catatan'] = trim((string) ($validated['catatan'] ?? ''));
+
+        if (
+            in_array($validated['kondisi'], ['rusak', 'hilang'], true)
+            && $validated['catatan'] === ''
+        ) {
+            throw ValidationException::withMessages([
+                'catatan' => 'Keterangan kerusakan atau kehilangan wajib diisi.',
+            ]);
+        }
+
+        if (
+            $request->hasFile('bukti_foto')
+            && ! in_array($validated['kondisi'], ['rusak', 'hilang'], true)
+        ) {
+            throw ValidationException::withMessages([
+                'bukti_foto' => 'Foto bukti hanya dapat dilampirkan untuk kondisi rusak atau hilang.',
+            ]);
+        }
 
         $dinas = $this->dinasAktif();
 
@@ -636,51 +839,141 @@ class SerahTerimaDinasController extends Controller
         $adaMasalah = $validated['kondisi'] !== 'baik'
             || $jumlahAktual !== $jumlahMaster;
 
-        DB::transaction(function () use (
-            $dinas,
-            $inventaris,
-            $validated,
-            $jumlahAktual,
-            $adaMasalah
-        ) {
-            RealisasiInventaris::updateOrCreate(
-                [
-                    'dinas_id' => $dinas->id,
-                    'inventaris_id' => $inventaris->id,
-                ],
-                [
-                    'status' => $adaMasalah ? 'silang' : 'centang',
-                    'kondisi' => $validated['kondisi'],
-                    'jumlah_aktual' => $jumlahAktual,
-                    'catatan' => $validated['catatan'] ?? null,
-                    'diperiksa_pada' => now(),
-                    'diperiksa_oleh' => auth()->id(),
-                ]
-            );
+        $fotoUnggahan = $request->file('bukti_foto');
+        $fotoBaruPath = null;
+        $fotoLamaPath = null;
 
-            $inventaris->jumlah_aktual_terakhir = $jumlahAktual;
-            $inventaris->kondisi_terakhir = $validated['kondisi'];
+        try {
+            $realisasi = DB::transaction(function () use (
+                $dinas,
+                $inventaris,
+                $validated,
+                $jumlahAktual,
+                $adaMasalah,
+                $activityLogService,
+                $fotoUnggahan,
+                &$fotoBaruPath,
+                &$fotoLamaPath
+            ): RealisasiInventaris {
+                Dinas::query()->lockForUpdate()->findOrFail($dinas->id);
 
-            if ($adaMasalah) {
+                $existingRealisasi = RealisasiInventaris::query()
+                    ->where('dinas_id', $dinas->id)
+                    ->where('inventaris_id', $inventaris->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                $fotoLamaPath = $existingRealisasi?->bukti_foto_path;
+                $fotoLamaTersedia = $this->buktiFotoInventarisTersedia($fotoLamaPath);
+
                 if (
-                    ! $inventaris->dilaporkan_pada
-                    || $inventaris->status_tinjauan === 'normal'
+                    $validated['kondisi'] === 'rusak'
+                    && ! $fotoLamaTersedia
+                    && ! $fotoUnggahan
                 ) {
-                    $inventaris->status_tinjauan = 'perlu_tinjauan';
-                    $inventaris->catatan_masalah =
-                        $validated['catatan']
-                        ?: 'Kondisi atau jumlah aktual berbeda dari data inventaris.';
-                    $inventaris->dilaporkan_pada = now();
-                    $inventaris->dilaporkan_oleh = auth()->id();
-                } else {
-                    $inventaris->status_tinjauan =
-                        $inventaris->status_tinjauan
-                        ?: 'perlu_tinjauan';
+                    throw ValidationException::withMessages([
+                        'bukti_foto' => 'Foto bukti kerusakan wajib dilampirkan.',
+                    ]);
                 }
+
+                if ($fotoUnggahan) {
+                    $fotoBaruPath = $fotoUnggahan->store('inventaris/bukti', 'local');
+
+                    if (! is_string($fotoBaruPath)) {
+                        throw ValidationException::withMessages([
+                            'bukti_foto' => 'Foto bukti gagal disimpan. Silakan coba kembali.',
+                        ]);
+                    }
+                }
+
+                $fotoTersimpanPath = $fotoBaruPath
+                    ?? ($fotoLamaTersedia ? $fotoLamaPath : null);
+
+                $oldValues = $existingRealisasi === null
+                    ? null
+                    : [
+                        'dinas_id' => (int) $existingRealisasi->dinas_id,
+                        'inventaris_id' => (int) $existingRealisasi->inventaris_id,
+                        'status' => $existingRealisasi->status,
+                        'kondisi' => $existingRealisasi->kondisi,
+                        'jumlah_aktual' => $existingRealisasi->jumlah_aktual,
+                        'status_tinjauan' => $inventaris->status_tinjauan,
+                    ];
+
+                $realisasi = RealisasiInventaris::updateOrCreate(
+                    [
+                        'dinas_id' => $dinas->id,
+                        'inventaris_id' => $inventaris->id,
+                    ],
+                    [
+                        'status' => $adaMasalah ? 'silang' : 'centang',
+                        'kondisi' => $validated['kondisi'],
+                        'jumlah_aktual' => $jumlahAktual,
+                        'catatan' => $validated['catatan'] !== ''
+                            ? $validated['catatan']
+                            : null,
+                        'bukti_foto_path' => $fotoTersimpanPath,
+                        'diperiksa_pada' => now(),
+                        'diperiksa_oleh' => auth()->id(),
+                    ]
+                );
+
+                $inventaris->jumlah_aktual_terakhir = $jumlahAktual;
+                $inventaris->kondisi_terakhir = $validated['kondisi'];
+
+                if ($adaMasalah) {
+                    if (
+                        ! $inventaris->dilaporkan_pada
+                        || $inventaris->status_tinjauan === 'normal'
+                    ) {
+                        $inventaris->status_tinjauan = 'perlu_tinjauan';
+                        $inventaris->catatan_masalah =
+                            $validated['catatan']
+                            ?: 'Kondisi atau jumlah aktual berbeda dari data inventaris.';
+                        $inventaris->dilaporkan_pada = now();
+                        $inventaris->dilaporkan_oleh = auth()->id();
+                    } else {
+                        $inventaris->status_tinjauan =
+                            $inventaris->status_tinjauan
+                            ?: 'perlu_tinjauan';
+                    }
+                }
+
+                $inventaris->save();
+
+                $activityLogService->log(
+                    'inspection',
+                    'inventaris',
+                    'Pemeriksaan inventaris melalui Serah Terima berhasil disimpan.',
+                    $realisasi,
+                    $oldValues,
+                    [
+                        'dinas_id' => (int) $dinas->id,
+                        'inventaris_id' => (int) $inventaris->id,
+                        'status' => $realisasi->status,
+                        'kondisi' => $realisasi->kondisi,
+                        'jumlah_aktual' => $realisasi->jumlah_aktual,
+                        'status_tinjauan' => $inventaris->status_tinjauan,
+                    ]
+                );
+
+                return $realisasi;
+            });
+        } catch (\Throwable $exception) {
+            if (is_string($fotoBaruPath)) {
+                Storage::disk('local')->delete($fotoBaruPath);
             }
 
-            $inventaris->save();
-        });
+            throw $exception;
+        }
+
+        if (
+            is_string($fotoLamaPath)
+            && $fotoLamaPath !== $realisasi->bukti_foto_path
+            && $this->isInventarisEvidencePath($fotoLamaPath)
+        ) {
+            Storage::disk('local')->delete($fotoLamaPath);
+        }
 
         $pesan = $adaMasalah
             ? 'Pemeriksaan tersimpan. Inventaris memerlukan perhatian dan menunggu tinjauan admin.'
@@ -692,6 +985,9 @@ class SerahTerimaDinasController extends Controller
                 'inventaris_id' => $inventaris->id,
                 'status' => $adaMasalah ? 'silang' : 'centang',
                 'ada_masalah' => $adaMasalah,
+                'bukti_foto_url' => $realisasi->bukti_foto_path
+                    ? route('user.inventaris.foto-bukti', $inventaris)
+                    : null,
                 'message' => $pesan,
             ]);
         }
@@ -701,10 +997,23 @@ class SerahTerimaDinasController extends Controller
             ->with('success', $pesan);
     }
 
+    private function buktiFotoInventarisTersedia(?string $path): bool
+    {
+        return $this->isInventarisEvidencePath($path)
+            && Storage::disk('local')->exists($path);
+    }
+
+    private function isInventarisEvidencePath(mixed $path): bool
+    {
+        return is_string($path)
+            && str_starts_with($path, 'inventaris/bukti/')
+            && ! str_contains($path, '..');
+    }
+
     /**
      * Membuat atau memperbarui serah terima oleh penyerah.
      */
-    public function store(Request $request)
+    public function store(Request $request, ActivityLogService $activityLogService)
     {
         $validated = $request->validate([
             'serah_terima_id' => [
@@ -750,6 +1059,13 @@ class SerahTerimaDinasController extends Controller
                 'nullable',
                 Rule::in(['keep', 'set', 'clear']),
             ],
+            'foto_bersama' => [
+                'required_without:serah_terima_id',
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:5120',
+            ],
         ]);
 
         $dariRiwayat = ! empty($validated['serah_terima_id']);
@@ -788,12 +1104,12 @@ class SerahTerimaDinasController extends Controller
         }
 
         if (
-            $serahTerimaLama?->isTerkunci()
+            ($serahTerimaLama && ! $this->bolehDiedit($serahTerimaLama))
             || $this->dinasTerkunci($dinas)
         ) {
             return back()
                 ->withErrors([
-                    'dinas' => 'Serah terima ini sudah disetujui admin dan terkunci. Data tidak dapat diubah.',
+                    'dinas' => 'Serah terima sudah dikonfirmasi penerima atau disetujui admin. Data tidak dapat diubah.',
                 ])
                 ->withInput();
         }
@@ -880,8 +1196,37 @@ class SerahTerimaDinasController extends Controller
         }
 
         $signaturePenyerah = null;
+        $fotoBuktiPath = null;
+        $fotoBuktiUpload = $request->file('foto_bersama');
+        $fotoBuktiLama = data_get(
+            $serahTerimaLama?->ringkasan,
+            'foto_bukti_path'
+        );
+
+        if (
+            $serahTerimaLama
+            && ! $fotoBuktiLama
+            && ! $request->hasFile('foto_bersama')
+        ) {
+            throw ValidationException::withMessages([
+                'foto_bersama' => 'Foto bersama penyerah dan penerima wajib dilampirkan sebelum menyimpan serah terima.',
+            ]);
+        }
 
         try {
+            if ($fotoBuktiUpload) {
+                $fotoBuktiPath = $fotoBuktiUpload->store(
+                    'serah-terima/bukti',
+                    'local'
+                );
+
+                if (! is_string($fotoBuktiPath)) {
+                    throw ValidationException::withMessages([
+                        'foto_bersama' => 'Foto bukti gagal disimpan. Silakan coba kembali.',
+                    ]);
+                }
+            }
+
             if ($actionPenyerah === 'set') {
                 $signaturePenyerah = $this->saveSignature(
                     $validated['tanda_tangan_penyerah'] ?? null,
@@ -913,6 +1258,7 @@ class SerahTerimaDinasController extends Controller
                         'kondisi' => $hasil?->kondisi,
                         'status' => $hasil?->status,
                         'catatan' => $hasil?->catatan,
+                        'bukti_foto_path' => $hasil?->bukti_foto_path,
                         'diperiksa_pada' => $hasil?->diperiksa_pada?->toDateTimeString(),
                         'diperiksa_oleh' => $hasil?->diperiksa_oleh,
                     ];
@@ -963,6 +1309,13 @@ class SerahTerimaDinasController extends Controller
                 ]
             );
 
+            unset($ringkasan['foto_bukti_path']);
+
+            if ($fotoBuktiPath || $fotoBuktiLama) {
+                $ringkasan['foto_bukti_path'] = $fotoBuktiPath
+                    ?? $fotoBuktiLama;
+            }
+
             $penyerahFinal = match ($actionPenyerah) {
                 'clear' => null,
                 'set' => $signaturePenyerah,
@@ -974,8 +1327,44 @@ class SerahTerimaDinasController extends Controller
                 $penerima,
                 $ringkasan,
                 $penyerahFinal,
-                $serahTerimaLama
+                $serahTerimaLama,
+                $activityLogService
             ) {
+                Dinas::query()
+                    ->lockForUpdate()
+                    ->findOrFail($dinas->id);
+
+                $record = null;
+
+                if ($serahTerimaLama) {
+                    $record = SerahTerima::query()
+                        ->lockForUpdate()
+                        ->findOrFail($serahTerimaLama->id);
+
+                    if (! $this->bolehDiedit($record)) {
+                        throw ValidationException::withMessages([
+                            'dinas' => 'Serah terima sudah dikonfirmasi penerima atau disetujui admin. Data tidak dapat diubah.',
+                        ]);
+                    }
+                }
+
+                if ($this->dinasTerkunci($dinas)) {
+                    throw ValidationException::withMessages([
+                        'dinas' => 'Serah terima dinas ini sudah disetujui admin dan terkunci.',
+                    ]);
+                }
+
+                $oldValues = $record === null
+                    ? null
+                    : [
+                        'dinas_id' => (int) $record->dinas_id,
+                        'penerima_user_id' => $record->penerima_user_id === null
+                            ? null
+                            : (int) $record->penerima_user_id,
+                        'status' => $record->status,
+                        'status_review' => $record->status_review,
+                    ];
+
                 $dataSimpan = [
                     'dinas_id' => $dinas->id,
                     'dinas_penerima_id' => null,
@@ -991,17 +1380,38 @@ class SerahTerimaDinasController extends Controller
                     'ditinjau_pada' => null,
                 ];
 
-                if ($serahTerimaLama) {
-                    $serahTerimaLama->update($dataSimpan);
+                if ($record) {
+                    $record->update($dataSimpan);
                 } else {
-                    SerahTerima::create($dataSimpan);
+                    $record = SerahTerima::create($dataSimpan);
                 }
+
+                $activityLogService->log(
+                    $oldValues === null ? 'create' : 'update',
+                    'serah_terima',
+                    $oldValues === null
+                        ? 'Serah Terima dibuat dan dikonfirmasi oleh penyerah.'
+                        : 'Serah Terima diperbarui dan dikonfirmasi kembali oleh penyerah.',
+                    $record,
+                    $oldValues,
+                    [
+                        'dinas_id' => (int) $record->dinas_id,
+                        'penerima_user_id' => (int) $record->penerima_user_id,
+                        'status' => $record->status,
+                        'status_review' => $record->status_review,
+                        'sender_confirmation' => 'confirmed',
+                    ]
+                );
             });
         } catch (\Throwable $e) {
             if ($signaturePenyerah) {
-                Storage::disk('public')->delete(
+                $this->deleteSignature(
                     $signaturePenyerah
                 );
+            }
+
+            if ($fotoBuktiPath) {
+                Storage::disk('local')->delete($fotoBuktiPath);
             }
 
             throw $e;
@@ -1021,9 +1431,20 @@ class SerahTerimaDinasController extends Controller
                 )
             )
         ) {
-            Storage::disk('public')->delete(
+            $this->deleteSignature(
                 $tandaTanganPenyerahLama
             );
+        }
+
+        if (
+            $fotoBuktiLama
+            && $fotoBuktiPath
+            && $fotoBuktiPath !== $fotoBuktiLama
+            && is_string($fotoBuktiLama)
+            && str_starts_with($fotoBuktiLama, 'serah-terima/bukti/')
+            && ! str_contains($fotoBuktiLama, '..')
+        ) {
+            Storage::disk('local')->delete($fotoBuktiLama);
         }
 
         /*
@@ -1031,7 +1452,7 @@ class SerahTerimaDinasController extends Controller
          * isi serah terima atau penerimanya dapat berubah.
          */
         if ($tandaTanganPenerimaLama) {
-            Storage::disk('public')->delete(
+            $this->deleteSignature(
                 $tandaTanganPenerimaLama
             );
         }
@@ -1053,7 +1474,8 @@ class SerahTerimaDinasController extends Controller
      */
     public function konfirmasi(
         Request $request,
-        $serahTerima
+        $serahTerima,
+        ActivityLogService $activityLogService
     ) {
         abort_unless(
             auth()->user()?->hasRole('pjl'),
@@ -1072,18 +1494,18 @@ class SerahTerimaDinasController extends Controller
         $data = SerahTerima::with('dinas')
             ->findOrFail($serahTerima);
 
-        abort_if(
-            $data->isTerkunci(),
-            422,
-            'Serah terima ini sudah disetujui dan terkunci.'
-        );
-
         abort_unless(
             $data->penerima_user_id !== null
                 && (int) $data->penerima_user_id
                     === (int) auth()->id(),
             403,
             'Anda bukan petugas penerima yang ditunjuk untuk serah terima ini.'
+        );
+
+        abort_if(
+            $data->isTerkunci(),
+            422,
+            'Serah terima ini sudah disetujui dan terkunci.'
         );
 
         abort_unless(
@@ -1098,6 +1520,12 @@ class SerahTerimaDinasController extends Controller
             'Tanda tangan penerima sudah tersedia.'
         );
 
+        abort_unless(
+            ! empty($data->tanda_tangan_penyerah),
+            422,
+            'Tanda tangan penyerah belum tersedia.'
+        );
+
         $signaturePenerima = $this->saveSignature(
             $validated['tanda_tangan_penerima'],
             'penerima'
@@ -1106,24 +1534,24 @@ class SerahTerimaDinasController extends Controller
         try {
             DB::transaction(function () use (
                 $data,
-                $signaturePenerima
+                $signaturePenerima,
+                $activityLogService
             ) {
                 $terkini = SerahTerima::query()
                     ->lockForUpdate()
                     ->findOrFail($data->id);
 
+                abort_unless(
+                    $terkini->penerima_user_id !== null
+                        && (int) $terkini->penerima_user_id === (int) auth()->id(),
+                    403,
+                    'Anda bukan penerima yang ditunjuk.'
+                );
+
                 abort_if(
                     $terkini->isTerkunci(),
                     422,
                     'Serah terima ini sudah disetujui dan terkunci.'
-                );
-
-                abort_unless(
-                    $terkini->penerima_user_id !== null
-                        && (int) $terkini->penerima_user_id
-                            === (int) auth()->id(),
-                    403,
-                    'Anda bukan penerima yang ditunjuk.'
                 );
 
                 abort_unless(
@@ -1133,14 +1561,41 @@ class SerahTerimaDinasController extends Controller
                     'Serah terima sudah dikonfirmasi atau tidak lagi menunggu penerima.'
                 );
 
+                abort_unless(
+                    ! empty($terkini->tanda_tangan_penyerah),
+                    422,
+                    'Tanda tangan penyerah belum tersedia.'
+                );
+
+                $oldValues = [
+                    'dinas_id' => (int) $terkini->dinas_id,
+                    'penerima_user_id' => (int) $terkini->penerima_user_id,
+                    'status' => $terkini->status,
+                    'status_review' => $terkini->status_review,
+                ];
+
                 $terkini->update([
                     'tanda_tangan_penerima' => $signaturePenerima,
                     'status' => 'selesai',
                     'status_review' => 'menunggu_review',
                 ]);
+
+                $activityLogService->log(
+                    'confirm_recipient',
+                    'serah_terima',
+                    'Penerima mengonfirmasi Serah Terima dan status berubah menjadi selesai.',
+                    $terkini,
+                    $oldValues,
+                    [
+                        'dinas_id' => (int) $terkini->dinas_id,
+                        'penerima_user_id' => (int) $terkini->penerima_user_id,
+                        'status' => $terkini->status,
+                        'status_review' => $terkini->status_review,
+                    ]
+                );
             });
         } catch (\Throwable $e) {
-            Storage::disk('public')->delete($signaturePenerima);
+            $this->deleteSignature($signaturePenerima);
 
             throw $e;
         }
@@ -1222,18 +1677,33 @@ class SerahTerimaDinasController extends Controller
             ]);
         }
 
-        $path = 'serah-terima/'
+        $path = 'serah-terima/signatures/'
             .auth()->id()
             .'/'
             .uniqid($jenis.'_', true)
             .'.png';
 
-        if (! Storage::disk('public')->put($path, $image)) {
+        if (! Storage::disk('local')->put($path, $image)) {
             throw new \RuntimeException(
                 'Gagal menyimpan tanda tangan ke storage.'
             );
         }
 
         return $path;
+    }
+
+    private function deleteSignature(?string $path): void
+    {
+        if (! is_string($path) || ! $this->isSignaturePath($path)) {
+            return;
+        }
+
+        Storage::disk('local')->delete($path);
+        Storage::disk('public')->delete($path);
+    }
+
+    private function isSignaturePath(string $path): bool
+    {
+        return preg_match('#^serah-terima/(?:signatures/)?[0-9]+/[A-Za-z0-9_.-]+\.png$#D', $path) === 1;
     }
 }

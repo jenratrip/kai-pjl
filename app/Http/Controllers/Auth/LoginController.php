@@ -290,7 +290,7 @@ class LoginController extends Controller
                 $dinas
                 && $dinas->jadwal_ka_snapshot !== null
                 && (
-                    (int) $dinas->user_id !== (int) $user->id
+                    (int) $dinas->user_id !== (int) $lockedUser->id
                     || (int) $dinas->jpl_id !== (int) $lockedJpl->id
                     || (int) $dinas->shift_id !== (int) $shift->id
                     || Carbon::parse($dinas->tanggal_dinas)->toDateString() !== $tanggal

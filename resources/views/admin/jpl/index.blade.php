@@ -154,9 +154,6 @@
                                     @selected((string) request('resort_id') === (string) $resort->id)
                                 >
                                     {{ $resort->nama_resort }}
-                                    @if ($resort->wilayah)
-                                        — {{ $resort->wilayah->nama_wilayah }}
-                                    @endif
                                 </option>
                             @endforeach
                         </select>
@@ -562,9 +559,6 @@
                                     @selected(old('_form_type') === 'create_jpl' && (string) old('resort_id') === (string) $resort->id)
                                 >
                                     {{ $resort->nama_resort }}
-                                    @if ($resort->wilayah)
-                                        — {{ $resort->wilayah->nama_wilayah }}
-                                    @endif
                                 </option>
                             @endforeach
                         </select>

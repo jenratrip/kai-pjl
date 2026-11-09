@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\JplImportTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Imports\JplImport;
 use App\Models\Jpl;
 use App\Models\Resort;
-use App\Models\Wilayah;
+use App\Services\ActivityLogService;
 use App\Services\DefaultInventarisService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,24 +30,16 @@ class JplImportController extends Controller
      */
     private function sessionKey(Request $request): string
     {
-        return 'jpl_import_' . $this->routePrefix($request);
+        return 'jpl_import_'.$this->routePrefix($request);
     }
 
-    /**
-     * Mengambil Wilayah default dari konfigurasi aplikasi.
-     */
-    private function defaultWilayah(): ?Wilayah
+    /** Download template Excel yang menggunakan header yang dibaca importer. */
+    public function downloadTemplate()
     {
-        $wilayahId = config('kai.default_wilayah_id');
-
-        if (! is_numeric($wilayahId)) {
-            return null;
-        }
-
-        return Wilayah::query()
-            ->whereKey((int) $wilayahId)
-            ->where('is_active', true)
-            ->first();
+        return Excel::download(
+            new JplImportTemplateExport,
+            'template-import-jpl.xlsx'
+        );
     }
 
     /**
@@ -87,19 +80,12 @@ class JplImportController extends Controller
         ], JSON_UNESCAPED_UNICODE) ?: '';
     }
 
-    /**
-     * Halaman upload Excel JPL.
-     *
-     * Wilayah tidak dipilih secara manual.
-     */
+    /** Halaman upload Excel JPL. */
     public function create(Request $request)
     {
         $prefix = $this->routePrefix($request);
-        $wilayah = $this->defaultWilayah();
 
-        return view("{$prefix}.jpl.import", [
-            'wilayahName' => $wilayah?->nama_wilayah,
-        ]);
+        return view("{$prefix}.jpl.import");
     }
 
     /**
@@ -121,24 +107,9 @@ class JplImportController extends Controller
         ]);
 
         /*
-         * Wilayah diambil otomatis dari konfigurasi.
-         */
-        $wilayah = $this->defaultWilayah();
-
-        if (! $wilayah) {
-            return redirect()
-                ->route($this->routePrefix($request) . '.jpl.import')
-                ->with(
-                    'error',
-                    'Wilayah default belum tersedia atau tidak aktif. '
-                    . 'Periksa KAI_DEFAULT_WILAYAH_ID dan data Wilayah.'
-                );
-        }
-
-        /*
          * Baca Excel menggunakan parser JplImport.
          */
-        $import = new JplImport();
+        $import = new JplImport;
 
         Excel::import(
             $import,
@@ -156,28 +127,17 @@ class JplImportController extends Controller
                 );
         }
 
-        /*
-         * Ambil Resort yang tersedia di Wilayah tujuan.
-         */
+        /* Resort yang ada dipakai tanpa bergantung pada DAOP tertentu. */
         $existingResorts = Resort::query()
-            ->where('wilayah_id', $wilayah->id)
             ->get()
-            ->mapWithKeys(function ($resort) {
-                return [
-                    $this->normalizeKey($resort->nama_resort)
-                        => $resort->id,
-                ];
+            ->groupBy(function ($resort) {
+                return $this->normalizeKey($resort->nama_resort);
             });
 
-        /*
-         * Ambil identitas JPL yang sudah ada di Wilayah tujuan.
-         */
+        /* Ambil identitas JPL yang sudah ada di seluruh sistem. */
         $existingIdentities = [];
 
         $existingJpls = Jpl::with('resort')
-            ->whereHas('resort', function ($query) use ($wilayah) {
-                $query->where('wilayah_id', $wilayah->id);
-            })
             ->get();
 
         foreach ($existingJpls as $jpl) {
@@ -222,7 +182,15 @@ class JplImportController extends Controller
                 } elseif (! $existingResorts->has($resortKey)) {
                     $row['status'] = 'baru';
                     $row['notes'][] =
-                        'Resort belum tersedia dan akan dibuat otomatis.';
+                        'Resort belum tersedia dan akan dibuat saat konfirmasi.';
+                } elseif ($existingResorts->get($resortKey)->count() > 1) {
+                    $row['status'] = 'error';
+                    $row['errors'][] =
+                        'Nama Resort cocok dengan lebih dari satu data. Tentukan Resort yang benar sebelum impor.';
+                } elseif (! $existingResorts->get($resortKey)->first()->is_active) {
+                    $row['status'] = 'error';
+                    $row['errors'][] =
+                        'Resort yang cocok sedang nonaktif. Aktifkan Resort atau pilih data yang aktif sebelum impor.';
                 }
 
                 if (
@@ -247,7 +215,7 @@ class JplImportController extends Controller
                 if (isset($existingIdentities[$identity])) {
                     $row['notes'][] =
                         'Data identik sudah ada di database. '
-                        . 'Baris akan dilewati.';
+                        .'Baris akan dilewati.';
 
                     if ($row['status'] !== 'error') {
                         $row['status'] = 'duplikat';
@@ -255,7 +223,7 @@ class JplImportController extends Controller
                 } elseif (isset($seenIdentities[$identity])) {
                     $row['notes'][] =
                         'Data identik muncul lebih dari sekali dalam Excel. '
-                        . 'Baris akan dilewati.';
+                        .'Baris akan dilewati.';
 
                     if ($row['status'] !== 'error') {
                         $row['status'] = 'duplikat';
@@ -289,15 +257,7 @@ class JplImportController extends Controller
          * Daftar Resort baru dari baris yang dapat diimport.
          */
         $newResortNames = $previewRows
-            ->whereIn('status', ['valid', 'baru'])
-            ->filter(function ($row) use ($existingResorts) {
-                $name = $this->normalize($row['resort'] ?? '');
-
-                return $name !== ''
-                    && ! $existingResorts->has(
-                        $this->normalizeKey($name)
-                    );
-            })
+            ->where('status', 'baru')
             ->pluck('resort')
             ->filter()
             ->map(fn ($name) => $this->normalize($name))
@@ -328,8 +288,6 @@ class JplImportController extends Controller
          */
         session([
             $sessionKey => [
-                'wilayah_id' => $wilayah->id,
-                'wilayah_name' => $wilayah->nama_wilayah,
                 'rows' => $previewRows->all(),
                 'total' => $total,
                 'valid_count' => $validCount,
@@ -361,23 +319,20 @@ class JplImportController extends Controller
                 ->with(
                     'error',
                     'Data preview import tidak ditemukan. '
-                    . 'Silakan upload file kembali.'
+                    .'Silakan upload file kembali.'
                 );
         }
 
         return view(
             "{$prefix}.jpl.import-preview",
             [
-                'wilayahName' => $import['wilayah_name'] ?? '-',
-                'wilayahId' => $import['wilayah_id'] ?? null,
                 'rows' => $import['rows'] ?? [],
                 'total' => $import['total'] ?? 0,
                 'validCount' => $import['valid_count'] ?? 0,
                 'errorCount' => $import['error_count'] ?? 0,
                 'duplicateCount' => $import['duplicate_count'] ?? 0,
                 'newResortNames' => $import['new_resort_names'] ?? [],
-                'existingResortNames' =>
-                    $import['existing_resort_names'] ?? [],
+                'existingResortNames' => $import['existing_resort_names'] ?? [],
             ]
         );
     }
@@ -385,23 +340,20 @@ class JplImportController extends Controller
     /**
      * Konfirmasi partial import JPL.
      *
-     * Hanya baris valid dan baris dengan Resort baru yang disimpan.
+     * Hanya baris valid dan Resort baru yang disimpan.
      * Baris error dan duplikat dilewati.
      */
     public function confirm(
         Request $request,
-        DefaultInventarisService $inventarisService
+        DefaultInventarisService $inventarisService,
+        ActivityLogService $activityLogService
     ) {
         $prefix = $this->routePrefix($request);
         $sessionKey = $this->sessionKey($request);
 
         $import = session($sessionKey);
 
-        if (
-            ! $import ||
-            empty($import['rows']) ||
-            empty($import['wilayah_id'])
-        ) {
+        if (! $import || empty($import['rows'])) {
             return redirect()
                 ->route("{$prefix}.jpl.import")
                 ->with(
@@ -410,31 +362,10 @@ class JplImportController extends Controller
                 );
         }
 
-        /*
-         * Pastikan Wilayah default masih tersedia dan sama
-         * dengan Wilayah yang digunakan saat preview.
-         */
-        $wilayah = $this->defaultWilayah();
-
-        if (
-            ! $wilayah ||
-            (int) ($import['wilayah_id'] ?? 0) !== (int) $wilayah->id
-        ) {
-            session()->forget($sessionKey);
-
-            return redirect()
-                ->route("{$prefix}.jpl.import")
-                ->with(
-                    'error',
-                    'Wilayah default berubah atau tidak tersedia. '
-                    . 'Silakan upload ulang file Excel.'
-                );
-        }
-
         $rows = collect($import['rows']);
 
         /*
-         * Hanya ambil baris valid dan baris Resort baru.
+         * Ambil ulang baris valid dan Resort baru dari preview.
          */
         $validRows = $rows
             ->filter(function ($row) {
@@ -460,136 +391,161 @@ class JplImportController extends Controller
                 ->with(
                     'error',
                     'Tidak ada data valid yang dapat diimport. '
-                    . 'Seluruh baris berstatus error atau duplikat.'
+                    .'Seluruh baris berstatus error atau duplikat.'
                 );
         }
-
-        $wilayahId = $wilayah->id;
 
         /*
          * Simpan data valid dalam satu transaksi.
          */
-        $result = DB::transaction(function () use (
-            $validRows,
-            $wilayahId,
-            $inventarisService
-        ) {
-            $resortCache = [];
+        try {
+            $result = DB::transaction(function () use (
+                $validRows,
+                $inventarisService,
+                $activityLogService,
+                $skippedErrors,
+                $skippedDuplicates
+            ) {
+                $resortCache = [];
 
-            $jumlahJpl = 0;
-            $jumlahDuplikatTambahan = 0;
-
-            /*
-             * Ambil ulang identitas terkini untuk menghindari
-             * duplikat yang mungkin masuk setelah preview.
-             */
-            $existingIdentities = [];
-
-            $existingJpls = Jpl::with('resort')
-                ->whereHas('resort', function ($query) use ($wilayahId) {
-                    $query->where('wilayah_id', $wilayahId);
-                })
-                ->get();
-
-            foreach ($existingJpls as $existingJpl) {
-                $identity = $this->identityKey(
-                    $existingJpl->toArray(),
-                    $existingJpl->resort?->nama_resort ?? ''
-                );
-
-                $existingIdentities[$identity] = true;
-            }
-
-            foreach ($validRows as $row) {
-                $resortName = $this->normalize(
-                    $row['resort'] ?? ''
-                );
-
-                if ($resortName === '') {
-                    continue;
-                }
-
-                $identity = $this->identityKey(
-                    $row,
-                    $resortName
-                );
+                $jumlahJpl = 0;
+                $jumlahDuplikatTambahan = 0;
 
                 /*
-                 * Periksa ulang duplikat sebelum menyimpan.
+                 * Ambil ulang identitas terkini untuk menghindari
+                 * duplikat yang mungkin masuk setelah preview.
                  */
-                if (isset($existingIdentities[$identity])) {
-                    $jumlahDuplikatTambahan++;
-                    continue;
+                $existingIdentities = [];
+
+                $existingJpls = Jpl::with('resort')->get();
+                $knownResorts = Resort::query()->get();
+
+                foreach ($existingJpls as $existingJpl) {
+                    $identity = $this->identityKey(
+                        $existingJpl->toArray(),
+                        $existingJpl->resort?->nama_resort ?? ''
+                    );
+
+                    $existingIdentities[$identity] = true;
                 }
 
-                $resortKey = $this->normalizeKey($resortName);
+                foreach ($validRows as $row) {
+                    $resortName = $this->normalize(
+                        $row['resort'] ?? ''
+                    );
 
-                /*
-                 * Cari Resort di Wilayah default.
-                 * Jika belum ada, buat otomatis.
-                 */
-                if (isset($resortCache[$resortKey])) {
-                    $resort = $resortCache[$resortKey];
-                } else {
-                    $resort = Resort::query()
-                        ->where('wilayah_id', $wilayahId)
-                        ->get()
-                        ->first(function ($item) use ($resortKey) {
-                            return $this->normalizeKey(
-                                $item->nama_resort
-                            ) === $resortKey;
-                        });
-
-                    if (! $resort) {
-                        $resort = Resort::create([
-                            'wilayah_id' => $wilayahId,
-                            'nama_resort' => $resortName,
-                            'is_active' => true,
-                        ]);
+                    if ($resortName === '') {
+                        continue;
                     }
 
-                    $resortCache[$resortKey] = $resort;
+                    $identity = $this->identityKey(
+                        $row,
+                        $resortName
+                    );
+
+                    /*
+                     * Periksa ulang duplikat sebelum menyimpan.
+                     */
+                    if (isset($existingIdentities[$identity])) {
+                        $jumlahDuplikatTambahan++;
+
+                        continue;
+                    }
+
+                    $resortKey = $this->normalizeKey($resortName);
+
+                    /* Cari ulang Resort untuk mencegah preview basi/ambigu. */
+                    if (isset($resortCache[$resortKey])) {
+                        $resort = $resortCache[$resortKey];
+                    } else {
+                        $matches = $knownResorts->filter(function ($item) use ($resortKey) {
+                            return $this->normalizeKey($item->nama_resort) === $resortKey;
+                        });
+
+                        if ($matches->count() > 1) {
+                            throw new \RuntimeException(
+                                'Nama Resort "'.$resortName.'" sekarang cocok dengan beberapa data. Periksa data Resort lalu unggah ulang file.'
+                            );
+                        }
+
+                        if ($matches->isNotEmpty()) {
+                            $resort = $matches->first();
+
+                            if (! $resort->is_active) {
+                                throw new \RuntimeException(
+                                    'Resort "'.$resortName.'" sedang nonaktif. Aktifkan Resort atau periksa kembali file.'
+                                );
+                            }
+                        } else {
+                            $resort = Resort::query()->create([
+                                'nama_resort' => $resortName,
+                                'is_active' => true,
+                            ]);
+
+                            $knownResorts->push($resort);
+                        }
+
+                        $resortCache[$resortKey] = $resort;
+                    }
+
+                    /*
+                     * Simpan atribut JPL dari Excel.
+                     * Field kosong tetap NULL.
+                     */
+                    $jpl = Jpl::create([
+                        'kode_jpl' => $row['kode_jpl'] ?? null,
+                        'nama_jpl' => $row['nama_jpl'] ?? null,
+                        'resort_id' => $resort->id,
+                        'antara' => $row['antara'] ?? null,
+                        'km_hm' => $row['km_hm'] ?? null,
+                        'status_penjagaan' => $row['status_penjagaan'] ?? null,
+                        'jenis_jalur_ka' => $row['jenis_jalur_ka'] ?? null,
+                        'konst_jalan' => $row['konst_jalan'] ?? null,
+                        'titik_koordinat' => $row['titik_koordinat'] ?? null,
+                        'lebar_jln' => $row['lebar_jln'] ?? null,
+                        'kota_kabupaten' => $row['kota_kabupaten'] ?? null,
+                        'provinsi' => $row['provinsi'] ?? null,
+                        'is_active' => true,
+                    ]);
+
+                    /*
+                     * Buat inventaris default untuk JPL baru.
+                     */
+                    $inventarisService->initializeForJpl($jpl);
+
+                    $existingIdentities[$identity] = true;
+
+                    $jumlahJpl++;
                 }
 
-                /*
-                 * Simpan atribut JPL dari Excel.
-                 * Field kosong tetap NULL.
-                 */
-                $jpl = Jpl::create([
-                    'kode_jpl' => $row['kode_jpl'] ?? null,
-                    'nama_jpl' => $row['nama_jpl'] ?? null,
-                    'resort_id' => $resort->id,
-                    'antara' => $row['antara'] ?? null,
-                    'km_hm' => $row['km_hm'] ?? null,
-                    'status_penjagaan' =>
-                        $row['status_penjagaan'] ?? null,
-                    'jenis_jalur_ka' =>
-                        $row['jenis_jalur_ka'] ?? null,
-                    'konst_jalan' => $row['konst_jalan'] ?? null,
-                    'titik_koordinat' =>
-                        $row['titik_koordinat'] ?? null,
-                    'lebar_jln' => $row['lebar_jln'] ?? null,
-                    'kota_kabupaten' =>
-                        $row['kota_kabupaten'] ?? null,
-                    'provinsi' => $row['provinsi'] ?? null,
-                    'is_active' => true,
-                ]);
+                $result = [
+                    'imported' => $jumlahJpl,
+                    'additional_duplicates' => $jumlahDuplikatTambahan,
+                ];
 
-                /*
-                 * Buat inventaris default untuk JPL baru.
-                 */
-                $inventarisService->initializeForJpl($jpl);
+                if ($result['imported'] > 0) {
+                    $activityLogService->log(
+                        'import',
+                        'jpl',
+                        'Impor JPL berhasil diproses.',
+                        null,
+                        null,
+                        [
+                            'imported_count' => $result['imported'],
+                            'error_count' => $skippedErrors,
+                            'duplicate_count' => $skippedDuplicates
+                                + $result['additional_duplicates'],
+                        ],
+                    );
+                }
 
-                $existingIdentities[$identity] = true;
-
-                $jumlahJpl++;
-            }
-
-            return [
-                'imported' => $jumlahJpl,
-                'additional_duplicates' => $jumlahDuplikatTambahan,
-            ];
-        });
+                return $result;
+            });
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route("{$prefix}.jpl.import.preview")
+                ->with('error', $exception->getMessage());
+        }
 
         $totalSkippedDuplicates = $skippedDuplicates
             + $result['additional_duplicates'];
@@ -600,10 +556,10 @@ class JplImportController extends Controller
         session()->forget($sessionKey);
 
         $message = 'Import selesai. '
-            . "{$result['imported']} JPL berhasil disimpan beserta inventaris default. "
-            . "{$skippedErrors} baris error dilewati. "
-            . "{$totalSkippedDuplicates} baris duplikat dilewati. "
-            . 'Resort baru dibuat otomatis jika diperlukan.';
+            ."{$result['imported']} JPL berhasil disimpan beserta inventaris default. "
+            ."{$skippedErrors} baris error dilewati. "
+            ."{$totalSkippedDuplicates} baris duplikat dilewati. "
+            .'Resort baru dibuat otomatis jika belum tersedia.';
 
         return redirect()
             ->route("{$prefix}.jpl.index")

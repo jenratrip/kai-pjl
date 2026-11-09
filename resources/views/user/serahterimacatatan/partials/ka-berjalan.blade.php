@@ -1,4 +1,4 @@
-<section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+<section class="serah-terima-ka-section rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
     @php
         $kaBerjalanTeks = collect($ringkasanKA['berjalan'] ?? [])
             ->map(function ($ka) {
@@ -41,28 +41,22 @@
         Nomor dan nama KA yang berjalan selama dinas.
     </label>
 
-    <textarea
-        id="ka_berjalan"
-        name="ka_berjalan"
-        data-summary="ka_berjalan"
-        rows="4"
-        readonly
-        placeholder="Tidak ada KA berjalan"
-        class="w-full rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-    >{{ $kaBerjalanTeks !== '' ? $kaBerjalanTeks : 'Tidak ada' }}</textarea>
-
-    <div class="mt-3 space-y-2">
-        @foreach ($ringkasanKA['berjalan'] ?? [] as $ka)
-            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p class="font-semibold text-slate-800">
-                    {{ $ka['nomor'] ?? '-' }}
-                    @if (! empty($ka['nama']))
-                        <span class="font-normal text-slate-600">— {{ $ka['nama'] }}</span>
-                    @endif
-                </p>
-
-                @include('user.serahterimacatatan.partials.ka-check-indicators', ['ka' => $ka])
-            </article>
-        @endforeach
+    <div class="serah-terima-ka-list-screen">
+        <textarea
+            id="ka_berjalan"
+            name="ka_berjalan"
+            data-summary="ka_berjalan"
+            rows="4"
+            readonly
+            placeholder="Tidak ada KA berjalan"
+            class="w-full rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        >{{ $kaBerjalanTeks !== '' ? $kaBerjalanTeks : 'Tidak ada' }}</textarea>
     </div>
+
+    @include('user.serahterimacatatan.partials.ka-print-table', [
+        'rows' => $ringkasanKA['berjalan'] ?? [],
+        'statusLabel' => 'Berjalan',
+        'showDetails' => true,
+    ])
+
 </section>

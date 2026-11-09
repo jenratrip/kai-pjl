@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\ActivityLog;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -94,7 +93,7 @@ class UserController extends Controller
     /**
      * Memperbarui data dan role user.
      */
-    public function update(Request $request, int $id)
+    public function update(Request $request, int $id, ActivityLogService $activityLogService)
     {
         $user = $this->findManagedUser($id);
 
@@ -123,16 +122,10 @@ class UserController extends Controller
             ]);
         }
 
-        $oldValues = [
-            'nip' => $user->nip,
-            'name' => $user->name,
-            'email' => $user->email,
-            'phone' => $user->phone,
-            'role' => $user->role->name,
-        ];
+        $oldRole = $user->role->name;
 
         DB::transaction(function () use (
-            $user, $validated, $role, $oldValues
+            $user, $validated, $role, $oldRole, $activityLogService
         ) {
             $user->update([
                 'nip' => $validated['nip'],
@@ -142,24 +135,34 @@ class UserController extends Controller
                 'role_id' => $role->id,
             ]);
 
-            ActivityLog::create([
-                'user_id' => Auth::id(),
-                'action' => 'update',
-                'module' => 'manajemen_user',
-                'description' => 'Mengubah data dan role user: '.$user->name,
-                'subject_type' => User::class,
-                'subject_id' => $user->id,
-                'old_values' => $oldValues,
-                'new_values' => [
-                    'nip' => $user->nip,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
-                    'role' => $role->name,
-                ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
+            $changedFields = array_values(array_diff(
+                array_keys($user->getChanges()),
+                ['updated_at']
+            ));
+
+            if ($changedFields !== []) {
+                $oldValues = [];
+                $newValues = [
+                    'changed_fields' => array_map(
+                        static fn (string $field): string => $field === 'role_id' ? 'role' : $field,
+                        $changedFields
+                    ),
+                ];
+
+                if (in_array('role_id', $changedFields, true)) {
+                    $oldValues['role'] = $oldRole;
+                    $newValues['role'] = $role->name;
+                }
+
+                $activityLogService->log(
+                    'update',
+                    'users',
+                    'Admin memperbarui akun pengguna.',
+                    $user,
+                    $oldValues === [] ? null : $oldValues,
+                    $newValues
+                );
+            }
         });
 
         return redirect()
@@ -170,33 +173,30 @@ class UserController extends Controller
     /**
      * Mengaktifkan atau menonaktifkan akun PJL/Admin.
      */
-    public function toggleStatus(int $id)
+    public function toggleStatus(int $id, ActivityLogService $activityLogService)
     {
         $user = $this->findManagedUser($id);
 
-        $oldStatus = (bool) $user->is_active;
-        $newStatus = ! $oldStatus;
-        $roleName = strtoupper($user->role->name);
-
-        DB::transaction(function () use (
-            $user, $oldStatus, $newStatus, $roleName
+        $newStatus = DB::transaction(function () use (
+            $user, $activityLogService
         ) {
-            $user->update(['is_active' => $newStatus]);
+            $lockedUser = User::query()
+                ->lockForUpdate()
+                ->findOrFail($user->id);
+            $oldStatus = (bool) $lockedUser->is_active;
+            $newStatus = ! $oldStatus;
+            $lockedUser->update(['is_active' => $newStatus]);
 
-            ActivityLog::create([
-                'user_id' => Auth::id(),
-                'action' => 'update',
-                'module' => 'manajemen_user',
-                'description' => (
-                    $newStatus ? 'Mengaktifkan akun ' : 'Menonaktifkan akun '
-                ).$roleName.': '.$user->name,
-                'subject_type' => User::class,
-                'subject_id' => $user->id,
-                'old_values' => ['is_active' => $oldStatus],
-                'new_values' => ['is_active' => $newStatus],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
+            $activityLogService->log(
+                $newStatus ? 'activate' : 'deactivate',
+                'users',
+                $newStatus ? 'Admin mengaktifkan akun pengguna.' : 'Admin menonaktifkan akun pengguna.',
+                $lockedUser,
+                ['is_active' => $oldStatus],
+                ['is_active' => $newStatus]
+            );
+
+            return $newStatus;
         });
 
         return redirect()

@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Inventaris;
 use App\Models\Jpl;
+use App\Services\ActivityLogService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class InventarisController extends Controller
@@ -15,6 +18,7 @@ class InventarisController extends Controller
         'perlu_perbaikan',
         'rusak',
         'hilang',
+        'perlu_tinjauan',
     ];
 
     private const FILTER = [
@@ -46,6 +50,10 @@ class InventarisController extends Controller
             return $query->where('is_active', false);
         }
 
+        if ($status === 'perlu_tinjauan') {
+            return $query->where('status_tinjauan', 'perlu_tinjauan');
+        }
+
         if (in_array($status, self::KONDISI, true)) {
             return $query->where('kondisi_terakhir', $status);
         }
@@ -68,19 +76,17 @@ class InventarisController extends Controller
             'rusak' => Inventaris::where('kondisi_terakhir', 'rusak')->count(),
             'hilang' => Inventaris::where('kondisi_terakhir', 'hilang')->count(),
             'belum_diperiksa' => Inventaris::whereNull('kondisi_terakhir')->count(),
+            'perlu_tinjauan' => Inventaris::where('status_tinjauan', 'perlu_tinjauan')->count(),
         ];
 
         $query = Jpl::query()
             ->withCount([
                 'inventaris',
-                'inventaris as inventaris_aktif_count' => fn ($q) =>
-                    $q->where('is_active', true),
-                'inventaris as inventaris_baik_count' => fn ($q) =>
-                    $q->where('kondisi_terakhir', 'baik'),
-                'inventaris as inventaris_rusak_count' => fn ($q) =>
-                    $q->where('kondisi_terakhir', 'rusak'),
-                'inventaris as inventaris_perbaikan_count' => fn ($q) =>
-                    $q->where('kondisi_terakhir', 'perlu_perbaikan'),
+                'inventaris as inventaris_aktif_count' => fn ($q) => $q->where('is_active', true),
+                'inventaris as inventaris_baik_count' => fn ($q) => $q->where('kondisi_terakhir', 'baik'),
+                'inventaris as inventaris_rusak_count' => fn ($q) => $q->where('kondisi_terakhir', 'rusak'),
+                'inventaris as inventaris_perbaikan_count' => fn ($q) => $q->where('kondisi_terakhir', 'perlu_perbaikan'),
+                'inventaris as inventaris_perlu_tinjauan_count' => fn ($q) => $q->where('status_tinjauan', 'perlu_tinjauan'),
             ])
             ->withSum('inventaris as total_unit', 'jumlah');
 
@@ -127,6 +133,7 @@ class InventarisController extends Controller
             'perlu_perbaikan' => (clone $base)->where('kondisi_terakhir', 'perlu_perbaikan')->count(),
             'rusak' => (clone $base)->where('kondisi_terakhir', 'rusak')->count(),
             'hilang' => (clone $base)->where('kondisi_terakhir', 'hilang')->count(),
+            'perlu_tinjauan' => (clone $base)->where('status_tinjauan', 'perlu_tinjauan')->count(),
         ];
 
         $query = Inventaris::query()
@@ -157,9 +164,71 @@ class InventarisController extends Controller
 
     public function show(Inventaris $inventaris)
     {
-        $inventaris->load('jpl');
+        $inventaris->load(['jpl', 'pelapor', 'peninjau']);
 
         return view('admin.inventaris.show', compact('inventaris'));
+    }
+
+    /**
+     * Menyelesaikan tinjauan inventaris oleh Admin.
+     */
+    public function review(
+        Request $request,
+        Inventaris $inventaris,
+        ActivityLogService $activityLogService
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'catatan_tinjauan' => ['required', 'string', 'max:2000'],
+        ], [
+            'catatan_tinjauan.required' => 'Catatan hasil tinjauan wajib diisi.',
+            'catatan_tinjauan.max' => 'Catatan tinjauan maksimal 2000 karakter.',
+        ]);
+
+        $reviewed = DB::transaction(function () use (
+            $inventaris,
+            $validated,
+            $request,
+            $activityLogService
+        ): bool {
+            $lockedInventaris = Inventaris::query()
+                ->lockForUpdate()
+                ->findOrFail($inventaris->id);
+
+            if ($lockedInventaris->status_tinjauan !== 'perlu_tinjauan') {
+                return false;
+            }
+
+            $oldReviewStatus = $lockedInventaris->status_tinjauan;
+            $lockedInventaris->update([
+                'status_tinjauan' => 'normal',
+                'catatan_tinjauan' => $validated['catatan_tinjauan'],
+                'ditinjau_oleh' => $request->user()->id,
+                'ditinjau_pada' => now(),
+            ]);
+
+            $activityLogService->log(
+                'review',
+                'inventaris',
+                'Review Inventaris berhasil diselesaikan.',
+                $lockedInventaris,
+                ['status_tinjauan' => $oldReviewStatus],
+                [
+                    'status_tinjauan' => 'normal',
+                    'ditinjau_oleh' => $request->user()->id,
+                ]
+            );
+
+            return true;
+        });
+
+        return redirect()
+            ->route('admin.inventaris.show', $inventaris->id)
+            ->with(
+                $reviewed ? 'success' : 'error',
+                $reviewed
+                    ? 'Tinjauan inventaris berhasil diselesaikan.'
+                    : 'Inventaris ini tidak sedang menunggu tinjauan.'
+            );
     }
 
     public function create()
@@ -169,7 +238,7 @@ class InventarisController extends Controller
         return view('admin.inventaris.create', compact('jpl'));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ActivityLogService $activityLogService)
     {
         $validated = $request->validate([
             'kode_barang' => [
@@ -196,7 +265,19 @@ class InventarisController extends Controller
 
         $validated['is_active'] = $request->boolean('is_active');
 
-        Inventaris::create($validated);
+        DB::transaction(function () use ($validated, $activityLogService): void {
+            $inventaris = Inventaris::create($validated);
+            $inventaris->refresh();
+
+            $activityLogService->log(
+                'create',
+                'inventaris',
+                'Inventaris berhasil ditambahkan.',
+                $inventaris,
+                null,
+                $this->activityValues($inventaris)
+            );
+        });
 
         return redirect()
             ->route('admin.inventaris.index')
@@ -213,8 +294,11 @@ class InventarisController extends Controller
         );
     }
 
-    public function update(Request $request, Inventaris $inventaris)
-    {
+    public function update(
+        Request $request,
+        Inventaris $inventaris,
+        ActivityLogService $activityLogService
+    ) {
         $validated = $request->validate([
             'kode_barang' => [
                 'nullable',
@@ -241,18 +325,75 @@ class InventarisController extends Controller
 
         $validated['is_active'] = $request->boolean('is_active');
 
-        $inventaris->update($validated);
+        DB::transaction(function () use ($inventaris, $validated, $activityLogService): void {
+            $lockedInventaris = Inventaris::query()
+                ->lockForUpdate()
+                ->findOrFail($inventaris->id);
+            $oldValues = $this->activityValues($lockedInventaris);
+            $lockedInventaris->fill($validated);
+            $changedFields = array_keys($lockedInventaris->getDirty());
+            $lockedInventaris->save();
+
+            if ($changedFields !== []) {
+                $newValues = $this->activityValues($lockedInventaris);
+                $newValues['changed_fields'] = $changedFields;
+
+                $activityLogService->log(
+                    'update',
+                    'inventaris',
+                    'Data Inventaris berhasil diperbarui.',
+                    $lockedInventaris,
+                    $oldValues,
+                    $newValues
+                );
+            }
+        });
 
         return redirect()
             ->route('admin.inventaris.index')
             ->with('success', 'Inventaris berhasil diperbarui.');
     }
 
-    public function destroy(Inventaris $inventaris)
+    public function destroy(Inventaris $inventaris, ActivityLogService $activityLogService)
     {
-        if ($inventaris->realisasiInventaris()->exists()) {
-            $inventaris->update(['is_active' => false]);
+        $deactivated = DB::transaction(function () use ($inventaris, $activityLogService): bool {
+            $lockedInventaris = Inventaris::query()
+                ->lockForUpdate()
+                ->findOrFail($inventaris->id);
 
+            if ($lockedInventaris->realisasiInventaris()->exists()) {
+                if ($lockedInventaris->is_active) {
+                    $lockedInventaris->update(['is_active' => false]);
+
+                    $activityLogService->log(
+                        'deactivate',
+                        'inventaris',
+                        'Inventaris dinonaktifkan karena memiliki riwayat pemeriksaan.',
+                        $lockedInventaris,
+                        ['is_active' => true],
+                        ['is_active' => false]
+                    );
+                }
+
+                return true;
+            }
+
+            $oldValues = $this->activityValues($lockedInventaris);
+            $lockedInventaris->delete();
+
+            $activityLogService->log(
+                'delete',
+                'inventaris',
+                'Inventaris berhasil dihapus.',
+                $lockedInventaris,
+                $oldValues,
+                null
+            );
+
+            return false;
+        });
+
+        if ($deactivated) {
             return redirect()
                 ->route('admin.inventaris.index')
                 ->with(
@@ -261,10 +402,22 @@ class InventarisController extends Controller
                 );
         }
 
-        $inventaris->delete();
-
         return redirect()
             ->route('admin.inventaris.index')
             ->with('success', 'Inventaris berhasil dihapus.');
+    }
+
+    /**
+     * @return array<string, bool|int|string|null>
+     */
+    private function activityValues(Inventaris $inventaris): array
+    {
+        return [
+            'jpl_id' => $inventaris->jpl_id === null ? null : (int) $inventaris->jpl_id,
+            'kategori' => $inventaris->kategori,
+            'jumlah' => (int) $inventaris->jumlah,
+            'is_active' => (bool) $inventaris->is_active,
+            'status_tinjauan' => $inventaris->status_tinjauan,
+        ];
     }
 }

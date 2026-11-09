@@ -1,4 +1,4 @@
-@extends('layouts.admin')
+@extends(auth()->user()?->isSuperadmin() ? 'layouts.superadmin' : 'layouts.admin')
 
 @section('title', 'Detail Serah Terima Dinas')
 
@@ -959,7 +959,7 @@
             @if ($serahTerima->tanda_tangan_penyerah)
                 <div class="flex min-h-48 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <img
-                        src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($serahTerima->tanda_tangan_penyerah) }}"
+                        src="{{ route('admin.serah-terima-dinas.tanda-tangan', [$serahTerima, 'penyerah']) }}"
                         alt="Tanda tangan petugas penyerah"
                         class="max-h-40 max-w-full object-contain"
                     >
@@ -984,7 +984,7 @@
             @if ($serahTerima->tanda_tangan_penerima)
                 <div class="flex min-h-48 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <img
-                        src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($serahTerima->tanda_tangan_penerima) }}"
+                        src="{{ route('admin.serah-terima-dinas.tanda-tangan', [$serahTerima, 'penerima']) }}"
                         alt="Tanda tangan petugas penerima"
                         class="max-h-40 max-w-full object-contain"
                     >
@@ -1077,6 +1077,11 @@
                 </p>
             </div>
 
+        @elseif (auth()->user()?->isSuperadmin())
+            <div class="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <p class="font-semibold text-blue-900">Informasi pemantauan</p>
+                <p class="mt-1 text-sm text-blue-800">Serah Terima ini hanya dapat ditinjau oleh Superadmin. Keputusan operasional tetap menjadi kewenangan Admin.</p>
+            </div>
         @else
             <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <p class="mb-4 text-sm text-slate-600">
@@ -1117,7 +1122,7 @@
     </section>
 
     {{-- MODAL REVISI --}}
-    @if ($penerimaanTerkonfirmasi && !$reviewSudahDisetujui)
+    @if (!auth()->user()?->isSuperadmin() && $penerimaanTerkonfirmasi && !$reviewSudahDisetujui)
         <div
             id="modalRevisi"
             class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto bg-slate-950/60 p-4"

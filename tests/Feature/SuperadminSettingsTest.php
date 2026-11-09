@@ -3,6 +3,7 @@
 use App\Models\ActivityLog;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
@@ -151,6 +152,14 @@ it('allows duplicate email and phone values while keeping NIP unique in user man
     $this->assertDatabaseCount('users', 3);
     $this->assertDatabaseCount('activity_logs', 2);
 
+    $userLogs = ActivityLog::query()->where('action', 'create')->get();
+    expect($userLogs)->toHaveCount(2);
+    foreach ($userLogs as $userLog) {
+        expect($userLog->new_values)->toHaveKeys(['role', 'is_active'])
+            ->and(array_keys($userLog->new_values))->toHaveCount(2)
+            ->and(json_encode($userLog->new_values))->not->toContain('USER-00', 'shared@example.test', '08123456789');
+    }
+
     $this->post(route('superadmin.users.store'), ['nip' => 'USER-001', ...$sharedData])
         ->assertSessionHasErrors('nip');
 
@@ -186,6 +195,16 @@ it('accepts repeated email values in user import while rejecting duplicate NIP r
             ->assertJsonPath('failed', 0);
 
         $this->assertDatabaseCount('users', 3);
+        $this->assertDatabaseCount('activity_logs', 1);
+        $importLog = ActivityLog::query()->sole();
+        expect($importLog->action)->toBe('import')
+            ->and($importLog->new_values)->toBe([
+                'imported_count' => 2,
+                'failed_count' => 1,
+                'import_source' => 'excel',
+            ])
+            ->and($importLog->description)->not->toContain('Petugas Satu')
+            ->and(json_encode($importLog->new_values))->not->toContain('IMPORT-001', 'shared@example.test', '08111111111');
         $this->assertDatabaseHas('users', ['nip' => 'IMPORT-001', 'email' => 'shared@example.test']);
         $this->assertDatabaseHas('users', ['nip' => 'IMPORT-002', 'email' => 'shared@example.test']);
     } finally {
@@ -230,6 +249,11 @@ it('lets a superadmin update their own profile and password without exposing pas
         ->and($passwordLog->description)->not->toContain('new-password-123')
         ->and($passwordLog->old_values)->toBeNull()
         ->and($passwordLog->new_values)->toBeNull();
+
+    $profileLog = ActivityLog::where('module', 'superadmin_profile')->sole();
+    expect($profileLog->new_values['changed_fields'])->toContain('name', 'email', 'phone')
+        ->and(json_encode([$profileLog->old_values, $profileLog->new_values, $profileLog->description]))
+        ->not->toContain('Superadmin Test', 'Superadmin Baru', 'before@example.test', 'after@example.test', '08123456789');
 });
 
 it('rejects an incorrect current password and an unconfirmed new password', function () {
@@ -267,4 +291,158 @@ it('forbids admin and PJL users from viewing or changing superadmin settings', f
 
         $this->put(route('superadmin.settings.password.update'), [])->assertForbidden();
     }
+});
+
+it('rolls back Superadmin account creation when Activity Log storage fails', function () {
+    $superadmin = createSettingsTestUser('superadmin', 'SA-ROLLBACK-CREATE');
+    $role = Role::create(['name' => 'admin', 'label' => 'Admin']);
+    $this->mock(ActivityLogService::class)
+        ->shouldReceive('log')
+        ->once()
+        ->andThrow(new RuntimeException('Activity Log gagal disimpan.'));
+
+    $this->actingAs($superadmin)
+        ->post(route('superadmin.users.store'), [
+            'nip' => 'NEW-ROLLBACK-USER',
+            'name' => 'Nama Rahasia',
+            'email' => 'private@example.test',
+            'phone' => '08123456789',
+            'role_id' => $role->id,
+            'is_active' => '1',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])
+        ->assertServerError();
+
+    expect(User::query()->count())->toBe(1)
+        ->and(ActivityLog::query()->count())->toBe(0);
+});
+
+it('rolls back Superadmin user updates and status changes when Activity Log storage fails', function () {
+    $superadmin = createSettingsTestUser('superadmin', 'SA-ROLLBACK-UPDATE');
+    $target = createSettingsTestUser('pjl', 'PJL-ROLLBACK-UPDATE');
+    $this->mock(ActivityLogService::class)
+        ->shouldReceive('log')
+        ->twice()
+        ->andThrow(new RuntimeException('Activity Log gagal disimpan.'));
+
+    $this->actingAs($superadmin)
+        ->put(route('superadmin.users.update', $target), [
+            'nip' => $target->nip,
+            'name' => 'Nama Baru',
+            'email' => null,
+            'phone' => null,
+            'role_id' => $target->role_id,
+            'is_active' => '1',
+        ])
+        ->assertServerError();
+
+    expect($target->fresh()->name)->toBe('Pjl Test')
+        ->and(ActivityLog::query()->count())->toBe(0);
+
+    $this->patch(route('superadmin.users.toggle-status', $target))
+        ->assertServerError();
+
+    expect($target->fresh()->is_active)->toBeTrue()
+        ->and(ActivityLog::query()->count())->toBe(0);
+});
+
+it('does not log a Superadmin user update when no user fields changed', function () {
+    $superadmin = createSettingsTestUser('superadmin', 'SA-NOOP');
+
+    $this->actingAs($superadmin)
+        ->put(route('superadmin.users.update', $superadmin), [
+            'nip' => $superadmin->nip,
+            'name' => $superadmin->name,
+            'email' => $superadmin->email,
+            'phone' => $superadmin->phone,
+            'role_id' => $superadmin->role_id,
+            'is_active' => '1',
+        ])
+        ->assertRedirect(route('superadmin.users.index'));
+
+    expect(ActivityLog::query()->count())->toBe(0);
+});
+
+it('records role and status transitions without copying User personal details', function () {
+    $superadmin = createSettingsTestUser('superadmin', 'SA-STATUS-AUDIT');
+    $pjl = createSettingsTestUser('pjl', 'PJL-STATUS-AUDIT');
+    $adminRole = Role::create(['name' => 'admin', 'label' => 'Admin']);
+
+    $this->actingAs($superadmin)
+        ->put(route('superadmin.users.update', $pjl), [
+            'nip' => $pjl->nip,
+            'name' => $pjl->name,
+            'email' => $pjl->email,
+            'phone' => $pjl->phone,
+            'role_id' => $adminRole->id,
+            'is_active' => '0',
+        ])
+        ->assertRedirect(route('superadmin.users.index'));
+
+    $activity = ActivityLog::query()->sole();
+    expect($activity->old_values)->toBe([
+        'role' => 'pjl',
+        'is_active' => true,
+    ])
+        ->and($activity->new_values['role'])->toBe('admin')
+        ->and($activity->new_values['is_active'])->toBeFalse()
+        ->and($activity->new_values['changed_fields'])->toContain('role', 'is_active')
+        ->and(json_encode([$activity->old_values, $activity->new_values, $activity->description]))
+        ->not->toContain('PJL-STATUS-AUDIT', 'Pjl Test');
+});
+
+it('rolls back a Superadmin import when its summary Activity Log cannot be written', function () {
+    $superadmin = createSettingsTestUser('superadmin', 'SA-IMPORT-ROLLBACK');
+    Role::create(['name' => 'pjl', 'label' => 'PJL']);
+    $workbook = createUserImportWorkbook([
+        ['PJL-IMPORT-ROLLBACK', 'Petugas Rollback', 'pjl@example.test', '08123456789', 'pjl', 'aktif'],
+    ]);
+
+    try {
+        $preview = $this->actingAs($superadmin)
+            ->post(route('superadmin.users.import.preview.store'), ['file' => $workbook['upload']])
+            ->assertOk();
+
+        $this->mock(ActivityLogService::class)
+            ->shouldReceive('log')
+            ->once()
+            ->andThrow(new RuntimeException('Activity Log gagal disimpan.'));
+
+        $this->postJson(route('superadmin.users.import.confirm'), [
+            'token' => $preview->json('token'),
+        ])->assertServerError();
+
+        expect(User::query()->count())->toBe(1)
+            ->and(ActivityLog::query()->count())->toBe(0);
+    } finally {
+        @unlink($workbook['path']);
+    }
+});
+
+it('rolls back Superadmin profile and password changes when Activity Log storage fails', function () {
+    $superadmin = createSettingsTestUser('superadmin', 'SA-ROLLBACK-SETTINGS', 'before@example.test', 'old-password');
+    $this->mock(ActivityLogService::class)
+        ->shouldReceive('log')
+        ->twice()
+        ->andThrow(new RuntimeException('Activity Log gagal disimpan.'));
+
+    $this->actingAs($superadmin)
+        ->put(route('superadmin.settings.profile.update'), [
+            'name' => 'Tidak Tersimpan',
+            'email' => 'after@example.test',
+            'phone' => '08123456789',
+        ])
+        ->assertServerError();
+
+    expect($superadmin->fresh()->email)->toBe('before@example.test');
+
+    $this->put(route('superadmin.settings.password.update'), [
+        'current_password' => 'old-password',
+        'password' => 'new-password-123',
+        'password_confirmation' => 'new-password-123',
+    ])->assertServerError();
+
+    expect(Hash::check('old-password', $superadmin->fresh()->password))->toBeTrue()
+        ->and(ActivityLog::query()->count())->toBe(0);
 });

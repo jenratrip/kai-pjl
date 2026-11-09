@@ -1,4 +1,4 @@
-﻿ @extends('layouts.user-operasional')
+@extends('layouts.user')
 
 @section('title', 'Realisasi KA - Sistem PJL')
 
@@ -61,7 +61,7 @@
             {{-- JAM SEKARANG DAN RENTANG FILTER --}}
             <div class="time-window-info">
                 <span>
-                    Filter jadwal: <strong>±1 jam dari waktu sekarang</strong>.
+                    Filter jadwal: <strong>60 menit ke depan dari waktu sekarang</strong>.
                     KA manual tetap ditampilkan.
                 </span>
 
@@ -89,7 +89,7 @@
                 class="summary-compact"
                 role="group"
                 aria-label="Ringkasan realisasi shift"
-                title="Progress dihitung dari KA yang sudah berstatus JALAN atau BATAL berdasarkan KA yang tampil pada tabel.">
+                title="Rekap menghitung seluruh KA dalam shift, termasuk KA yang sudah dicatat.">
 
                 <div class="summary-chips">
                     <div class="summary-chip">
@@ -180,33 +180,82 @@
                     </div>
 
                     <div class="legend-item">
-                        <span class="legend-mark mk-yes">✓</span>
+                        <span class="legend-mark mk-yes">?</span>
                         <span class="legend-mark mk-no">×</span>
                         <span class="legend-text">
-                            Pemeriksaan: ✓ Ya, × Tidak, abu-abu Belum diisi
+                            Pemeriksaan: ? Ya, × Tidak, abu-abu Belum diisi
                         </span>
                     </div>
                 </div>
             </div>
 
+            <div class="print-color-legend" aria-label="Keterangan warna dan pemeriksaan">
+                <span><i class="sw-green"></i> Tepat waktu</span>
+                <span><i class="sw-yellow"></i> Terlambat</span>
+                <span><i class="sw-blue"></i> Lebih cepat</span>
+                <span><i class="sw-red"></i> Batal</span>
+                <span><i class="sw-gray"></i> Belum diproses</span>
+                <span><i class="sw-awas"></i> AWAS 2 ARAH</span>
+                <span class="print-check-legend">Pemeriksaan: YA / TIDAK / BELUM</span>
+                <span class="print-simultaneous-legend">KA Bersamaan: peringatan merah</span>
+            </div>
+
             {{-- TABEL REALISASI KA --}}
+            @php
+                $petugasCetak = auth()->user();
+                $statusPetugasCetak = $dinasAktif
+                    ? ($dinasAktif->is_pengganti ? 'WAKILAN' : 'REGULER')
+                    : (strtolower((string) ($petugasCetak?->status_petugas ?? $petugasCetak?->jenis_petugas ?? 'reguler')) === 'wakilan'
+                        ? 'WAKILAN'
+                        : 'REGULER');
+            @endphp
             <div class="table-wrapper">
                 <table>
+                    <colgroup>
+                        <col style="width: 8%">
+                        <col style="width: 8%">
+                        <col style="width: 8%">
+                        <col style="width: 7%">
+                        <col style="width: 8%">
+                        <col style="width: 10%">
+                        <col style="width: 7%">
+                        <col style="width: 6%">
+                        <col style="width: 10%">
+                        <col style="width: 7%">
+                        <col style="width: 11%">
+                        <col style="width: 10%">
+                    </colgroup>
                     <thead>
+                        <tr class="print-document-header-row">
+                            <th colspan="12">
+                                <header class="print-document-header">
+                                    <div class="print-document-brand">
+                                        <img src="{{ asset('images/logo-kai.jpg') }}" alt="Logo KAI">
+                                        <div>
+                                            <strong>KAI OPERASIONAL</strong>
+                                            <span>SISTEM DIGITAL PJL</span>
+                                            <span class="print-document-title">Laporan Realisasi KA</span>
+                                        </div>
+                                    </div>
+                                    <div class="print-document-identity">
+                                        <strong>{{ $petugasCetak?->name ?? 'Petugas' }}</strong>
+                                        <span>NIP / NIPKWT: {{ $petugasCetak?->nip ?: '-' }}</span>
+                                        <span>Status: {{ $statusPetugasCetak }}</span>
+                                    </div>
+                                </header>
+                            </th>
+                        </tr>
                         <tr>
-                            <th>NO</th>
-                            <th>NOMOR KA</th>
+                            <th>NO KA</th>
                             <th>NAMA KA</th>
-                            <th>HULU</th>
-                            <th>HILIR</th>
                             <th>RELASI</th>
                             <th>JAM JADWAL</th>
                             <th>JAM AKTUAL</th>
                             <th>STATUS</th>
-                            <th>SEMBOYAN 21</th>
+                            <th>S. 21</th>
                             <th>GENTA</th>
                             <th>PINTU PERLINTASAN</th>
-                            <th>SEMBOYAN 35</th>
+                            <th>S. 35</th>
                             <th>KETERANGAN</th>
                             <th>AKSI</th>
                         </tr>
@@ -250,24 +299,6 @@
                         </div>
 
                         <div class="small-field">
-                            <label for="manualHulu">HULU</label>
-                            <input
-                                id="manualHulu"
-                                type="text"
-                                class="small-input"
-                                placeholder="Hulu">
-                        </div>
-
-                        <div class="small-field">
-                            <label for="manualHilir">HILIR</label>
-                            <input
-                                id="manualHilir"
-                                type="text"
-                                class="small-input"
-                                placeholder="Hilir">
-                        </div>
-
-                        <div class="small-field">
                             <label for="manualRelasi">RELASI</label>
                             <input
                                 id="manualRelasi"
@@ -292,7 +323,7 @@
                                     class="mini-check inactive"
                                     data-group="manual21"
                                     data-value="yes"
-                                    onclick="setManualCheck(this)">✓</button>
+                                    onclick="setManualCheck(this)">?</button>
 
                                 <button
                                     type="button"
@@ -311,7 +342,7 @@
                                     class="mini-check inactive"
                                     data-group="manualGenta"
                                     data-value="yes"
-                                    onclick="setManualCheck(this)">✓</button>
+                                    onclick="setManualCheck(this)">?</button>
 
                                 <button
                                     type="button"
@@ -330,7 +361,7 @@
                                     class="mini-check inactive"
                                     data-group="manualPintu"
                                     data-value="yes"
-                                    onclick="setManualCheck(this)">✓</button>
+                                    onclick="setManualCheck(this)">?</button>
 
                                 <button
                                     type="button"
@@ -349,7 +380,7 @@
                                     class="mini-check inactive"
                                     data-group="manual35"
                                     data-value="yes"
-                                    onclick="setManualCheck(this)">✓</button>
+                                    onclick="setManualCheck(this)">?</button>
 
                                 <button
                                     type="button"
@@ -368,22 +399,22 @@
                                 class="small-input"
                                 placeholder="Keterangan">
                         </div>
-                    </div>
 
-                    <div class="add-actions">
-                        <button
-                            type="button"
-                            class="add-button"
-                            onclick="tambahKAManual()">
-                            + Simpan KA Manual
-                        </button>
+                        <div class="add-actions">
+                            <button
+                                type="button"
+                                class="add-button"
+                                onclick="tambahKAManual()">
+                                Simpan KA
+                            </button>
 
-                        <button
-                            type="button"
-                            class="action-btn btn-outline"
-                            onclick="toggleFormTambahKA(false)">
-                            Batal
-                        </button>
+                            <button
+                                type="button"
+                                class="action-btn btn-outline"
+                                onclick="toggleFormTambahKA(false)">
+                                Batal
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -399,7 +430,7 @@
                         role="status"
                         aria-live="polite">
                         <span class="save-dot"></span>
-                        <span id="saveStatusText">Penyimpanan otomatis aktif</span>
+                        <span id="saveStatusText">Perubahan disimpan hanya melalui tombol Simpan.</span>
                     </div>
                 </div>
 
@@ -408,7 +439,11 @@
                         type="button"
                         class="action-btn btn-outline"
                         onclick="cetakDokumen()">
-                        ▣ &nbsp; Cetak Dokumen JPL
+                        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" class="action-icon">
+                            <path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z" />
+                            <path d="M17 11h.01" />
+                        </svg>
+                        <span>Cetak Dokumen JPL</span>
                     </button>
 
                     <button
@@ -416,7 +451,11 @@
                         id="simpanBtn"
                         class="action-btn btn-dark"
                         onclick="simpanRealisasi()">
-                        ▣ &nbsp; Simpan Semua
+                        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" class="action-icon">
+                            <path d="M5 3h12l4 4v14H3V3h2z" />
+                            <path d="M7 3v6h10V3M7 21v-8h10v8" />
+                        </svg>
+                        <span data-save-label>Simpan Semua</span>
                     </button>
 
                     <a
@@ -441,7 +480,7 @@
 
                 <div class="cd-quick-actions">
                     <a href="{{ route('user.catatan-dinas') }}" class="cd-quick-link">
-                        Lihat semua catatan →
+                        Lihat semua catatan ?
                     </a>
 
                     <button
@@ -611,6 +650,12 @@
         };
     </script>
 
-    {{-- Jam realtime, filter jadwal, tabel, dan autosave --}}
+    {{-- Filter waktu jendela berjalan --}}
+    <script src="{{ asset('js/user/realisasi-ka-time-window.js') }}" defer></script>
+
+    {{-- Interaksi status, pemeriksaan, dan target penyimpanan --}}
+    <script src="{{ asset('js/user/realisasi-ka-interactions.js') }}" defer></script>
+
+    {{-- Jam realtime, filter jadwal, tabel, dan penyimpanan manual --}}
     <script src="{{ asset('js/user/realisasi-ka.js') }}" defer></script>
 @endpush

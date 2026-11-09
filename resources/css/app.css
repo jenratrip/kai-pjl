@@ -7,3 +7,88 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+@layer components {
+    body.superadmin-shell [x-cloak] {
+        display: none !important;
+    }
+
+    .superadmin-content {
+        width: 100%;
+        max-width: 1680px;
+        margin-inline: auto;
+    }
+
+    .superadmin-content [class~="shadow-sm"] {
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgb(15 23 42 / 0.06), 0 8px 24px rgb(15 23 42 / 0.035);
+    }
+
+    .superadmin-content h1,
+    .superadmin-content h2,
+    .superadmin-content h3 {
+        letter-spacing: -0.02em;
+    }
+
+    .superadmin-content h1 {
+        color: #0f172a;
+    }
+
+    .superadmin-content span[class*="rounded-md"][class*="bg-"] {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 9999px;
+        font-weight: 600;
+    }
+
+    .superadmin-content input:not([type="checkbox"]):not([type="radio"]),
+    .superadmin-content select,
+    .superadmin-content textarea {
+        border-color: #cbd5e1;
+        border-radius: 0.75rem;
+        color: #1e293b;
+    }
+
+    .superadmin-content input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+    .superadmin-content select,
+    .superadmin-content textarea {
+        min-height: 2.5rem;
+    }
+
+    .superadmin-content input:focus,
+    .superadmin-content select:focus,
+    .superadmin-content textarea:focus {
+        border-color: #2563eb;
+        outline: 2px solid transparent;
+        box-shadow: 0 0 0 3px rgb(37 99 235 / 0.14);
+    }
+
+    .superadmin-content table {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .superadmin-content thead {
+        background-color: #f8fafc;
+    }
+
+    .superadmin-content thead th {
+        color: #475569;
+        letter-spacing: 0.055em;
+    }
+
+    .superadmin-content tbody tr {
+        transition: background-color 150ms ease;
+    }
+
+    .superadmin-content button:focus-visible,
+    .superadmin-content a:focus-visible {
+        outline: 2px solid #2563eb;
+        outline-offset: 2px;
+    }
+
+    .superadmin-content label {
+        color: #334155;
+        font-weight: 600;
+    }
+}

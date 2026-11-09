@@ -6,6 +6,15 @@
 
 @section('content')
 
+    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Pemantauan operasional</p>
+            <h1 class="mt-2 text-2xl font-bold text-slate-900">Master Data JPL</h1>
+            <p class="mt-1 text-sm text-slate-500">Daftar perlintasan untuk pengawasan Superadmin.</p>
+        </div>
+        <span class="inline-flex w-fit rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800">Hanya baca</span>
+    </div>
+
     {{-- Notifikasi --}}
     @if (session('success'))
         <div class="mb-6 rounded-lg bg-green-50 p-4 text-sm text-green-700">
@@ -20,19 +29,12 @@
     @endif
 
     {{-- Statistik --}}
-    <div class="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+    <div class="mb-6 grid grid-cols-1 gap-6">
 
         <div class="rounded-xl bg-white p-6 shadow-sm">
             <p class="text-sm text-gray-500">Total Data JPL</p>
             <p class="mt-2 text-3xl font-bold text-gray-800">
                 {{ $totalJpl }}
-            </p>
-        </div>
-
-        <div class="rounded-xl bg-white p-6 shadow-sm">
-            <p class="text-sm text-gray-500">Total Resort</p>
-            <p class="mt-2 text-3xl font-bold text-gray-800">
-                {{ $totalResort }}
             </p>
         </div>
 
@@ -166,10 +168,6 @@
                         </th>
 
                         <th class="whitespace-nowrap px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                            Wilayah
-                        </th>
-
-                        <th class="whitespace-nowrap px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                             Lokasi
                         </th>
 
@@ -201,10 +199,6 @@
                                 {{ $jpl->resort?->nama_resort ?? '-' }}
                             </td>
 
-                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
-                                {{ $jpl->resort?->wilayah?->nama_wilayah ?? '-' }}
-                            </td>
-
                             <td class="px-6 py-4 text-sm text-gray-600">
                                 {{ $jpl->lokasi ?: '-' }}
                             </td>
@@ -225,7 +219,7 @@
 
                     @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-12 text-center">
+                            <td colspan="6" class="px-6 py-12 text-center">
                                 <p class="text-sm font-medium text-gray-600">
                                     Data JPL tidak ditemukan.
                                 </p>

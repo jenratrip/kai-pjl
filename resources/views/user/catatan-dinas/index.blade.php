@@ -1,4 +1,4 @@
-@extends('layouts.user-operasional')
+@extends('layouts.user')
 
 @section('title', 'Catatan Dinas - Sistem PJL')
 
@@ -7,7 +7,7 @@
 @endpush
 
 @section('content')
-    {{-- Layout sudah punya <main>, jadi tidak perlu <main> lagi di sini. --}}
+    {{-- Shell bersama menyediakan area konten; section ini tetap memakai struktur lamanya. --}}
     @include('user.catatan-dinas._section', [
         'catatan'      => $catatan,
         'daftarDinas'  => $daftarDinas,

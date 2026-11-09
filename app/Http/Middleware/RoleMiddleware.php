@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class RoleMiddleware
@@ -16,11 +17,31 @@ class RoleMiddleware
         Closure $next,
         string ...$roles
     ): Response {
-        if (! $request->user()) {
+        $user = $request->user();
+
+        if (! $user) {
             return redirect()->route('login');
         }
 
-        $userRole = $request->user()->role?->name;
+        if (! $user->is_active) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Akun tidak aktif. Silakan hubungi administrator.',
+                ], 403);
+            }
+
+            return redirect()
+                ->route('login')
+                ->withErrors([
+                    'nip' => 'Akun tidak aktif. Silakan hubungi administrator.',
+                ]);
+        }
+
+        $userRole = $user->role?->name;
 
         if (! in_array($userRole, $roles, true)) {
             abort(403, 'Anda tidak memiliki akses ke halaman ini.');

@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Jpl;
 use App\Models\Resort;
+use App\Services\ActivityLogService;
 use App\Services\DefaultInventarisService;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,7 +43,7 @@ class JplController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = Jpl::with('resort.wilayah');
+        $query = Jpl::with('resort');
 
         /*
          * Pencarian otomatis berdasarkan kata yang relevan.
@@ -98,7 +100,7 @@ class JplController extends Controller
         /*
          * Resort aktif untuk filter dan form tambah.
          */
-        $resorts = Resort::with('wilayah')
+        $resorts = Resort::query()
             ->where('is_active', true)
             ->orderBy('nama_resort')
             ->get();
@@ -157,7 +159,7 @@ class JplController extends Controller
             $search,
             $matches
         )) {
-            $candidates[] = $matches[1] . '+' . $matches[2];
+            $candidates[] = $matches[1].'+'.$matches[2];
         }
 
         /*
@@ -185,8 +187,7 @@ class JplController extends Controller
          */
         $words = array_values(array_filter(
             $words,
-            fn (string $word): bool =>
-                !in_array($word, $this->stopWords, true)
+            fn (string $word): bool => ! in_array($word, $this->stopWords, true)
         ));
 
         return $words;
@@ -266,6 +267,15 @@ class JplController extends Controller
         Request $request,
         ?Jpl $jpl = null
     ): array {
+        $resortRule = Rule::exists('resorts', 'id')
+            ->where(function (Builder $query) use ($jpl) {
+                $query->where('is_active', true);
+
+                if ($jpl) {
+                    $query->orWhere('id', $jpl->resort_id);
+                }
+            });
+
         return $request->validate([
             'kode_jpl' => [
                 'nullable',
@@ -284,8 +294,7 @@ class JplController extends Controller
             'resort_id' => [
                 'required',
                 'integer',
-                Rule::exists('resorts', 'id')
-                    ->where('is_active', true),
+                $resortRule,
             ],
 
             'antara' => [
@@ -357,6 +366,8 @@ class JplController extends Controller
                 'sometimes',
                 'boolean',
             ],
+        ], [
+            'resort_id.exists' => 'Resort yang dipilih tidak tersedia atau nonaktif.',
         ]);
     }
 
@@ -365,7 +376,8 @@ class JplController extends Controller
      */
     public function store(
         Request $request,
-        DefaultInventarisService $inventarisService
+        DefaultInventarisService $inventarisService,
+        ActivityLogService $activityLogService
     ): RedirectResponse {
         $validated = $this->validateJpl($request);
 
@@ -374,11 +386,21 @@ class JplController extends Controller
 
         DB::transaction(function () use (
             $validated,
-            $inventarisService
+            $inventarisService,
+            $activityLogService
         ) {
             $jpl = Jpl::create($validated);
 
             $inventarisService->initializeForJpl($jpl);
+
+            $activityLogService->log(
+                'create',
+                'jpl',
+                'JPL berhasil dibuat beserta inventaris default.',
+                $jpl,
+                null,
+                $this->activityValues($jpl),
+            );
         });
 
         return redirect()
@@ -395,7 +417,7 @@ class JplController extends Controller
     public function show(string $id): View
     {
         $jpl = Jpl::with([
-            'resort.wilayah',
+            'resort',
             'dinas',
             'jadwalKa',
             'inventaris',
@@ -409,10 +431,10 @@ class JplController extends Controller
      */
     public function edit(string $id): View
     {
-        $jpl = Jpl::with('resort.wilayah')
+        $jpl = Jpl::with('resort')
             ->findOrFail($id);
 
-        $resorts = Resort::with('wilayah')
+        $resorts = Resort::query()
             ->where(function ($query) use ($jpl) {
                 $query->where('is_active', true)
                     ->orWhere('id', $jpl->resort_id);
@@ -431,7 +453,8 @@ class JplController extends Controller
      */
     public function update(
         Request $request,
-        string $id
+        string $id,
+        ActivityLogService $activityLogService
     ): RedirectResponse {
         $jpl = Jpl::findOrFail($id);
 
@@ -444,11 +467,26 @@ class JplController extends Controller
          * Pertahankan status lama jika checkbox
          * is_active tidak dikirim oleh form.
          */
-        if (!array_key_exists('is_active', $validated)) {
+        if (! array_key_exists('is_active', $validated)) {
             $validated['is_active'] = $jpl->is_active;
         }
 
-        $jpl->update($validated);
+        DB::transaction(function () use ($jpl, $validated, $activityLogService): void {
+            $oldValues = $this->activityValues($jpl);
+            $jpl->update($validated);
+            $newValues = $this->activityValues($jpl);
+
+            if ($oldValues !== $newValues) {
+                $activityLogService->log(
+                    'update',
+                    'jpl',
+                    'Data JPL berhasil diperbarui.',
+                    $jpl,
+                    $oldValues,
+                    $newValues,
+                );
+            }
+        });
 
         return redirect()
             ->route('admin.jpl.index')
@@ -461,11 +499,11 @@ class JplController extends Controller
     /**
      * Menonaktifkan JPL tanpa menghapus riwayatnya.
      */
-    public function destroy(string $id): RedirectResponse
+    public function destroy(string $id, ActivityLogService $activityLogService): RedirectResponse
     {
         $jpl = Jpl::findOrFail($id);
 
-        if (!$jpl->is_active) {
+        if (! $jpl->is_active) {
             return redirect()
                 ->route('admin.jpl.index')
                 ->with(
@@ -474,9 +512,19 @@ class JplController extends Controller
                 );
         }
 
-        $jpl->update([
-            'is_active' => false,
-        ]);
+        DB::transaction(function () use ($jpl, $activityLogService): void {
+            $oldValues = $this->activityValues($jpl);
+            $jpl->update(['is_active' => false]);
+
+            $activityLogService->log(
+                'deactivate',
+                'jpl',
+                'JPL berhasil dinonaktifkan.',
+                $jpl,
+                $oldValues,
+                $this->activityValues($jpl),
+            );
+        });
 
         return redirect()
             ->route('admin.jpl.index')
@@ -489,7 +537,7 @@ class JplController extends Controller
     /**
      * Mengaktifkan kembali JPL.
      */
-    public function activate(string $id): RedirectResponse
+    public function activate(string $id, ActivityLogService $activityLogService): RedirectResponse
     {
         $jpl = Jpl::findOrFail($id);
 
@@ -502,9 +550,19 @@ class JplController extends Controller
                 );
         }
 
-        $jpl->update([
-            'is_active' => true,
-        ]);
+        DB::transaction(function () use ($jpl, $activityLogService): void {
+            $oldValues = $this->activityValues($jpl);
+            $jpl->update(['is_active' => true]);
+
+            $activityLogService->log(
+                'activate',
+                'jpl',
+                'JPL berhasil diaktifkan kembali.',
+                $jpl,
+                $oldValues,
+                $this->activityValues($jpl),
+            );
+        });
 
         return redirect()
             ->route('admin.jpl.index')
@@ -512,5 +570,28 @@ class JplController extends Controller
                 'success',
                 'JPL berhasil diaktifkan kembali.'
             );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function activityValues(Jpl $jpl): array
+    {
+        return [
+            'kode_jpl' => $jpl->kode_jpl,
+            'nama_jpl' => $jpl->nama_jpl,
+            'resort_id' => $jpl->resort_id,
+            'antara' => $jpl->antara,
+            'km_hm' => $jpl->km_hm,
+            'lokasi' => $jpl->lokasi,
+            'kota_kabupaten' => $jpl->kota_kabupaten,
+            'provinsi' => $jpl->provinsi,
+            'jenis_jalur_ka' => $jpl->jenis_jalur_ka,
+            'konst_jalan' => $jpl->konst_jalan,
+            'titik_koordinat' => $jpl->titik_koordinat,
+            'lebar_jln' => $jpl->lebar_jln,
+            'status_penjagaan' => $jpl->status_penjagaan,
+            'is_active' => $jpl->is_active,
+        ];
     }
 }

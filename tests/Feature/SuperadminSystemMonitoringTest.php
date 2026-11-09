@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Superadmin\SystemMonitoringController;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Tests\Support\CreatesKaiInMemorySchema;
@@ -86,6 +88,41 @@ test('monitoring reports snapshot and schedule integrity issues', function (): v
     expect($schedule->fresh()->jadwal_ka_batch_id)->toBe($batch->id);
 });
 
+test('monitoring resolves batch range identifiers and reports valid data as consistent', function (): void {
+    $superadmin = $this->kaiUser($this->kaiRole('superadmin'), 'SUPERADMIN-VALID-BATCH');
+    $jpl = $this->kaiJpl('JPL-VALID-BATCH');
+    $train = $this->kaiTrain('KA-VALID-BATCH');
+    $batch = $this->kaiBatch('active', now()->subDay()->toDateString());
+    $batch->jpls()->sync([$jpl->id => ['tanggal_akhir_berlaku' => null]]);
+    $this->kaiSchedule($jpl, $train, ['jadwal_ka_batch_id' => $batch->id]);
+
+    $this->withoutVite()
+        ->actingAs($superadmin)
+        ->get(route('superadmin.monitoring.index'))
+        ->assertOk()
+        ->assertSeeText('Batch Jadwal KA')
+        ->assertSeeText('Konsisten')
+        ->assertSeeText('0 jadwal batch tidak memiliki cakupan JPL yang cocok.')
+        ->assertDontSeeText('Pemeriksaan relasi atau rentang batch Jadwal KA gagal.');
+});
+
+test('monitoring reports a batch query failure instead of treating it as valid', function (): void {
+    DB::connection()->beforeExecuting(function (string $query): void {
+        if (str_contains($query, 'jadwal_ka') && str_contains(strtolower($query), 'left join')) {
+            throw new RuntimeException('simulated read failure');
+        }
+    });
+
+    $controller = app(SystemMonitoringController::class);
+    $method = new ReflectionMethod($controller, 'checkJadwalIntegrity');
+    $method->setAccessible(true);
+    $result = $method->invoke($controller);
+
+    expect($result['state'])->toBe('unknown')
+        ->and($result['label'])->toBe('Tidak dapat diperiksa')
+        ->and($result['summary'])->toBe('Pemeriksaan relasi atau rentang batch Jadwal KA gagal.');
+});
+
 test('error log output redacts credentials and bearer tokens', function (): void {
     $superadmin = $this->kaiUser($this->kaiRole('superadmin'), 'SUPERADMIN-LOGS');
     $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'kai-pjl-monitoring-'.Str::random(12);
@@ -112,6 +149,55 @@ test('error log output redacts credentials and bearer tokens', function (): void
             ->assertDontSeeText('user:pass');
     } finally {
         File::delete($logPath);
+        File::deleteDirectory($directory);
+    }
+});
+
+test('error monitoring reports event and fingerprint counts for a complete scan', function (): void {
+    $superadmin = $this->kaiUser($this->kaiRole('superadmin'), 'SUPERADMIN-COMPLETE-LOGS');
+    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'kai-pjl-monitoring-'.Str::random(12);
+    File::ensureDirectoryExists($directory);
+    $timestamp = now()->format('Y-m-d H:i:s');
+    File::put(
+        $directory.DIRECTORY_SEPARATOR.'laravel.log',
+        "[{$timestamp}] local.ERROR: Repeated safe test failure\n[{$timestamp}] local.ERROR: Repeated safe test failure\n",
+    );
+    config()->set('app.monitoring_log_directory', $directory);
+
+    try {
+        $this->withoutVite()
+            ->actingAs($superadmin)
+            ->get(route('superadmin.monitoring.index'))
+            ->assertOk()
+            ->assertSeeText('2 kejadian')
+            ->assertSeeText('1 kelompok unik')
+            ->assertSeeText('Lengkap: seluruh 1 file log');
+    } finally {
+        File::deleteDirectory($directory);
+    }
+});
+
+test('error monitoring marks a byte-limited scan as partial and shows a lower bound', function (): void {
+    $superadmin = $this->kaiUser($this->kaiRole('superadmin'), 'SUPERADMIN-PARTIAL-LOGS');
+    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'kai-pjl-monitoring-'.Str::random(12);
+    File::ensureDirectoryExists($directory);
+    $timestamp = now()->format('Y-m-d H:i:s');
+    File::put(
+        $directory.DIRECTORY_SEPARATOR.'laravel.log',
+        str_repeat('x', 2_000_005)."\n[{$timestamp}] local.ERROR: Error after scan boundary\n",
+    );
+    config()->set('app.monitoring_log_directory', $directory);
+
+    try {
+        $this->withoutVite()
+            ->actingAs($superadmin)
+            ->get(route('superadmin.monitoring.index'))
+            ->assertOk()
+            ->assertSeeText('≥ 1 kejadian')
+            ->assertSeeText('1 kelompok unik')
+            ->assertSeeText('Parsial:')
+            ->assertSeeText('ukuran satu atau lebih file melebihi batas 2 MB');
+    } finally {
         File::deleteDirectory($directory);
     }
 });

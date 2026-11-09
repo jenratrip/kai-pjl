@@ -1,166 +1,93 @@
 <!DOCTYPE html>
 <html lang="id">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Login PJL - Sistem Operasional PJL</title>
 
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        [hidden] {
+            display: none !important;
+        }
 
         body {
-            font-family: Arial, Helvetica, sans-serif;
+            margin: 0;
+            min-height: 100vh;
             background: #1E3157;
-            min-height: 100vh;
             color: #1F3157;
+            font-family: Arial, sans-serif;
         }
 
-        .login-container {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px 20px;
-        }
-
-        .login-card {
-            width: 410px;
-            max-width: 100%;
-            background: #FFFFFF;
-            border-radius: 10px;
-            padding: 30px 34px 25px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.16);
-        }
-
-        .logo { text-align: center; margin-bottom: 8px; }
-
-        .logo-image {
-            width: 100px;
-            height: 58px;
-            object-fit: contain;
+        .input-icon {
+            pointer-events: none;
+            position: absolute;
+            top: 50%;
+            left: 13px;
+            z-index: 2;
             display: block;
-            margin: 0 auto;
-        }
-
-        .system-title {
-            text-align: center;
-            margin-top: 5px;
-            color: #1F3157;
-            font-size: 17px;
-            font-weight: 700;
-            line-height: 1.3;
-        }
-
-        .company-name {
-            text-align: center;
-            margin-top: 5px;
+            width: 18px;
+            height: 18px;
+            transform: translateY(-50%);
             color: #6B7280;
-            font-size: 11px;
-            line-height: 1.4;
         }
 
-        .divider {
-            border: 0;
-            border-top: 1px solid #E5E7EB;
-            margin: 22px 0 23px;
+        .input-icon svg,
+        .password-toggle svg,
+        .info-icon svg {
+            display: block;
+            width: 100%;
+            height: 100%;
         }
 
-        /* ========== TAB PILIHAN AKSES (BARU) ========== */
-
-        .login-tabs {
-            display: flex;
-            gap: 4px;
-            padding: 4px;
-            margin-bottom: 20px;
-            background: #F3F4F6;
-            border-radius: 9px;
-        }
-
-        .login-tab {
-            flex: 1;
-            height: 38px;
-            border: none;
-            border-radius: 7px;
-            background: transparent;
-            color: #6B7280;
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .login-tab.active {
-            background: #FFFFFF;
-            color: #1F3157;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-        }
-
-        /* fieldset dipakai agar input di panel tersembunyi
-           otomatis tidak ikut tervalidasi & tidak terkirim */
-        .login-panel {
-            border: 0;
+        fieldset.pjl-fields {
             min-width: 0;
+            border: 0;
+            padding: 0;
+            margin: 0;
         }
-
-        .login-panel[hidden] { display: none; }
-
-        /* ========== PILIHAN REGULER / WAKILAN (BARU) ========== */
 
         .jenis-group {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 8px;
         }
 
-        .jenis-option { flex: 1 1 90px; position: relative; }
+        .jenis-group--row {
+            flex-wrap: nowrap;
+        }
 
-        .dinasan-empty { color: #B91C1C; font-size: 12px; }
-
-        /* susun atas-bawah (dipakai Jenis Petugas) */
-        .jenis-group--stack { flex-direction: column; flex-wrap: nowrap; gap: 8px; }
-        .jenis-group--stack .jenis-option { flex: none; }
-
-        /* ========== VERSI RINGKAS (panel Petugas PJL) ========== */
-
-        .login-container { padding: 24px 20px; }
-        .login-card { padding: 24px 30px 20px; }
-        .divider { margin: 16px 0 16px; }
-        .login-tabs { margin-bottom: 14px; }
-        .login-tab { height: 34px; }
-
-        #panelPetugas .form-group { margin-bottom: 12px; }
-        #panelPetugas .form-label { margin-bottom: 5px; font-size: 13px; }
-        #panelPetugas .form-input { height: 42px; font-size: 13px; padding-left: 42px; }
-        #panelPetugas .input-icon { left: 13px; width: 18px; height: 18px; }
-        #panelPetugas .password-toggle { right: 11px; }
-        #panelPetugas .password-toggle svg { width: 18px; height: 18px; }
-        #panelPetugas .jenis-group { gap: 8px; }
-        #panelPetugas .jenis-group--stack { gap: 6px; }
-        #panelPetugas .jenis-option label { height: 36px; font-size: 13px; }
-        .login-button { height: 44px; margin-top: 2px; }
-        .login-info { margin-top: 12px; }
+        .jenis-option {
+            position: relative;
+            flex: 1 1 90px;
+            min-width: 0;
+        }
 
         .jenis-option input {
             position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
             opacity: 0;
             pointer-events: none;
         }
 
         .jenis-option label {
             display: flex;
+            min-height: 36px;
             align-items: center;
             justify-content: center;
-            height: 44px;
+            padding: 0 6px;
             border: 1px solid #DDE1E7;
             border-radius: 8px;
             color: #6B7280;
             font-size: 13px;
             font-weight: 700;
+            text-align: center;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
         }
 
         .jenis-option input:checked + label {
@@ -170,431 +97,478 @@
         }
 
         .jenis-option input:focus-visible + label {
-            box-shadow: 0 0 0 3px rgba(227, 148, 61, 0.25);
+            outline: 3px solid rgba(227, 148, 61, 0.25);
+            outline-offset: 1px;
         }
 
-        .error-message {
-            margin-bottom: 16px;
-            padding: 11px 13px;
-            border: 1px solid #FECACA;
-            border-radius: 7px;
-            background: #FEF2F2;
+        .dinasan-empty {
+            margin: 0;
             color: #B91C1C;
             font-size: 12px;
             line-height: 1.5;
         }
 
-        .form-group { margin-bottom: 18px; }
-
-        .form-label {
-            display: block;
-            margin-bottom: 7px;
-            color: #1F3157;
-            font-size: 14px;
-            font-weight: 700;
-        }
-
-        .input-wrapper { position: relative; width: 100%; }
-
-        .form-input {
-            width: 100%;
-            height: 48px;
-            padding: 0 45px;
-            border: 1px solid #DDE1E7;
-            border-radius: 8px;
-            background: #FFFFFF;
-            color: #1F3157;
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: 14px;
-            outline: none;
-            transition: all 0.2s ease;
-        }
-
-        select.form-input {
-            appearance: none;
-            -webkit-appearance: none;
-            cursor: pointer;
-            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
-            background-repeat: no-repeat;
-            background-position: right 13px center;
-            background-size: 18px;
-        }
-
-        .form-input::placeholder { color: #9CA3AF; opacity: 1; }
-
-        .form-input:focus {
-            border-color: #1F3157;
-            box-shadow: 0 0 0 3px rgba(31, 49, 87, 0.08);
-        }
-
-        .input-icon {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            width: 20px;
-            height: 20px;
-            transform: translateY(-50%);
-            color: #6B7280;
-            pointer-events: none;
-            z-index: 2;
-        }
-
-        .input-icon svg { width: 100%; height: 100%; display: block; }
-
-        .password-toggle {
-            position: absolute;
-            right: 13px;
-            top: 50%;
-            width: 24px;
-            height: 24px;
-            padding: 0;
-            border: none;
-            background: transparent;
-            color: #6B7280;
-            cursor: pointer;
-            transform: translateY(-50%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .password-toggle:hover { color: #1F3157; }
-        .password-toggle:focus { outline: none; }
-        .password-toggle svg { width: 20px; height: 20px; display: block; }
-
-        .login-button {
-            width: 100%;
-            height: 48px;
-            margin-top: 4px;
-            border: none;
-            border-radius: 8px;
-            background: #E3943D;
-            color: #FFFFFF;
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: 14px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .login-button:hover { background: #D5822B; transform: translateY(-1px); }
-        .login-button:active { transform: translateY(0); }
-        .login-button:focus { outline: none; box-shadow: 0 0 0 3px rgba(227, 148, 61, 0.25); }
-
-        .login-info {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            margin-top: 15px;
-            color: #7B8491;
-            font-size: 10px;
-            line-height: 1.4;
-            text-align: center;
-        }
-
-        .info-icon {
-            width: 13px;
-            height: 13px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .info-icon svg { width: 100%; height: 100%; }
-
-        @media (max-width: 600px) {
-            .login-container { padding: 25px 16px; }
-            .login-card { width: 100%; max-width: 380px; padding: 27px 23px 23px; }
-            .logo-image { width: 90px; height: 52px; }
-            .system-title { font-size: 16px; }
-            .company-name { font-size: 10px; }
-            .divider { margin: 20px 0 21px; }
-            .form-group { margin-bottom: 16px; }
-            .form-label { font-size: 13px; }
-            .form-input { height: 46px; padding-left: 43px; padding-right: 43px; font-size: 13px; }
-            .input-icon { left: 14px; width: 19px; height: 19px; }
-            .password-toggle { right: 12px; width: 23px; height: 23px; }
-            .password-toggle svg { width: 19px; height: 19px; }
-            .login-button { height: 46px; font-size: 13px; }
-            .login-info { font-size: 9px; }
-            .login-tab { font-size: 12px; }
-        }
-
         @media (max-width: 360px) {
-            .login-card { padding: 24px 18px 20px; }
-            .logo-image { width: 82px; height: 48px; }
-            .system-title { font-size: 15px; }
-            .company-name { font-size: 9px; }
-            .form-label { font-size: 12px; }
-            .form-input { height: 44px; font-size: 12px; }
-            .login-button { height: 44px; font-size: 12px; }
-            .login-info { font-size: 8px; }
-            .jenis-option label { font-size: 12px; }
+            .jenis-option label {
+                font-size: 12px;
+            }
         }
     </style>
 </head>
 
 <body>
-
     @php
-        // Tab aktif: dari old input (saat validasi gagal) atau default petugas
-        $loginType = old('login_type', 'petugas');
-        $jenis     = old('jenis_petugas', 'reguler');
-
-        // Sesuaikan dengan master data dinasan di sistem Anda
-        // (atau kirim dari controller: $dinasanList)
-        // Dikirim dari LoginController::showLoginForm() => [id_shift => nama_shift]
+        // Data dinasan dari LoginController::showLoginForm()
         $dinasanList = $dinasanList ?? [];
+
+        $jenis = old('jenis_petugas', 'reguler');
+
+        // Tampilkan bagian PJL jika terdapat input atau error sebelumnya.
+        $showPjl = old('nomor_pjl') || old('dinasan')
+            || $errors->has('nomor_pjl')
+            || $errors->has('dinasan')
+            || $errors->has('jenis_petugas');
     @endphp
 
-    <main class="login-container">
+    <main class="flex min-h-screen items-center justify-center px-5 py-6">
+        <div class="w-full max-w-[410px] rounded-[10px] bg-white px-[30px] pt-6 pb-5 shadow-[0_8px_25px_rgba(0,0,0,0.16)] max-[600px]:max-w-[380px] max-[600px]:px-[22px] max-[360px]:px-4">
 
-        <div class="login-card">
-
-            <div class="logo">
-                <img src="{{ asset('images/logo-kai.jpg') }}" alt="Logo KAI" class="logo-image">
+            {{-- Logo --}}
+            <div class="mb-2 text-center">
+                <img
+                    src="{{ asset('images/logo-kai.jpg') }}"
+                    alt="Logo KAI"
+                    class="mx-auto block h-[58px] w-[100px] object-contain max-[600px]:h-[52px] max-[600px]:w-[90px] max-[360px]:h-12 max-[360px]:w-[82px]"
+                >
             </div>
 
-            <div class="system-title">Sistem Operasional PJL</div>
-            <div class="company-name">PT. Kereta Api Indonesia (Persero)</div>
+            {{-- Identitas sistem --}}
+            <div class="mt-[5px] text-center text-[17px] leading-[1.3] font-bold text-[#1F3157] max-[600px]:text-base max-[360px]:text-[15px]">
+                Sistem Operasional PJL
+            </div>
 
-            <hr class="divider">
+            <div class="mt-[5px] text-center text-[11px] leading-[1.4] text-[#6B7280] max-[600px]:text-[10px] max-[360px]:text-[9px]">
+                PT. Kereta Api Indonesia (Persero)
+            </div>
 
+            <hr class="my-4 border-0 border-t border-[#E5E7EB]">
+
+            {{-- Error validasi dari server --}}
             @if ($errors->any())
-                <div class="error-message">
+                <div
+                    class="mb-4 rounded-[7px] border border-red-200 bg-red-50 px-[13px] py-[11px] text-xs leading-[1.5] text-red-700"
+                    role="alert"
+                >
                     @foreach ($errors->all() as $error)
                         <p>{{ $error }}</p>
                     @endforeach
                 </div>
             @endif
 
-            <!-- PILIHAN AKSES -->
-            <div class="login-tabs" role="tablist">
-                <button type="button" class="login-tab {{ $loginType === 'petugas' ? 'active' : '' }}"
-                        data-type="petugas" role="tab">Petugas PJL</button>
-                <button type="button" class="login-tab {{ $loginType === 'admin' ? 'active' : '' }}"
-                        data-type="admin" role="tab">Admin / Superadmin</button>
-            </div>
+            {{-- Error pengecekan melalui JavaScript --}}
+            <div
+                class="mb-4 rounded-[7px] border border-red-200 bg-red-50 px-[13px] py-[11px] text-xs leading-[1.5] text-red-700"
+                id="clientError"
+                role="alert"
+                hidden
+            ></div>
 
-            <form method="POST" action="{{ route('login.store') }}" id="loginForm">
+            @if (session('status'))
+                <div class="mb-4 rounded-[7px] border border-green-200 bg-green-50 px-[13px] py-[11px] text-xs leading-[1.5] text-green-800" role="status">
+                    {{ session('status') }}
+                </div>
+            @endif
+
+            <form
+                method="POST"
+                action="{{ route('login.store') }}"
+                data-cek-url="{{ route('login.cek') }}"
+                id="loginForm"
+            >
                 @csrf
 
-                <input type="hidden" name="login_type" id="loginType" value="{{ $loginType }}">
+                {{-- Kredensial semua role --}}
+                <div class="mb-3">
+                    <label
+                        for="nip"
+                        class="mb-[5px] block text-[13px] font-bold text-[#1F3157] max-[360px]:text-xs"
+                    >
+                        NIPP / NIPKWT
+                    </label>
 
-                <!-- ====================================================
-                     PANEL ADMIN / SUPERADMIN  (field & name tetap seperti
-                     semula: nip + password)
-                ===================================================== -->
-                <fieldset class="login-panel" id="panelAdmin"
-                          {{ $loginType === 'admin' ? '' : 'hidden disabled' }}>
+                    <div class="relative w-full">
+                        <span class="input-icon">
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <circle cx="12" cy="7" r="4"></circle>
+                                <path d="M5 21v-2a7 7 0 0 1 14 0v2"></path>
+                            </svg>
+                        </span>
 
-                    <div class="form-group">
-                        <label for="username" class="form-label">NIPP / NIPKWT</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="7" r="4"></circle>
-                                    <path d="M5 21v-2a7 7 0 0 1 14 0v2"></path>
-                                </svg>
-                            </span>
-                            <input type="text" name="nip" id="username" class="form-input"
-                                   placeholder="199208242015031002" value="{{ old('nip') }}"
-                                   autocomplete="username" required>
-                        </div>
+                        <input
+                            type="text"
+                            name="nip"
+                            id="nip"
+                            class="h-[42px] w-full rounded-lg border border-[#DDE1E7] bg-white py-0 pr-[45px] pl-[42px] text-[13px] text-[#1F3157] outline-none transition-all duration-200 placeholder:text-[#9CA3AF] focus:border-[#1F3157] focus:ring-[3px] focus:ring-[#1F3157]/[0.08] max-[600px]:h-11 max-[360px]:h-[42px] max-[360px]:text-xs"
+                            placeholder="Masukkan NIPP atau NIPKWT"
+                            value="{{ old('nip') }}"
+                            autocomplete="username"
+                            inputmode="numeric"
+                            required
+                            autofocus
+                        >
+                    </div>
+                </div>
+
+                {{-- Password --}}
+                <div class="mb-3">
+                    <label
+                        for="password"
+                        class="mb-[5px] block text-[13px] font-bold text-[#1F3157] max-[360px]:text-xs"
+                    >
+                        Kata Sandi
+                    </label>
+
+                    <div class="relative w-full">
+                        <span class="input-icon">
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <rect x="4" y="10" width="16" height="10" rx="2"></rect>
+                                <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+                            </svg>
+                        </span>
+
+                        <input
+                            type="password"
+                            name="password"
+                            id="password"
+                            class="h-[42px] w-full rounded-lg border border-[#DDE1E7] bg-white py-0 pr-[45px] pl-[42px] text-[13px] text-[#1F3157] outline-none transition-all duration-200 placeholder:text-[#9CA3AF] focus:border-[#1F3157] focus:ring-[3px] focus:ring-[#1F3157]/[0.08] max-[600px]:h-11 max-[360px]:h-[42px] max-[360px]:text-xs"
+                            placeholder="••••••••••••"
+                            autocomplete="current-password"
+                            required
+                        >
+
+                        <button
+                            type="button"
+                            class="password-toggle absolute top-1/2 right-[11px] flex h-6 w-6 -translate-y-1/2 items-center justify-center border-0 bg-transparent p-0 text-[#6B7280] transition-colors hover:text-[#1F3157] focus:outline-none"
+                            data-target="password"
+                            aria-label="Tampilkan password"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                {{-- Khusus petugas PJL --}}
+                <fieldset
+                    class="pjl-fields"
+                    id="pjlFields"
+                    {{ $showPjl ? '' : 'hidden disabled' }}
+                >
+                    <div class="mt-4 mb-3 border-t border-dashed border-[#E5E7EB] pt-3 text-xs leading-[1.4] text-[#6B7280]">
+                        <strong class="block text-[13px] text-[#1F3157]">
+                            Data Dinas Petugas PJL
+                        </strong>
+                        Lengkapi data berikut untuk memulai dinas.
                     </div>
 
-                    <div class="form-group">
-                        <label for="password" class="form-label">Kata Sandi</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="4" y="10" width="16" height="10" rx="2"></rect>
-                                    <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
-                                </svg>
-                            </span>
-                            <input type="password" name="password" id="password" class="form-input"
-                                   placeholder="••••••••••••" autocomplete="current-password" required>
-                            <button type="button" class="password-toggle" data-target="password"
-                                    aria-label="Tampilkan password">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </fieldset>
+                    {{-- Nomor PJL --}}
+                    <div class="mb-3">
+                        <label
+                            for="nomorPjl"
+                            class="mb-[5px] block text-[13px] font-bold text-[#1F3157] max-[360px]:text-xs"
+                        >
+                            Nomor PJL
+                        </label>
 
-                <!-- ====================================================
-                     PANEL PETUGAS PJL (Reguler / Wakilan)
-                ===================================================== -->
-                <fieldset class="login-panel" id="panelPetugas"
-                          {{ $loginType === 'petugas' ? '' : 'hidden disabled' }}>
-
-                    <!-- Nomor PJL -->
-                    <div class="form-group">
-                        <label for="nomorPjl" class="form-label">Nomor PJL</label>
-                        <div class="input-wrapper">
+                        <div class="relative w-full">
                             <span class="input-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
                                     <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"></path>
                                     <circle cx="12" cy="10" r="2.5"></circle>
                                 </svg>
                             </span>
-                            <input type="text" name="nomor_pjl" id="nomorPjl" class="form-input"
-                                   placeholder="Contoh: 351" value="{{ old('nomor_pjl') }}" required>
+
+                            <input
+                                type="text"
+                                name="nomor_pjl"
+                                id="nomorPjl"
+                                class="h-[42px] w-full rounded-lg border border-[#DDE1E7] bg-white py-0 pr-[45px] pl-[42px] text-[13px] text-[#1F3157] outline-none transition-all duration-200 placeholder:text-[#9CA3AF] focus:border-[#1F3157] focus:ring-[3px] focus:ring-[#1F3157]/[0.08] max-[600px]:h-11 max-[360px]:h-[42px] max-[360px]:text-xs"
+                                placeholder="Contoh: 351"
+                                value="{{ old('nomor_pjl') }}"
+                                required
+                            >
                         </div>
                     </div>
 
-                    <!-- NIPP (reguler) / NIPKWT (wakilan) -->
-                    <div class="form-group">
-                        <label for="nomorInduk" class="form-label" id="nomorIndukLabel">NIPP / NIPKWT</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="7" r="4"></circle>
-                                    <path d="M5 21v-2a7 7 0 0 1 14 0v2"></path>
-                                </svg>
-                            </span>
-                            <input type="text" name="nip" id="nomorInduk" class="form-input"
-                                   placeholder="Masukkan NIPP atau NIPKWT" value="{{ old('nip') }}"
-                                   autocomplete="username" inputmode="numeric" required>
-                        </div>
-                    </div>
+                    {{-- Dinasan --}}
+                    <div class="mb-3">
+                        <span class="mb-[5px] block text-[13px] font-bold text-[#1F3157] max-[360px]:text-xs">
+                            Dinasan
+                        </span>
 
-                    <!-- Password -->
-                    <div class="form-group">
-                        <label for="passwordPetugas" class="form-label">Kata Sandi</label>
-                        <div class="input-wrapper">
-                            <span class="input-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="4" y="10" width="16" height="10" rx="2"></rect>
-                                    <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
-                                </svg>
-                            </span>
-                            <input type="password" name="password" id="passwordPetugas" class="form-input"
-                                   placeholder="••••••••••••" autocomplete="current-password" required>
-                            <button type="button" class="password-toggle" data-target="passwordPetugas"
-                                    aria-label="Tampilkan password">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Dinasan -->
-                    <div class="form-group">
-                        <span class="form-label">Dinasan</span>
                         <div class="jenis-group">
                             @forelse ($dinasanList as $shiftId => $shiftNama)
                                 <div class="jenis-option">
-                                    <input type="radio" name="dinasan" id="dinasan{{ $shiftId }}"
-                                           value="{{ $shiftId }}"
-                                           {{ (string) old('dinasan') === (string) $shiftId ? 'checked' : '' }}
-                                           required>
-                                    <label for="dinasan{{ $shiftId }}">{{ $shiftNama }}</label>
+                                    <input
+                                        type="radio"
+                                        name="dinasan"
+                                        id="dinasan{{ $shiftId }}"
+                                        value="{{ $shiftId }}"
+                                        {{ (string) old('dinasan') === (string) $shiftId ? 'checked' : '' }}
+                                        required
+                                    >
+
+                                    <label for="dinasan{{ $shiftId }}">
+                                        {{ $shiftNama }}
+                                    </label>
                                 </div>
                             @empty
-                                <p class="dinasan-empty">Data dinasan belum tersedia.</p>
+                                <p class="dinasan-empty">
+                                    Data dinasan belum tersedia.
+                                </p>
                             @endforelse
                         </div>
                     </div>
 
-                    <!-- Reguler / Wakilan -->
-                    <div class="form-group">
-                        <span class="form-label">Jenis Petugas</span>
-                        <div class="jenis-group jenis-group--stack">
+                    {{-- Jenis petugas --}}
+                    <div class="mb-3">
+                        <span class="mb-[5px] block text-[13px] font-bold text-[#1F3157] max-[360px]:text-xs">
+                            Jenis Petugas
+                        </span>
+
+                        <div class="jenis-group jenis-group--row">
                             <div class="jenis-option">
-                                <input type="radio" name="jenis_petugas" id="jenisReguler" value="reguler"
-                                       {{ $jenis === 'reguler' ? 'checked' : '' }}>
-                                <label for="jenisReguler">Reguler</label>
+                                <input
+                                    type="radio"
+                                    name="jenis_petugas"
+                                    id="jenisReguler"
+                                    value="reguler"
+                                    {{ $jenis === 'reguler' ? 'checked' : '' }}
+                                >
+
+                                <label for="jenisReguler">
+                                    Reguler
+                                </label>
                             </div>
+
                             <div class="jenis-option">
-                                <input type="radio" name="jenis_petugas" id="jenisWakilan" value="wakilan"
-                                       {{ $jenis === 'wakilan' ? 'checked' : '' }}>
-                                <label for="jenisWakilan">Wakilan</label>
+                                <input
+                                    type="radio"
+                                    name="jenis_petugas"
+                                    id="jenisWakilan"
+                                    value="wakilan"
+                                    {{ $jenis === 'wakilan' ? 'checked' : '' }}
+                                >
+
+                                <label for="jenisWakilan">
+                                    Wakilan (Pengganti)
+                                </label>
                             </div>
                         </div>
                     </div>
                 </fieldset>
 
-                <button type="submit" class="login-button">Masuk ke Sistem</button>
-
+                {{-- Tombol login --}}
+                <button
+                    type="submit"
+                    class="login-button mt-0.5 h-11 w-full cursor-pointer rounded-lg border-0 bg-[#E3943D] font-[Arial] text-sm font-bold text-white transition-all hover:-translate-y-px hover:bg-[#D5822B] active:translate-y-0 focus:outline-none focus:ring-[3px] focus:ring-[#E3943D]/25 disabled:cursor-wait disabled:opacity-70 disabled:transform-none max-[600px]:h-[46px] max-[600px]:text-[13px] max-[360px]:h-11 max-[360px]:text-xs"
+                >
+                    Masuk ke Sistem
+                </button>
             </form>
 
-            <div class="login-info">
-                <span class="info-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                         stroke-linecap="round" stroke-linejoin="round">
+            <div class="mt-3 text-center text-xs">
+                <a href="{{ route('password.request') }}" class="font-semibold text-[#1F3157] underline underline-offset-2">
+                    Lupa kata sandi?
+                </a>
+            </div>
+
+            {{-- Informasi --}}
+            <div class="mt-3 flex items-center justify-center gap-1.5 text-center text-[10px] leading-[1.4] text-[#7B8491] max-[600px]:text-[9px] max-[360px]:text-[8px]">
+                <span class="flex h-[13px] w-[13px] shrink-0 items-center justify-center">
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
                         <circle cx="12" cy="12" r="9"></circle>
                         <line x1="12" y1="10" x2="12" y2="16"></line>
                         <circle cx="12" cy="7" r="0.5" fill="currentColor"></circle>
                     </svg>
                 </span>
-                <span id="loginInfoText">Gunakan kredensial resmi Anda.</span>
+
+                <span>Gunakan kredensial resmi Anda.</span>
             </div>
-
         </div>
-
     </main>
 
+    {{-- JavaScript login --}}
     <script>
         (function () {
             const EYE = `
                 <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
-                <circle cx="12" cy="12" r="3"></circle>`;
+                <circle cx="12" cy="12" r="3"></circle>
+            `;
+
             const EYE_OFF = `
                 <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
-                <line x1="4" y1="4" x2="20" y2="20"></line>`;
+                <line x1="4" y1="4" x2="20" y2="20"></line>
+            `;
 
-            /* ---- Tampilkan / sembunyikan password (semua tombol) ---- */
+            // Tampilkan atau sembunyikan password.
             document.querySelectorAll('.password-toggle').forEach(function (btn) {
                 btn.addEventListener('click', function () {
                     const input = document.getElementById(btn.dataset.target);
+
+                    if (!input) {
+                        return;
+                    }
+
                     const show = input.type === 'password';
+
                     input.type = show ? 'text' : 'password';
-                    btn.setAttribute('aria-label', show ? 'Sembunyikan password' : 'Tampilkan password');
+
+                    btn.setAttribute(
+                        'aria-label',
+                        show ? 'Sembunyikan password' : 'Tampilkan password'
+                    );
+
                     btn.querySelector('svg').innerHTML = show ? EYE_OFF : EYE;
                 });
             });
 
-            /* ---- Pindah tab Petugas PJL <-> Admin/Superadmin ---- */
-            const tabs        = document.querySelectorAll('.login-tab');
-            const loginType   = document.getElementById('loginType');
-            const panelAdmin  = document.getElementById('panelAdmin');
-            const panelPetugas = document.getElementById('panelPetugas');
-            const infoText    = document.getElementById('loginInfoText');
+            const form = document.getElementById('loginForm');
+            const nipInput = document.getElementById('nip');
+            const passInput = document.getElementById('password');
+            const pjlFields = document.getElementById('pjlFields');
+            const submitBtn = form.querySelector('.login-button');
+            const errorBox = document.getElementById('clientError');
 
-            function setPanel(panel, active) {
-                panel.hidden = !active;
-                panel.disabled = !active; // disabled => tidak divalidasi & tidak terkirim
+            const tokenInput = form.querySelector('input[name="_token"]');
+
+            if (!form || !nipInput || !passInput || !pjlFields || !submitBtn || !errorBox || !tokenInput) {
+                return;
             }
 
-            function switchType(type) {
-                loginType.value = type;
-                tabs.forEach(t => t.classList.toggle('active', t.dataset.type === type));
-                setPanel(panelAdmin, type === 'admin');
-                setPanel(panelPetugas, type === 'petugas');
-                infoText.textContent = type === 'admin'
-                    ? 'Gunakan kredensial NIP resmi Anda.'
-                    : 'Isi data sesuai penugasan dinas Anda.';
+            const token = tokenInput.value;
+
+            function setPjl(show) {
+                pjlFields.hidden = !show;
+                pjlFields.disabled = !show;
             }
 
-            tabs.forEach(t => t.addEventListener('click', () => switchType(t.dataset.type)));
-            switchType(loginType.value);
+            function showError(message) {
+                errorBox.textContent = message;
+                errorBox.hidden = false;
+            }
+
+            function clearError() {
+                errorBox.textContent = '';
+                errorBox.hidden = true;
+            }
+
+            // Jika NIP atau password berubah, lakukan pengecekan ulang.
+            [nipInput, passInput].forEach(function (element) {
+                element.addEventListener('input', function () {
+                    setPjl(false);
+                    clearError();
+                });
+            });
+
+            form.addEventListener('submit', async function (event) {
+                // Jika field PJL sudah tampil, lanjutkan validasi server.
+                if (!pjlFields.hidden) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                clearError();
+
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Memeriksa...';
+
+                try {
+                    const response = await fetch(form.dataset.cekUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': token,
+                        },
+                        body: JSON.stringify({
+                            nip: nipInput.value,
+                            password: passInput.value,
+                        }),
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        showError(
+                            data.message || 'NIPP / NIPKWT atau password tidak valid.'
+                        );
+
+                        return;
+                    }
+
+                    if (data.role === 'pjl') {
+                        setPjl(true);
+
+                        document.getElementById('nomorPjl').focus();
+
+                        return;
+                    }
+
+                    if (data.role === 'admin') {
+                        form.submit();
+                        return;
+                    }
+
+                    showError('Role pengguna tidak dikenali.');
+                } catch (error) {
+                    showError(
+                        'Gagal menghubungi server. Periksa koneksi Anda dan coba kembali.'
+                    );
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Masuk ke Sistem';
+                }
+            });
         })();
     </script>
-
 </body>
 </html>

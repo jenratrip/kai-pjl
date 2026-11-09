@@ -1,344 +1,738 @@
 @php
-    $modeEditForm = !empty($modeEdit) && !empty($serahTerima);
+    $modeLihat = !empty($modeLihat);
+    $modePenerima = !empty($modePenerima);
+    $modeEditForm = !empty($modeEdit) && !empty($serahTerima) && !$modeLihat;
 
     $ringkasanLama = old(
         'ringkasan_text',
-        data_get($serahTerima, 'ringkasan.catatan_serah_terima', '')
+        data_get($serahTerima ?? null, 'ringkasan.catatan_serah_terima', '')
     );
 
-    $adaTtdPenyerahLama = !empty($serahTerima?->tanda_tangan_penyerah);
+    $adaTtdPenyerahLama = !empty(($serahTerima ?? null)?->tanda_tangan_penyerah);
+
+    $menungguKonfirmasiPenerima =
+        $modePenerima
+        && !empty($serahTerima)
+        && $serahTerima->status === 'menunggu_penerima'
+        && empty($serahTerima->tanda_tangan_penerima);
 @endphp
 
-<form
-    id="serahTerimaSubmitForm"
-    method="POST"
-    action="{{ route('user.serah-terima-dinas.store') }}"
-    class="space-y-4"
-    data-ada-ttd-lama="{{ $adaTtdPenyerahLama ? '1' : '0' }}"
->
-    @csrf
+@if ($modePenerima)
 
-    {{-- Hanya terisi saat mengedit dari riwayat --}}
-    @if ($modeEditForm)
-        <input type="hidden" name="serah_terima_id" value="{{ $serahTerima->id }}">
+    {{-- KONFIRMASI OLEH PENERIMA --}}
+    @if ($menungguKonfirmasiPenerima)
+
+        <div class="space-y-4 print:hidden">
+
+            <div class="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <h3 class="font-bold text-blue-900">
+                    Konfirmasi Serah Terima Dinas
+                </h3>
+
+                <p class="mt-1 text-sm leading-relaxed text-blue-800">
+                    Silakan periksa seluruh informasi serah terima.
+                    Jika sudah sesuai, bubuhkan tanda tangan sebagai
+                    penerima untuk mengonfirmasi serah terima ini.
+                </p>
+            </div>
+
+            <form
+                id="formKonfirmasiPenerima"
+                method="POST"
+                action="{{ route('user.serah-terima-dinas.konfirmasi', $serahTerima->id) }}"
+                class="space-y-4"
+            >
+                @csrf
+
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+
+                    <label class="mb-3 block font-semibold text-slate-800">
+                        Tanda tangan penerima
+                    </label>
+
+                    {{-- AREA TANDA TANGAN DIPERKECIL --}}
+                    <div
+                        class="w-full overflow-hidden rounded-lg border border-slate-300 bg-white"
+                        style="height: 180px; max-height: 180px;"
+                    >
+                        <canvas
+                            id="canvasTandaTanganPenerima"
+                            class="block w-full"
+                            style="
+                                width: 100%;
+                                height: 180px !important;
+                                max-height: 180px !important;
+                                touch-action: none;
+                            "
+                        ></canvas>
+                    </div>
+
+                    <input
+                        type="hidden"
+                        name="tanda_tangan_penerima"
+                        id="inputTandaTanganPenerima"
+                    >
+
+                    <p
+                        id="errorTandaTanganPenerima"
+                        class="mt-2 hidden text-sm text-red-600"
+                        role="alert"
+                    >
+                        Tanda tangan penerima wajib diisi.
+                    </p>
+
+                    <div class="mt-3 flex justify-end">
+                        <button
+                            type="button"
+                            id="hapusTandaTanganPenerima"
+                            class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                            Hapus tanda tangan
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-end gap-3">
+
+                    <a
+                        href="{{ route('user.serah-terima-dinas.riwayat') }}"
+                        class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#1d2d50] transition hover:bg-slate-50"
+                    >
+                        Kembali ke riwayat
+                    </a>
+
+                    <button
+                        type="submit"
+                        id="tombolKonfirmasiPenerima"
+                        class="rounded-lg bg-green-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        Terima dan Tanda Tangani
+                    </button>
+
+                </div>
+            </form>
+        </div>
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const canvas = document.getElementById('canvasTandaTanganPenerima');
+            const form = document.getElementById('formKonfirmasiPenerima');
+            const input = document.getElementById('inputTandaTanganPenerima');
+            const tombolHapus = document.getElementById('hapusTandaTanganPenerima');
+            const tombolKonfirmasi = document.getElementById('tombolKonfirmasiPenerima');
+            const error = document.getElementById('errorTandaTanganPenerima');
+
+            if (!canvas || !form || !input) {
+                return;
+            }
+
+            const ctx = canvas.getContext('2d');
+
+            let menggambar = false;
+            let adaCoretan = false;
+            let submitting = false;
+
+            function aturCanvas() {
+                const rect = canvas.getBoundingClientRect();
+
+                if (!rect.width || !rect.height) {
+                    return;
+                }
+
+                const dpr = window.devicePixelRatio || 1;
+
+                const gambarLama = adaCoretan
+                    ? canvas.toDataURL('image/png')
+                    : null;
+
+                canvas.width = Math.round(rect.width * dpr);
+                canvas.height = Math.round(rect.height * dpr);
+
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+                ctx.lineWidth = 2.5;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = '#1d2d50';
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, rect.width, rect.height);
+
+                if (gambarLama) {
+                    const img = new Image();
+
+                    img.onload = function () {
+                        ctx.drawImage(
+                            img,
+                            0,
+                            0,
+                            rect.width,
+                            rect.height
+                        );
+                    };
+
+                    img.src = gambarLama;
+                }
+            }
+
+            function posisi(event) {
+                const rect = canvas.getBoundingClientRect();
+
+                return {
+                    x: event.clientX - rect.left,
+                    y: event.clientY - rect.top
+                };
+            }
+
+            canvas.addEventListener('pointerdown', function (event) {
+                if (submitting) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                menggambar = true;
+                adaCoretan = true;
+
+                canvas.setPointerCapture(event.pointerId);
+
+                const p = posisi(event);
+
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x + 0.1, p.y + 0.1);
+                ctx.stroke();
+
+                error.classList.add('hidden');
+            });
+
+            canvas.addEventListener('pointermove', function (event) {
+                if (!menggambar || submitting) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                const p = posisi(event);
+
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+            });
+
+            function berhentiMenggambar() {
+                menggambar = false;
+            }
+
+            canvas.addEventListener('pointerup', berhentiMenggambar);
+            canvas.addEventListener('pointercancel', berhentiMenggambar);
+            canvas.addEventListener('lostpointercapture', berhentiMenggambar);
+
+            tombolHapus.addEventListener('click', function () {
+                if (submitting) {
+                    return;
+                }
+
+                const rect = canvas.getBoundingClientRect();
+
+                ctx.clearRect(
+                    0,
+                    0,
+                    canvas.width,
+                    canvas.height
+                );
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, rect.width, rect.height);
+
+                adaCoretan = false;
+                input.value = '';
+
+                error.classList.add('hidden');
+            });
+
+            form.addEventListener('submit', function (event) {
+                if (submitting) {
+                    event.preventDefault();
+                    return;
+                }
+
+                if (!adaCoretan) {
+                    event.preventDefault();
+
+                    error.classList.remove('hidden');
+
+                    canvas.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+
+                    return;
+                }
+
+                input.value = canvas.toDataURL('image/png');
+
+                if (!input.value.startsWith('data:image/png;base64,')) {
+                    event.preventDefault();
+
+                    error.classList.remove('hidden');
+                    input.value = '';
+
+                    return;
+                }
+
+                submitting = true;
+
+                tombolKonfirmasi.disabled = true;
+                tombolKonfirmasi.textContent = 'Mengirim konfirmasi...';
+                tombolHapus.disabled = true;
+            });
+
+            aturCanvas();
+
+            let resizeTimeout;
+
+            window.addEventListener('resize', function () {
+                clearTimeout(resizeTimeout);
+
+                resizeTimeout = setTimeout(function () {
+                    if (!menggambar && !submitting) {
+                        aturCanvas();
+                    }
+                }, 150);
+            });
+
+            window.addEventListener('pageshow', function (event) {
+                if (event.persisted) {
+                    submitting = false;
+
+                    tombolKonfirmasi.disabled = false;
+                    tombolKonfirmasi.textContent = 'Terima dan Tanda Tangani';
+                    tombolHapus.disabled = false;
+                }
+            });
+        });
+        </script>
+
+    @else
+
+        <div class="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+            Serah terima ini sudah dikonfirmasi atau tidak lagi menunggu tanda tangan penerima.
+        </div>
+
+        <div class="flex justify-end">
+            <a
+                href="{{ route('user.serah-terima-dinas.riwayat') }}"
+                class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#1d2d50] transition hover:bg-slate-50"
+            >
+                Kembali ke riwayat
+            </a>
+        </div>
+
     @endif
 
-    {{-- Data yang dikirim ke controller --}}
-    <input
-        type="hidden"
-        name="ringkasan"
-        id="ringkasanInput"
-    >
+@elseif ($modeLihat)
 
-    <input
-        type="hidden"
-        name="tanda_tangan_penyerah"
-        id="signatureSubmitInput"
-    >
+    {{-- DATA SUDAH DISETUJUI ADMIN --}}
+    <div class="space-y-4 print:hidden">
 
-    {{-- set = tanda tangan baru dikirim, keep = pakai tanda tangan lama --}}
-    <input
-        type="hidden"
-        name="tanda_tangan_penyerah_action"
-        id="signatureActionInput"
-        value="keep"
-    >
+        <div class="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            Serah terima ini sudah disetujui admin dan terkunci. Data hanya
+            dapat dilihat atau dicetak.
+        </div>
 
-    {{-- Ringkasan tambahan --}}
-    <div>
-        <label
-            for="ringkasan_text"
-            class="mb-1 block text-sm font-semibold text-slate-700"
-        >
-            Ringkasan serah terima
-        </label>
+        <div class="flex flex-wrap items-center justify-end gap-3">
 
-        <textarea
-            id="ringkasan_text"
-            rows="3"
-            required
-            placeholder="Ringkas kondisi dinas dan hal yang perlu diketahui penerima."
-            class="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm"
-        >{{ $ringkasanLama }}</textarea>
+            <a
+                href="{{ route('user.serah-terima-dinas.riwayat') }}"
+                class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#1d2d50] transition hover:bg-slate-50"
+            >
+                Kembali ke riwayat
+            </a>
+
+            <button
+                type="button"
+                onclick="window.print()"
+                class="rounded-lg border border-[#1d2d50] bg-white px-4 py-2.5 text-sm font-semibold text-[#1d2d50] transition hover:bg-slate-50"
+            >
+                Cetak
+            </button>
+
+        </div>
     </div>
 
-    {{-- Pesan kesalahan dari pengecekan di browser --}}
-    <p
-        id="serahTerimaClientError"
-        class="hidden rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 print:hidden"
-        role="alert"
-    ></p>
+@else
 
-    {{-- Tombol aksi --}}
-    <div class="flex flex-wrap items-center justify-end gap-3 print:hidden">
-        <button
-            type="button"
-            onclick="window.print()"
-            class="rounded-lg border border-[#1d2d50] bg-white px-4 py-2.5 text-sm font-semibold text-[#1d2d50] transition hover:bg-slate-50"
+    {{-- FORM PENYERAH: SIMPAN / EDIT SERAH TERIMA --}}
+    <form
+        id="serahTerimaSubmitForm"
+        method="POST"
+        action="{{ route('user.serah-terima-dinas.store') }}"
+        enctype="multipart/form-data"
+        class="space-y-4"
+        data-ada-ttd-lama="{{ $adaTtdPenyerahLama ? '1' : '0' }}"
+    >
+        @csrf
+
+        @if ($modeEditForm)
+            <input type="hidden" name="serah_terima_id" value="{{ $serahTerima->id }}">
+        @endif
+
+        <input
+            type="hidden"
+            name="ringkasan"
+            id="ringkasanInput"
         >
-            Cetak
-        </button>
 
-        <button
-            type="submit"
-            id="submitSerahTerima"
-            class="rounded-lg bg-[#1d2d50] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#263d68] disabled:cursor-not-allowed disabled:opacity-50"
+        <input
+            type="hidden"
+            name="tanda_tangan_penyerah"
+            id="signatureSubmitInput"
         >
-            Simpan serah terima
-        </button>
-    </div>
 
-    <div class="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
-        Pastikan informasi KA, alat pengamanan, inventaris, catatan dinas, dan
-        tanda tangan sudah diperiksa sebelum menyimpan serah terima. Setelah
-        disimpan, serah terima langsung dikirim ke admin dan tercatat di
-        riwayat. Selama belum disetujui admin, serah terima masih bisa dibuka
-        dan diedit dari riwayat.
-    </div>
-</form>
+        <input
+            type="hidden"
+            name="tanda_tangan_penyerah_action"
+            id="signatureActionInput"
+            value="keep"
+        >
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const form = document.getElementById('serahTerimaSubmitForm');
+        <div>
+            <label
+                for="ringkasan_text"
+                class="mb-1 block text-sm font-semibold text-slate-700"
+            >
+                Ringkasan serah terima
+            </label>
 
-    if (!form) {
-        return;
-    }
+            <textarea
+                id="ringkasan_text"
+                rows="3"
+                required
+                placeholder="Ringkas kondisi dinas dan hal yang perlu diketahui penerima."
+                class="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm"
+            >{{ $ringkasanLama }}</textarea>
+        </div>
 
-    const submitButton = document.getElementById('submitSerahTerima');
-    const errorBox = document.getElementById('serahTerimaClientError');
-    const labelTombol = submitButton ? submitButton.textContent.trim() : '';
+        <p
+            id="serahTerimaClientError"
+            class="hidden rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 print:hidden"
+            role="alert"
+        ></p>
 
-    // Field tambahan yang dibaca controller. Jika field-nya berada di luar
-    // <form> ini (bagian petugas, catatan penting, dll.), nilainya disalin
-    // otomatis saat submit.
-    const FIELD_TAMBAHAN = [
-        'penerima_user_id',
-        'nama_penerima',
-        'nip_penerima',
-        'nip_penyerah',
-        'ppka',
-        'catatan_penting'
-    ];
+        <div class="flex flex-wrap items-center justify-end gap-3 print:hidden">
 
-    let submitting = false;
+            <button
+                type="button"
+                onclick="window.print()"
+                class="rounded-lg border border-[#1d2d50] bg-white px-4 py-2.5 text-sm font-semibold text-[#1d2d50] transition hover:bg-slate-50"
+            >
+                Cetak
+            </button>
 
-    function tampilkanError(pesan, target) {
-        if (errorBox) {
-            errorBox.textContent = pesan;
-            errorBox.classList.remove('hidden');
-        } else {
-            alert(pesan);
+            <button
+                type="submit"
+                id="submitSerahTerima"
+                class="rounded-lg bg-[#1d2d50] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#263d68] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+                Simpan serah terima
+            </button>
+
+        </div>
+
+        <div class="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900 print:hidden">
+            Pastikan informasi KA, alat pengamanan, inventaris, catatan dinas, dan
+            tanda tangan sudah diperiksa sebelum menyimpan serah terima. Setelah
+            disimpan, serah terima langsung dikirim ke admin dan tercatat di
+            riwayat. Selama belum disetujui admin, serah terima masih bisa dibuka
+            dan diedit dari riwayat.
+        </div>
+    </form>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('serahTerimaSubmitForm');
+
+        if (!form) {
+            return;
         }
 
-        if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const submitButton = document.getElementById('submitSerahTerima');
+        const errorBox = document.getElementById('serahTerimaClientError');
+        const labelTombol = submitButton ? submitButton.textContent.trim() : '';
 
-            if (typeof target.focus === 'function') {
-                target.focus({ preventScroll: true });
+        const FIELD_TAMBAHAN = [
+            'penerima_user_id',
+            'nama_penerima',
+            'nip_penerima',
+            'nip_penyerah',
+            'ppka',
+            'catatan_penting'
+        ];
+
+        let submitting = false;
+
+        function tampilkanError(pesan, target) {
+            if (errorBox) {
+                errorBox.textContent = pesan;
+                errorBox.classList.remove('hidden');
+            } else {
+                alert(pesan);
+            }
+
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+
+                if (typeof target.focus === 'function') {
+                    target.focus({ preventScroll: true });
+                }
             }
         }
-    }
 
-    function bersihkanError() {
-        if (errorBox) {
-            errorBox.textContent = '';
-            errorBox.classList.add('hidden');
-        }
-    }
-
-    function cariField(nama) {
-        const dalamForm = form.elements.namedItem(nama);
-
-        if (dalamForm && !dalamForm.dataset?.generated) {
-            return dalamForm;
+        function bersihkanError() {
+            if (errorBox) {
+                errorBox.textContent = '';
+                errorBox.classList.add('hidden');
+            }
         }
 
-        return document.querySelector('[name="' + nama + '"]')
-            || document.getElementById(nama);
-    }
+        function cariField(nama) {
+            const dalamForm = form.elements.namedItem(nama);
 
-    function nilaiField(nama) {
-        const el = cariField(nama);
+            if (dalamForm && !dalamForm.dataset?.generated) {
+                return dalamForm;
+            }
 
-        return el && typeof el.value === 'string' ? el.value.trim() : '';
-    }
-
-    function resetTombol() {
-        submitting = false;
-
-        if (submitButton) {
-            submitButton.disabled = false;
-            submitButton.textContent = labelTombol;
+            return document.querySelector('[name="' + nama + '"]')
+                || document.getElementById(nama);
         }
-    }
 
-    // Tombol kembali di browser (bfcache) tidak boleh meninggalkan tombol terkunci.
-    window.addEventListener('pageshow', function (event) {
-        if (event.persisted) {
-            resetTombol();
+        function nilaiField(nama) {
+            const el = cariField(nama);
+
+            return el && typeof el.value === 'string'
+                ? el.value.trim()
+                : '';
         }
+
+        function resetTombol() {
+            submitting = false;
+
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.textContent = labelTombol;
+            }
+        }
+
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                resetTombol();
+            }
+        });
+
+        form.addEventListener('submit', function (event) {
+            if (submitting) {
+                event.preventDefault();
+                return;
+            }
+
+            bersihkanError();
+
+            const signatureInput = document.getElementById('signatureData');
+            const signatureSubmitInput = document.getElementById('signatureSubmitInput');
+            const signatureActionInput = document.getElementById('signatureActionInput');
+            const ringkasanInput = document.getElementById('ringkasanInput');
+            const ringkasanText = document.getElementById('ringkasan_text');
+
+            if (!ringkasanText || !ringkasanInput || !signatureSubmitInput || !signatureActionInput) {
+                event.preventDefault();
+
+                tampilkanError(
+                    'Form serah terima tidak lengkap. Muat ulang halaman dan coba lagi.'
+                );
+
+                return;
+            }
+
+            // 1. Nama penerima wajib.
+            if (!nilaiField('nama_penerima')) {
+                event.preventDefault();
+
+                tampilkanError(
+                    'Isi nama penerima serah terima terlebih dahulu.',
+                    cariField('nama_penerima')
+                );
+
+                return;
+            }
+
+            // 2. Semua inventaris harus sudah diperiksa.
+            const inventarisBelum = document.querySelectorAll(
+                '#inventaris [data-item][data-state="belum"]'
+            );
+
+            if (inventarisBelum.length > 0) {
+                event.preventDefault();
+
+                tampilkanError(
+                    'Masih ada ' + inventarisBelum.length +
+                    ' inventaris yang belum diperiksa. Pilih Lengkap atau Tidak lengkap pada setiap barang.',
+                    inventarisBelum[0]
+                );
+
+                return;
+            }
+
+            // 3. Jangan simpan saat pemeriksaan inventaris masih berjalan.
+            const masihMenyimpan = Array.from(
+                document.querySelectorAll('#inventaris [data-status]')
+            ).some(function (el) {
+                return el.textContent.trim().toLowerCase().startsWith('menyimpan');
+            });
+
+            if (masihMenyimpan) {
+                event.preventDefault();
+
+                tampilkanError(
+                    'Pemeriksaan inventaris sedang disimpan. Tunggu sebentar lalu coba lagi.'
+                );
+
+                return;
+            }
+
+            // 4. Tanda tangan penyerah.
+            const signature = signatureInput?.value || '';
+            const adaTtdLama = form.dataset.adaTtdLama === '1';
+
+            if (!signature && !adaTtdLama) {
+                event.preventDefault();
+
+                document.getElementById('signatureError')
+                    ?.classList.remove('hidden');
+
+                tampilkanError(
+                    'Silakan bubuhkan tanda tangan penyerah terlebih dahulu.',
+                    document.getElementById('signatureCanvas')
+                );
+
+                return;
+            }
+
+            // 5. Susun ringkasan.
+            const summary = {
+                alat: {},
+                alat_catatan: {},
+                catatan_serah_terima: ringkasanText.value.trim()
+            };
+
+            document.querySelectorAll('[name^="alat["]').forEach(function (input) {
+                if (!input.checked) {
+                    return;
+                }
+
+                const match = input.name.match(/^alat\[(.+)\]$/);
+
+                if (match) {
+                    summary.alat[match[1]] = input.value;
+                }
+            });
+
+            document.querySelectorAll('[data-alat-catatan]').forEach(function (input) {
+                const key = input.dataset.alatCatatan;
+
+                if (key) {
+                    summary.alat_catatan[key] = input.value;
+                }
+            });
+
+            try {
+                ringkasanInput.value = JSON.stringify(summary);
+            } catch (error) {
+                event.preventDefault();
+
+                tampilkanError(
+                    'Data serah terima gagal diproses. Silakan coba lagi.'
+                );
+
+                return;
+            }
+
+            signatureSubmitInput.value = signature;
+            signatureActionInput.value = signature ? 'set' : 'keep';
+
+            // 6. Salin field tambahan yang berada di luar form.
+            form.querySelectorAll('input[data-generated="1"]').forEach(function (el) {
+                el.remove();
+            });
+
+            FIELD_TAMBAHAN.forEach(function (nama) {
+                const asli = form.elements.namedItem(nama);
+
+                if (asli) {
+                    return;
+                }
+
+                const nilai = nilaiField(nama);
+
+                if (nilai === '') {
+                    return;
+                }
+
+                const hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = nama;
+                hidden.value = nilai;
+                hidden.dataset.generated = '1';
+
+                form.appendChild(hidden);
+            });
+
+            submitting = true;
+
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = 'Menyimpan serah terima...';
+            }
+        });
     });
+    </script>
 
-    form.addEventListener('submit', function (event) {
-        if (submitting) {
-            event.preventDefault();
-            return;
-        }
-
-        bersihkanError();
-
-        const signatureInput = document.getElementById('signatureData');
-        const signatureSubmitInput = document.getElementById('signatureSubmitInput');
-        const signatureActionInput = document.getElementById('signatureActionInput');
-        const ringkasanInput = document.getElementById('ringkasanInput');
-        const ringkasanText = document.getElementById('ringkasan_text');
-
-        if (!ringkasanText || !ringkasanInput || !signatureSubmitInput || !signatureActionInput) {
-            event.preventDefault();
-            tampilkanError('Form serah terima tidak lengkap. Muat ulang halaman dan coba lagi.');
-            return;
-        }
-
-        // 1. Nama penerima wajib (controller: nama_penerima required).
-        if (!nilaiField('nama_penerima')) {
-            event.preventDefault();
-            tampilkanError(
-                'Isi nama penerima serah terima terlebih dahulu.',
-                cariField('nama_penerima')
-            );
-            return;
-        }
-
-        // 2. Semua inventaris harus sudah diperiksa (lengkap / tidak lengkap).
-        const inventarisBelum = document.querySelectorAll(
-            '#inventaris [data-item][data-state="belum"]'
-        );
-
-        if (inventarisBelum.length > 0) {
-            event.preventDefault();
-            tampilkanError(
-                'Masih ada ' + inventarisBelum.length +
-                ' inventaris yang belum diperiksa. Pilih Lengkap atau Tidak lengkap pada setiap barang.',
-                inventarisBelum[0]
-            );
-            return;
-        }
-
-        // 3. Jangan simpan saat pemeriksaan inventaris masih berjalan.
-        const masihMenyimpan = Array.from(
-            document.querySelectorAll('#inventaris [data-status]')
-        ).some(function (el) {
-            return el.textContent.trim().toLowerCase().startsWith('menyimpan');
-        });
-
-        if (masihMenyimpan) {
-            event.preventDefault();
-            tampilkanError('Pemeriksaan inventaris sedang disimpan. Tunggu sebentar lalu coba lagi.');
-            return;
-        }
-
-        // 4. Tanda tangan penyerah: baru, atau pakai yang lama saat mengedit.
-        const signature = signatureInput?.value || '';
-        const adaTtdLama = form.dataset.adaTtdLama === '1';
-
-        if (!signature && !adaTtdLama) {
-            event.preventDefault();
-
-            document.getElementById('signatureError')
-                ?.classList.remove('hidden');
-
-            tampilkanError(
-                'Silakan bubuhkan tanda tangan penyerah terlebih dahulu.',
-                document.getElementById('signatureCanvas')
-            );
-            return;
-        }
-
-        // 5. Susun ringkasan. Daftar KA diisi ulang oleh server dari data
-        //    realisasi terbaru, jadi tidak perlu dikirim dari browser.
-        const summary = {
-            alat: {},
-            alat_catatan: {},
-            catatan_serah_terima: ringkasanText.value.trim()
-        };
-
-        // Status alat pengamanan yang dipilih.
-        document.querySelectorAll('[name^="alat["]').forEach(function (input) {
-            if (!input.checked) {
-                return;
-            }
-
-            const match = input.name.match(/^alat\[(.+)\]$/);
-
-            if (match) {
-                summary.alat[match[1]] = input.value;
-            }
-        });
-
-        // Catatan setiap alat pengamanan.
-        document.querySelectorAll('[data-alat-catatan]').forEach(function (input) {
-            const key = input.dataset.alatCatatan;
-
-            if (key) {
-                summary.alat_catatan[key] = input.value;
-            }
-        });
-
-        try {
-            ringkasanInput.value = JSON.stringify(summary);
-        } catch (error) {
-            event.preventDefault();
-            tampilkanError('Data serah terima gagal diproses. Silakan coba lagi.');
-            return;
-        }
-
-        signatureSubmitInput.value = signature;
-        signatureActionInput.value = signature ? 'set' : 'keep';
-
-        // 6. Salin field tambahan yang berada di luar form ini.
-        form.querySelectorAll('input[data-generated="1"]').forEach(function (el) {
-            el.remove();
-        });
-
-        FIELD_TAMBAHAN.forEach(function (nama) {
-            const asli = form.elements.namedItem(nama);
-
-            // Sudah terkirim otomatis (mis. memakai atribut form="...").
-            if (asli) {
-                return;
-            }
-
-            const nilai = nilaiField(nama);
-
-            if (nilai === '') {
-                return;
-            }
-
-            const hidden = document.createElement('input');
-            hidden.type = 'hidden';
-            hidden.name = nama;
-            hidden.value = nilai;
-            hidden.dataset.generated = '1';
-            form.appendChild(hidden);
-        });
-
-        submitting = true;
-
-        if (submitButton) {
-            submitButton.disabled = true;
-            submitButton.textContent = 'Menyimpan serah terima...';
-        }
-    });
-});
-</script>
+@endif
 
 <style>
+.serah-terima-ka-list-screen textarea {
+    max-height: 12rem;
+    overflow-y: auto;
+    resize: vertical;
+}
+
+.serah-terima-ka-print-table {
+    display: none;
+}
+
 @media print {
+    @page {
+        size: A4 landscape;
+        margin: 12mm 10mm;
+    }
+
+    .op-header,
+    .op-sidebar,
+    .op-sidebar-overlay,
     aside,
     nav,
     .print\:hidden {
         display: none !important;
+    }
+
+    .operasional-content {
+        width: 100% !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
     }
 
     body {
@@ -348,6 +742,108 @@ document.addEventListener('DOMContentLoaded', function () {
     section {
         break-inside: avoid;
         box-shadow: none !important;
+    }
+
+    .serah-terima-ka-section {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+        padding: 12px !important;
+    }
+
+    .serah-terima-ka-list-screen {
+        display: none !important;
+    }
+
+    .serah-terima-ka-print-table {
+        display: table !important;
+        width: 100%;
+        margin: 0;
+        border-collapse: collapse;
+        table-layout: fixed;
+        color: #1e293b;
+        font-size: 8pt;
+        line-height: 1.35;
+        page-break-inside: auto;
+        break-inside: auto;
+    }
+
+    .serah-terima-ka-print-table--details .serah-terima-ka-print-col-number {
+        width: 4%;
+    }
+
+    .serah-terima-ka-print-table--details .serah-terima-ka-print-col-train-number {
+        width: 9%;
+    }
+
+    .serah-terima-ka-print-table--details .serah-terima-ka-print-col-train-name {
+        width: 25%;
+    }
+
+    .serah-terima-ka-print-table--details .serah-terima-ka-print-col-time {
+        width: 12%;
+    }
+
+    .serah-terima-ka-print-table--details .serah-terima-ka-print-col-status {
+        width: 10%;
+    }
+
+    .serah-terima-ka-print-table--details .serah-terima-ka-print-col-checks {
+        width: 24%;
+    }
+
+    .serah-terima-ka-print-table--details .serah-terima-ka-print-col-notes {
+        width: 16%;
+    }
+
+    .serah-terima-ka-print-table--names th:last-child,
+    .serah-terima-ka-print-table--names td:last-child {
+        width: 76%;
+    }
+
+    .serah-terima-ka-print-table--names col:first-child {
+        width: 24%;
+    }
+
+    .serah-terima-ka-print-table thead {
+        display: table-header-group;
+    }
+
+    .serah-terima-ka-print-table--names {
+        table-layout: auto;
+    }
+
+    .serah-terima-ka-print-table tr {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .serah-terima-ka-print-table th,
+    .serah-terima-ka-print-table td {
+        padding: 5px 6px;
+        border: 1px solid #94a3b8;
+        text-align: left;
+        vertical-align: top;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: normal;
+    }
+
+    .serah-terima-ka-print-table th {
+        background: #e2e8f0 !important;
+        color: #0f172a;
+        font-weight: 700;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    .serah-terima-ka-section h2 {
+        break-after: avoid-page;
+        page-break-after: avoid;
+    }
+
+    .serah-terima-ka-print-table thead tr {
+        break-inside: avoid;
+        page-break-inside: avoid;
     }
 
     button {

@@ -29,15 +29,14 @@
                 ↓ Template CSV
             </a>
 
-            <a href="{{ route('admin.dinas.export') }}"
+            <a href="{{ route('admin.dinas.export', request()->query()) }}"
                class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#1d2d50] hover:bg-slate-100">
                 ⇩ Ekspor CSV
             </a>
 
-            <button type="button"
-                    @click="$refs.upload.click()"
-                    class="rounded-lg border border-[#1d2d50] px-4 py-2.5 text-sm font-semibold text-[#1d2d50] hover:bg-slate-100">
-                ↑ Import CSV
+            <button type="button" disabled title="Penyalinan menunggu tersedianya sumber penempatan JPL petugas yang tepercaya."
+                    class="cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-500">
+                Gunakan Jadwal Bulan Sebelumnya
             </button>
 
             <button type="button"
@@ -47,6 +46,19 @@
             </button>
         </div>
     </div>
+
+    <section class="mb-6 flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
+        <div>
+            <h2 class="font-bold text-[#1d2d50]">Impor Jadwal Dinas</h2>
+            <p class="mt-1 text-sm text-slate-600">Pilih satu file Excel (.xlsx), CSV (.csv), atau TXT (.txt). Sistem mendeteksi formatnya otomatis dan memvalidasi seluruh data sebelum penyimpanan.</p>
+        </div>
+        <button type="button" @click="$refs.upload.click()"
+                class="shrink-0 rounded-lg bg-[#1d2d50] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#293e68]">
+            Impor Jadwal Dinas
+        </button>
+    </section>
+
+    @include('admin.dinas.roster-import')
 
     {{-- FLASH MESSAGE --}}
     @if(session('success'))
@@ -118,7 +130,23 @@
     {{-- FILTER --}}
     <div class="mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <form method="GET" action="{{ route('admin.dinas.index') }}"
-              class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+              class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-7">
+
+            <div>
+                <label for="filter-month" class="mb-1.5 block text-sm font-semibold text-slate-700">Bulan</label>
+                <select id="filter-month" name="month" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
+                    <option value="">Semua bulan</option>
+                    @foreach ([1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April', 5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus', 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'] as $monthNumber => $monthName)
+                        <option value="{{ $monthNumber }}" @selected(request('month') == $monthNumber)>{{ $monthName }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label for="filter-year" class="mb-1.5 block text-sm font-semibold text-slate-700">Tahun</label>
+                <input id="filter-year" type="number" name="year" min="2000" max="2100" value="{{ request('year') }}"
+                       class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
+            </div>
 
             <div>
                 <label for="filter-user" class="mb-1.5 block text-sm font-semibold text-slate-700">
@@ -366,8 +394,8 @@
         <input x-ref="upload"
                type="file"
                name="file"
-               accept=".csv,.txt,text/csv"
-               @change="readCsv($event)">
+               accept=".csv,.txt,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+               @change="handleImportFile($event)">
     </form>
 
     {{-- MODAL PREVIEW CSV --}}
@@ -383,7 +411,7 @@
                 <div>
                     <h2 class="text-xl font-bold text-[#1d2d50]">Preview Impor Jadwal Dinas</h2>
                     <p class="mt-1 text-sm text-slate-500">
-                        Periksa format data sebelum mengirimkannya ke server.
+                    Server memeriksa identitas, JPL, shift, bentrok, dan seluruh aturan sebelum konfirmasi.
                     </p>
                 </div>
                 <button type="button"
@@ -417,6 +445,7 @@
                         <p class="mb-2 font-bold">Petunjuk impor</p>
                         <ul class="list-inside list-disc space-y-2 text-xs leading-5">
                             <li>Gunakan template CSV terbaru.</li>
+                            <li>Template berisi header saja. Isi satu baris untuk setiap penugasan dan gunakan ID shift yang tersedia di sistem.</li>
                             <li>Pemisah kolom menggunakan titik koma (;).</li>
                             <li>Tanggal berformat YYYY-MM-DD atau DD/MM/YYYY.</li>
                             <li>Jam mulai dan selesai boleh dikosongkan, dihitung otomatis berdasarkan shift.</li>
@@ -428,6 +457,16 @@
                     <div x-show="readError" x-cloak
                          class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
                          x-text="readError"></div>
+                    <div x-show="validating" x-cloak class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800" role="status">
+                        Memvalidasi seluruh baris pada server...
+                    </div>
+                    <div x-show="serverValidationReady && serverErrors.length > 0" x-cloak
+                         class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
+                        <p class="font-bold">Hasil validasi server</p>
+                        <ul class="mt-2 max-h-48 list-inside list-disc space-y-1 overflow-y-auto">
+                            <template x-for="(error, index) in serverErrors" :key="`${index}-${error}`"><li x-text="error"></li></template>
+                        </ul>
+                    </div>
                 </aside>
 
                 {{-- TABEL PREVIEW --}}
@@ -496,8 +535,7 @@
                     </div>
 
                     <p class="mt-3 text-xs leading-5 text-slate-500">
-                        Preview memeriksa format CSV di browser. Server tetap memeriksa
-                        keberadaan NIP, JPL, shift, pengganti, dan bentrok jadwal.
+                        Pratinjau format awal dibantu browser, lalu seluruh validasi bisnis dilakukan server. Konfirmasi tetap memvalidasi ulang seluruh file.
                     </p>
 
                     <div class="mt-5 flex flex-col-reverse justify-end gap-3 sm:flex-row">
@@ -509,7 +547,7 @@
 
                         <button type="button"
                                 @click="confirmImport()"
-                                :disabled="previewRows.length === 0 || errorCount > 0 || importing || !!readError"
+                                :disabled="previewRows.length === 0 || errorCount > 0 || importing || !!readError || validating || !serverValidationReady || !serverValidationValid"
                                 class="rounded-lg bg-[#f5a400] px-5 py-3 text-sm font-bold text-[#1d2d50] hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50">
                             <span x-text="importing ? 'Mengirim...' : '✓ Konfirmasi dan Impor'"></span>
                         </button>
@@ -668,6 +706,7 @@
 <script>
 function dinasPage() {
     return {
+        previewUrl: @js(route('admin.dinas.import.preview')),
         openCreate: {{ $errors->any() ? 'true' : 'false' }},
         isReplacement: {{ old('is_pengganti') ? 'true' : 'false' }},
         showPreview: false,
@@ -675,6 +714,34 @@ function dinasPage() {
         fileName: '',
         previewRows: [],
         readError: '',
+        serverErrors: [],
+        serverValidationReady: false,
+        serverValidationValid: false,
+        validating: false,
+
+        handleImportFile(event) {
+            const file = event.target.files?.[0];
+            if (!file) return;
+
+            if (/\.xlsx$/i.test(file.name)) {
+                this.showPreview = false;
+                this.previewRows = [];
+                this.$dispatch('dinas-csv-file-selected');
+                this.$dispatch('dinas-roster-file-selected', { file });
+                event.target.value = '';
+                return;
+            }
+
+            if (/\.(csv|txt)$/i.test(file.name)) {
+                this.$dispatch('dinas-csv-file-selected');
+                this.readCsv(event);
+                return;
+            }
+
+            this.$dispatch('dinas-csv-file-selected');
+            this.readError = 'Pilih file Excel .xlsx, CSV .csv, atau TXT .txt.';
+            this.showPreview = true;
+        },
 
         // Harus sama persis dengan csvHeaders() di DinasController (8 kolom).
         expectedHeaders: [
@@ -697,7 +764,10 @@ function dinasPage() {
         },
 
         get errorCount() {
-            return this.previewRows.filter(row => !!row.error).length;
+            return this.previewRows.filter(row => !!row.error).length
+                + (this.serverValidationReady && !this.serverValidationValid && this.previewRows.every(row => !row.error)
+                    ? 1
+                    : 0);
         },
 
         // Hapus BOM asli (\uFEFF) maupun BOM yang salah decode (ï»¿).
@@ -776,6 +846,9 @@ function dinasPage() {
             this.fileName = file.name;
             this.previewRows = [];
             this.readError = '';
+            this.serverErrors = [];
+            this.serverValidationReady = false;
+            this.serverValidationValid = false;
             this.importing = false;
 
             if (!/\.(csv|txt)$/i.test(file.name)) {
@@ -879,6 +952,8 @@ function dinasPage() {
                     if (this.previewRows.length === 0) {
                         throw new Error('Tidak ditemukan baris data untuk diimpor.');
                     }
+
+                    this.validateCsvOnServer(file);
                 } catch (error) {
                     this.previewRows = [];
                     this.readError = error.message || 'File CSV tidak dapat dibaca.';
@@ -893,11 +968,53 @@ function dinasPage() {
             reader.readAsText(file, 'UTF-8');
         },
 
+        async validateCsvOnServer(file) {
+            this.validating = true;
+            const formData = new FormData();
+            formData.append('file', file);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+            try {
+                const response = await fetch(this.previewUrl, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                    },
+                    body: formData,
+                });
+                const data = await response.json();
+                const rowErrors = data.row_errors ?? {};
+
+                this.previewRows = this.previewRows.map(row => ({
+                    ...row,
+                    error: row.error || rowErrors[row.line] || '',
+                }));
+                this.serverValidationReady = true;
+                this.serverValidationValid = response.ok && data.valid === true;
+                this.serverErrors = data.errors ?? [];
+
+                if (!response.ok && this.serverErrors.length === 0 && data.message) {
+                    this.serverErrors = [data.message];
+                }
+            } catch {
+                this.serverValidationReady = true;
+                this.serverValidationValid = false;
+                this.serverErrors = ['Validasi server gagal dijalankan. Periksa koneksi lalu coba lagi.'];
+            } finally {
+                this.validating = false;
+            }
+        },
+
         confirmImport() {
             if (
                 this.previewRows.length === 0 ||
                 this.errorCount > 0 ||
                 this.readError ||
+                !this.serverValidationReady ||
+                !this.serverValidationValid ||
+                this.validating ||
                 this.importing
             ) {
                 return;

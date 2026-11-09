@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\ActivityLog;
+use App\Models\JadwalKaBatch;
 use App\Services\JadwalKaVersionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +46,20 @@ test('activating a version replaces only covered JPL and archives old batch only
         ->and(DB::table('jadwal_ka_batch_jpl')->where('jadwal_ka_batch_id', $oldBatch->id)->where('jpl_id', $jplA->id)->value('tanggal_akhir_berlaku'))->toBe('2026-11-04')
         ->and(DB::table('jadwal_ka_batch_jpl')->where('jadwal_ka_batch_id', $oldBatch->id)->where('jpl_id', $jplB->id)->value('tanggal_akhir_berlaku'))->toBeNull();
 
+    $activationLog = ActivityLog::query()->sole();
+    expect($activationLog->action)->toBe('activate')
+        ->and($activationLog->module)->toBe('jadwal_ka')
+        ->and($activationLog->subject_type)->toBe(JadwalKaBatch::class)
+        ->and($activationLog->subject_id)->toBe($newBatch->id)
+        ->and($activationLog->old_values)->toBe(['status' => 'draft'])
+        ->and($activationLog->new_values)->toMatchArray([
+            'status' => 'active',
+            'tanggal_mulai_berlaku' => '2026-11-05',
+            'covered_jpl_count' => 1,
+            'affected_jpl_count' => 1,
+            'schedule_count' => 1,
+        ]);
+
 });
 
 test('future batch remains scheduled and does not change active schedule until effective date', function () {
@@ -68,6 +84,13 @@ test('future batch remains scheduled and does not change active schedule until e
         ->and($futureSchedule->fresh()->is_active)->toBeFalse()
         ->and(app(JadwalKaVersionService::class)->activateScheduledBatch((int) $futureBatch->id))->toBeFalse();
 
+    $scheduleLog = ActivityLog::query()->sole();
+    expect($scheduleLog->action)->toBe('schedule')
+        ->and($scheduleLog->subject_id)->toBe($futureBatch->id)
+        ->and($scheduleLog->old_values)->toBe(['status' => 'draft'])
+        ->and($scheduleLog->new_values['status'])->toBe('scheduled')
+        ->and($scheduleLog->new_values['tanggal_mulai_berlaku'])->toBe('2026-11-06');
+
 });
 
 test('scheduled batch is activated once by the due-batch command', function () {
@@ -88,11 +111,38 @@ test('scheduled batch is activated once by the due-batch command', function () {
         ->and($oldSchedule->fresh()->is_active)->toBeFalse()
         ->and($newSchedule->fresh()->is_active)->toBeTrue();
 
+    $activationLog = ActivityLog::query()->where('subject_id', $scheduledBatch->id)->sole();
+    expect($activationLog->action)->toBe('activate')
+        ->and($activationLog->user_id)->toBeNull()
+        ->and($activationLog->old_values)->toBe(['status' => 'scheduled'])
+        ->and($activationLog->new_values['status'])->toBe('active');
+
+    $archiveLog = ActivityLog::query()->where('subject_id', $oldBatch->id)->sole();
+    expect($archiveLog->action)->toBe('archive')
+        ->and($archiveLog->user_id)->toBeNull()
+        ->and($archiveLog->old_values)->toBe(['status' => 'active'])
+        ->and($archiveLog->new_values['status'])->toBe('archived');
+
     $this->artisan('jadwal-ka:activate-due-batches')->assertSuccessful();
 
     expect($scheduledBatch->fresh()->status)->toBe('active')
-        ->and($newSchedule->fresh()->is_active)->toBeTrue();
+        ->and($newSchedule->fresh()->is_active)->toBeTrue()
+        ->and(ActivityLog::query()->count())->toBe(2);
 
+});
+
+test('failed batch scheduling creates no successful activity log', function () {
+    $jpl = $this->kaiJpl();
+    $batch = $this->kaiBatch('draft', null);
+    $batch->jpls()->sync([$jpl->id]);
+
+    expect(fn () => app(JadwalKaVersionService::class)->scheduleDraftBatch(
+        (int) $batch->id,
+        CarbonImmutable::today()
+    ))->toThrow(LogicException::class, 'Setiap JPL dalam batch harus memiliki jadwal yang tersimpan.');
+
+    expect($batch->fresh()->status)->toBe('draft')
+        ->and(ActivityLog::query()->count())->toBe(0);
 });
 
 test('Superadmin cannot use the Admin-only batch scheduling endpoint', function () {

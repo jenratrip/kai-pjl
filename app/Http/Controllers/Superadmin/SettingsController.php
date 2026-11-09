@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\ActivityLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 use RuntimeException;
@@ -42,24 +43,33 @@ class SettingsController extends Controller
             'phone' => ['nullable', 'string', 'max:20'],
         ]);
 
-        $user->name = $validated['name'];
-        $user->email = $validated['email'] ?? null;
-        $user->phone = $validated['phone'] ?? null;
+        $profileChanged = DB::transaction(function () use ($user, $validated): bool {
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
+            $lockedUser->name = $validated['name'];
+            $lockedUser->email = $validated['email'] ?? null;
+            $lockedUser->phone = $validated['phone'] ?? null;
 
-        $profileChanged = $user->isDirty(['name', 'email', 'phone']);
+            $changedFields = array_keys($lockedUser->getDirty());
 
-        if ($profileChanged && ! $user->save()) {
-            throw new RuntimeException('Profil Superadmin tidak dapat disimpan.');
-        }
+            if ($changedFields === []) {
+                return false;
+            }
 
-        if ($profileChanged) {
+            if (! $lockedUser->save()) {
+                throw new RuntimeException('Profil Superadmin tidak dapat disimpan.');
+            }
+
             $this->activityLogService->log(
                 'update',
                 'superadmin_profile',
                 'Superadmin memperbarui profil akun sendiri.',
-                $user
+                $lockedUser,
+                null,
+                ['changed_fields' => $changedFields]
             );
-        }
+
+            return true;
+        });
 
         return redirect()
             ->to(route('superadmin.settings.index').'#profil-superadmin')
@@ -85,18 +95,21 @@ class SettingsController extends Controller
             'password.confirmed' => 'Konfirmasi password baru tidak cocok.',
         ]);
 
-        $user->password = Hash::make($validated['password']);
+        DB::transaction(function () use ($user, $validated): void {
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
+            $lockedUser->password = Hash::make($validated['password']);
 
-        if (! $user->save()) {
-            throw new RuntimeException('Password Superadmin tidak dapat diperbarui.');
-        }
+            if (! $lockedUser->save()) {
+                throw new RuntimeException('Password Superadmin tidak dapat diperbarui.');
+            }
 
-        $this->activityLogService->log(
-            'password_changed',
-            'account_security',
-            'Superadmin mengubah password akun sendiri.',
-            $user
-        );
+            $this->activityLogService->log(
+                'password_changed',
+                'account_security',
+                'Superadmin mengubah password akun sendiri.',
+                $lockedUser
+            );
+        });
 
         return redirect()
             ->to(route('superadmin.settings.index').'#keamanan-akun')

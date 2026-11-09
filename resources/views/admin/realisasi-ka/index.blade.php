@@ -1,6 +1,7 @@
-@extends('layouts.admin')
+@extends(auth()->user()?->isSuperadmin() ? 'layouts.superadmin' : 'layouts.admin')
 
 @section('title', 'Realisasi KA')
+@section('page-title', 'Realisasi KA')
 
 @section('content')
 <div class="mx-auto max-w-7xl px-5 py-8 sm:px-8">

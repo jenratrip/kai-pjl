@@ -14,16 +14,16 @@ use App\Http\Controllers\Admin\JplController;
 use App\Http\Controllers\Admin\JplImportController;
 use App\Http\Controllers\Admin\RealisasiKaController as AdminRealisasiKaController;
 use App\Http\Controllers\Admin\RealisasiKaSettingController;
-use App\Http\Controllers\Admin\ResortController;
 use App\Http\Controllers\Admin\SerahTerimaDinasController as AdminSerahTerimaDinasController;
 use App\Http\Controllers\Admin\ShiftController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\UserImportController as AdminUserImportController;
-use App\Http\Controllers\Admin\WilayahController;
-use App\Http\Controllers\Admin\WilayahImportController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\PasswordRecoveryController;
 use App\Http\Controllers\Superadmin\ActivityLogController;
 use App\Http\Controllers\Superadmin\DashboardController as SuperadminDashboardController;
+use App\Http\Controllers\Superadmin\DinasController as SuperadminDinasController;
+use App\Http\Controllers\Superadmin\InventarisController as SuperadminInventarisController;
 // ======================================================
 // USER / PJL CONTROLLERS
 // ======================================================
@@ -39,10 +39,11 @@ use App\Http\Controllers\Superadmin\UserController as SuperadminUserController;
 
 use App\Http\Controllers\Superadmin\UserImportController as SuperadminUserImportController;
 use App\Http\Controllers\User\CatatanDinasController;
-use App\Http\Controllers\User\DashboardController as UserDashboardController;
+use App\Http\Controllers\User\CoachingMessageController;
 use App\Http\Controllers\User\InventarisController as UserInventarisController;
 use App\Http\Controllers\User\RealisasiKaController;
 use App\Http\Controllers\User\SerahTerimaDinasController;
+use App\Http\Controllers\User\UserProfileController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -77,10 +78,33 @@ Route::get('/', function () {
 // ======================================================
 
 Route::middleware('guest')->group(function () {
+    Route::get('/forgot-password', [PasswordRecoveryController::class, 'create'])
+        ->name('password.request');
+
+    Route::post('/forgot-password', [PasswordRecoveryController::class, 'store'])
+        ->middleware('throttle:5,1')
+        ->name('password.email');
+
+    Route::get('/reset-password/{user}/{token}', [PasswordRecoveryController::class, 'edit'])
+        ->whereNumber('user')
+        ->where('token', '[A-Za-z0-9]{64}')
+        ->name('password.reset');
+
+    Route::post('/reset-password/{user}/{token}', [PasswordRecoveryController::class, 'update'])
+        ->whereNumber('user')
+        ->where('token', '[A-Za-z0-9]{64}')
+        ->middleware('throttle:10,1')
+        ->name('password.update');
+
     Route::get('/login', [
         LoginController::class,
         'showLoginForm',
     ])->name('login');
+
+    Route::post('/login/cek', [
+        LoginController::class,
+        'cek',
+    ])->middleware('throttle:10,1')->name('login.cek');
 
     Route::post('/login', [
         LoginController::class,
@@ -102,12 +126,19 @@ Route::middleware(['auth', 'role:pjl'])
     ->name('user.')
     ->group(function () {
 
-        // DASHBOARD
-
-        Route::get('/dashboard', [
-            UserDashboardController::class,
-            'index',
-        ])->name('dashboard');
+        Route::get('/profil', [UserProfileController::class, 'show'])
+            ->name('profile.show');
+        Route::get('/profil/foto', [UserProfileController::class, 'photo'])
+            ->name('profile.photo');
+        Route::post('/profil/foto', [UserProfileController::class, 'updatePhoto'])
+            ->middleware('throttle:10,1')
+            ->name('profile.photo.update');
+        Route::delete('/profil/foto', [UserProfileController::class, 'destroyPhoto'])
+            ->middleware('throttle:10,1')
+            ->name('profile.photo.destroy');
+        Route::put('/profil/password', [UserProfileController::class, 'updatePassword'])
+            ->middleware('throttle:5,1')
+            ->name('profile.password.update');
 
         // REALISASI KA
 
@@ -133,6 +164,26 @@ Route::middleware(['auth', 'role:pjl'])
             'store',
         ])->name('catatan-dinas.store');
 
+        // PESAN PEMBINAAN PJL
+
+        Route::get('/pesan-pembinaan', [
+            CoachingMessageController::class,
+            'index',
+        ])->name('coaching-messages.index');
+
+        Route::get('/pesan-pembinaan/{message}', [
+            CoachingMessageController::class,
+            'show',
+        ])->whereNumber('message')
+            ->name('coaching-messages.show');
+
+        Route::post('/pesan-pembinaan/{message}/dibaca', [
+            CoachingMessageController::class,
+            'markAsRead',
+        ])->whereNumber('message')
+            ->middleware('throttle:30,1')
+            ->name('coaching-messages.read');
+
         // SERAH TERIMA DINAS USER
 
         Route::get('/serah-terima-dinas', [
@@ -145,7 +196,8 @@ Route::middleware(['auth', 'role:pjl'])
         Route::get('/serah-terima-dinas/cari-penerima', [
             SerahTerimaDinasController::class,
             'cariPenerima',
-        ])->name('serah-terima-dinas.cari-penerima');
+        ])->middleware('throttle:30,1')
+            ->name('serah-terima-dinas.cari-penerima');
 
         // RIWAYAT SERAH TERIMA
 
@@ -160,6 +212,26 @@ Route::middleware(['auth', 'role:pjl'])
         ])->whereNumber('serahTerima')
             ->name('serah-terima-dinas.edit');
 
+        Route::get('/serah-terima-dinas/riwayat/{serahTerima}/foto-bukti', [
+            SerahTerimaDinasController::class,
+            'fotoBukti',
+        ])->whereNumber('serahTerima')
+            ->name('serah-terima-dinas.foto-bukti');
+
+        Route::get('/serah-terima-dinas/riwayat/{serahTerima}/inventaris/{inventaris}/foto-bukti', [
+            SerahTerimaDinasController::class,
+            'fotoBuktiInventaris',
+        ])->whereNumber('serahTerima')
+            ->whereNumber('inventaris')
+            ->name('serah-terima-dinas.inventaris.foto-bukti');
+
+        Route::get('/serah-terima-dinas/riwayat/{serahTerima}/tanda-tangan/{jenis}', [
+            SerahTerimaDinasController::class,
+            'tandaTangan',
+        ])->whereNumber('serahTerima')
+            ->whereIn('jenis', ['penyerah', 'penerima'])
+            ->name('serah-terima-dinas.tanda-tangan');
+
         Route::get('/serah-terima-dinas/riwayat/{serahTerima}', [
             SerahTerimaDinasController::class,
             'show',
@@ -172,6 +244,7 @@ Route::middleware(['auth', 'role:pjl'])
             SerahTerimaDinasController::class,
             'konfirmasi',
         ])->whereNumber('serahTerima')
+            ->middleware('throttle:10,1')
             ->name('serah-terima-dinas.konfirmasi');
 
         // SIMPAN CATATAN SERAH TERIMA
@@ -179,28 +252,31 @@ Route::middleware(['auth', 'role:pjl'])
         Route::post('/serah-terima-dinas/catatan', [
             SerahTerimaDinasController::class,
             'storeCatatan',
-        ])->name('serah-terima-dinas.catatan.store');
+        ])->middleware('throttle:20,1')
+            ->name('serah-terima-dinas.catatan.store');
 
         // SIMPAN REALISASI INVENTARIS SERAH TERIMA
 
         Route::post('/serah-terima-dinas/inventaris', [
             SerahTerimaDinasController::class,
             'storeInventaris',
-        ])->name('serah-terima-dinas.inventaris.store');
+        ])->middleware('throttle:60,1')
+            ->name('serah-terima-dinas.inventaris.store');
 
         // SIMPAN SERAH TERIMA DINAS
 
         Route::post('/serah-terima-dinas/simpan', [
             SerahTerimaDinasController::class,
             'store',
-        ])->name('serah-terima-dinas.store');
+        ])->middleware('throttle:10,1')
+            ->name('serah-terima-dinas.store');
 
         // ENDPOINT KOMPATIBILITAS LAMA
 
         Route::post('/serah-terima-dinas', [
             SerahTerimaDinasController::class,
             'store',
-        ]);
+        ])->middleware('throttle:10,1');
 
         // INVENTARIS PJL
 
@@ -208,6 +284,18 @@ Route::middleware(['auth', 'role:pjl'])
             UserInventarisController::class,
             'index',
         ])->name('inventaris.index');
+
+        Route::post('/inventaris/salin-pemeriksaan', [
+            UserInventarisController::class,
+            'prepare',
+        ])->middleware('throttle:20,1')
+            ->name('inventaris.prepare');
+
+        Route::get('/inventaris/{inventaris}/bukti', [
+            UserInventarisController::class,
+            'fotoBukti',
+        ])->whereNumber('inventaris')
+            ->name('inventaris.foto-bukti');
 
         Route::patch('/inventaris/{inventaris}', [
             UserInventarisController::class,
@@ -232,18 +320,6 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'index',
         ])->name('dashboard');
 
-        // PENGATURAN REALISASI KA
-
-        Route::get('/pengaturan-realisasi-ka', [
-            RealisasiKaSettingController::class,
-            'index',
-        ])->name('realisasi-ka-settings.index');
-
-        Route::put('/pengaturan-realisasi-ka', [
-            RealisasiKaSettingController::class,
-            'update',
-        ])->name('realisasi-ka-settings.update');
-
         // DAFTAR REALISASI KA
 
         Route::get('/realisasi-ka', [
@@ -263,35 +339,10 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             'downloadTemplate',
         ])->name('users.import.template');
 
-        Route::post('/users/import/preview', [
-            AdminUserImportController::class,
-            'preview',
-        ])->name('users.import.preview');
-
-        Route::post('/users/import/confirm', [
-            AdminUserImportController::class,
-            'confirm',
-        ])->name('users.import.confirm');
-
-        Route::get('/users/{id}/edit', [
-            AdminUserController::class,
-            'edit',
-        ])->name('users.edit');
-
         Route::get('/users/{id}', [
             AdminUserController::class,
             'show',
         ])->name('users.show');
-
-        Route::put('/users/{id}', [
-            AdminUserController::class,
-            'update',
-        ])->name('users.update');
-
-        Route::patch('/users/{id}/status', [
-            AdminUserController::class,
-            'toggleStatus',
-        ])->name('users.toggle-status');
 
         // REVIEW CATATAN DINAS
 
@@ -304,11 +355,6 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             AdminCatatanDinasController::class,
             'show',
         ])->name('catatan-dinas.show');
-
-        Route::patch('/catatan-dinas/{catatanDinas}', [
-            AdminCatatanDinasController::class,
-            'update',
-        ])->name('catatan-dinas.update');
 
         // REVIEW SERAH TERIMA DINAS
 
@@ -328,19 +374,19 @@ Route::middleware(['auth', 'role:admin,superadmin'])
         ])->whereNumber('serahTerima')
             ->name('serah-terima-dinas.show');
 
-        Route::patch('/serah-terima-dinas/{serahTerima}', [
-            AdminSerahTerimaDinasController::class,
-            'update',
+        Route::get('/serah-terima-dinas/{serahTerima}/tanda-tangan/{jenis}', [
+            SerahTerimaDinasController::class,
+            'tandaTangan',
         ])->whereNumber('serahTerima')
-            ->name('serah-terima-dinas.update');
-
-        // Admin dan Superadmin hanya melakukan review.
-        // Tanda tangan penerima dilakukan oleh PJL penerima.
+            ->whereIn('jenis', ['penyerah', 'penerima'])
+            ->name('serah-terima-dinas.tanda-tangan');
 
         // MASTER DATA SHIFT
 
-        Route::resource('shift', ShiftController::class)
-            ->except(['create', 'show', 'edit']);
+        Route::get('/shift', [
+            ShiftController::class,
+            'index',
+        ])->name('shift.index');
 
         // JADWAL DINAS PJL
 
@@ -353,20 +399,6 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             DinasController::class,
             'template',
         ])->name('dinas.template');
-
-        Route::post('/dinas/import', [
-            DinasController::class,
-            'import',
-        ])->name('dinas.import');
-
-        Route::get('/dinas/updates', [
-            DinasController::class,
-            'updates',
-        ])->name('dinas.updates');
-
-        Route::resource('dinas', DinasController::class)
-            ->except(['create', 'show'])
-            ->names('dinas');
 
         // JADWAL KA
 
@@ -396,47 +428,11 @@ Route::middleware(['auth', 'role:admin,superadmin'])
         ])->whereNumber('jpl')
             ->name('jadwal-ka.show');
 
-        // MASTER DATA RESORT
+        // Operasi berikut hanya membaca data. Halaman Admin Dinas yang
+        // menyinkronkan status dan pengaturan yang membuat default berada di grup Admin.
 
-        Route::resource('resort', ResortController::class)
-            ->except(['destroy']);
-
-        Route::patch('/resort/{resort}/toggle-status', [
-            ResortController::class,
-            'toggleStatus',
-        ])->name('resort.toggle-status');
-
-        // IMPORT WILAYAH
-
-        Route::get('/wilayah/import/template', [
-            WilayahController::class,
-            'downloadTemplate',
-        ])->name('wilayah.import.template');
-
-        Route::post('/wilayah/import/preview', [
-            WilayahImportController::class,
-            'preview',
-        ])->name('wilayah.import.preview.store');
-
-        Route::get('/wilayah/import/preview', [
-            WilayahImportController::class,
-            'showPreview',
-        ])->name('wilayah.import.preview');
-
-        Route::post('/wilayah/import/confirm', [
-            WilayahImportController::class,
-            'confirm',
-        ])->name('wilayah.import.confirm');
-
-        // MASTER DATA WILAYAH
-
-        Route::patch('/wilayah/{wilayah}/toggle-status', [
-            WilayahController::class,
-            'toggleStatus',
-        ])->name('wilayah.toggle-status');
-
-        Route::resource('wilayah', WilayahController::class)
-            ->except(['show', 'destroy']);
+        // Admin dan Superadmin hanya melakukan review.
+        // Tanda tangan penerima dilakukan oleh PJL penerima.
 
         // INVENTARIS ADMIN
         // Superadmin tidak dibatasi dari fitur operasional lainnya.
@@ -450,10 +446,90 @@ Route::middleware(['auth', 'role:admin,superadmin'])
             ])->whereNumber('jpl')
                 ->name('inventaris.jpl.show');
 
+            Route::post('/inventaris/{inventaris}/review', [
+                AdminInventarisController::class,
+                'review',
+            ])->whereNumber('inventaris')
+                ->middleware('throttle:20,1')
+                ->name('inventaris.review');
+
             Route::resource('inventaris', AdminInventarisController::class)
                 ->parameters([
                     'inventaris' => 'inventaris',
                 ]);
+        });
+
+        // OPERASI ADMIN YANG MENGUBAH DATA ATAU MEMILIKI EFEK SAMPING
+
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/pengaturan-realisasi-ka', [
+                RealisasiKaSettingController::class,
+                'index',
+            ])->name('realisasi-ka-settings.index');
+
+            Route::put('/pengaturan-realisasi-ka', [
+                RealisasiKaSettingController::class,
+                'update',
+            ])->name('realisasi-ka-settings.update');
+
+            Route::post('/users/import/preview', [
+                AdminUserImportController::class,
+                'preview',
+            ])->name('users.import.preview');
+
+            Route::post('/users/import/confirm', [
+                AdminUserImportController::class,
+                'confirm',
+            ])->name('users.import.confirm');
+
+            Route::get('/users/{id}/edit', [
+                AdminUserController::class,
+                'edit',
+            ])->name('users.edit');
+
+            Route::put('/users/{id}', [
+                AdminUserController::class,
+                'update',
+            ])->name('users.update');
+
+            Route::patch('/users/{id}/status', [
+                AdminUserController::class,
+                'toggleStatus',
+            ])->name('users.toggle-status');
+
+            Route::patch('/catatan-dinas/{catatanDinas}', [
+                AdminCatatanDinasController::class,
+                'update',
+            ])->name('catatan-dinas.update');
+
+            Route::patch('/serah-terima-dinas/{serahTerima}', [
+                AdminSerahTerimaDinasController::class,
+                'update',
+            ])->whereNumber('serahTerima')
+                ->middleware('throttle:10,1')
+                ->name('serah-terima-dinas.update');
+
+            Route::resource('shift', ShiftController::class)
+                ->except(['create', 'show', 'edit', 'index']);
+
+            Route::post('/dinas/import', [
+                DinasController::class,
+                'import',
+            ])->name('dinas.import');
+
+            Route::post('/dinas/import/preview', [
+                DinasController::class,
+                'previewImport',
+            ])->middleware('throttle:5,1')->name('dinas.import.preview');
+
+            Route::get('/dinas/updates', [
+                DinasController::class,
+                'updates',
+            ])->name('dinas.updates');
+
+            Route::resource('dinas', DinasController::class)
+                ->except(['create', 'show'])
+                ->names('dinas');
         });
     });
 
@@ -508,6 +584,11 @@ Route::middleware(['auth', 'role:admin'])
         ])->name('jadwal-ka.import.store');
 
         // JPL IMPORT AND MUTATIONS
+
+        Route::get('/jpl/import/template', [
+            JplImportController::class,
+            'downloadTemplate',
+        ])->name('jpl.import.template');
 
         Route::get('/jpl/import', [
             JplImportController::class,
@@ -645,6 +726,27 @@ Route::middleware(['auth', 'superadmin'])
             SystemMonitoringController::class,
             'index',
         ])->name('monitoring.index');
+
+        // DAFTAR DINASAN READ-ONLY
+
+        Route::get('/dinas', [
+            SuperadminDinasController::class,
+            'index',
+        ])->name('dinas.index');
+
+        // INVENTARIS READ-ONLY
+
+        Route::get('/inventaris/jpl/{jpl}', [
+            SuperadminInventarisController::class,
+            'showJpl',
+        ])->whereNumber('jpl')
+            ->name('inventaris.jpl.show');
+
+        Route::resource('inventaris', SuperadminInventarisController::class)
+            ->parameters([
+                'inventaris' => 'inventaris',
+            ])
+            ->only(['index', 'show']);
 
         // JADWAL KA READ-ONLY
 

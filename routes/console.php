@@ -56,3 +56,7 @@ Schedule::command('dinas:sinkronkan-status')
 Schedule::command('jadwal-ka:activate-due-batches')
     ->everyMinute()
     ->withoutOverlapping();
+
+Schedule::command('app:prune-expired-coaching-message-nonces')
+    ->dailyAt('02:30')
+    ->withoutOverlapping();

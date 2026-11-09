@@ -1,10 +1,11 @@
-@extends('layouts.admin')
+@extends(auth()->user()?->isSuperadmin() ? 'layouts.superadmin' : 'layouts.admin')
 
 @section('title', 'Manajemen Shift - Sistem PJL')
+@section('page-title', 'Master Shift')
 
 @section('content')
 <div
-    class="p-4 md:p-6 lg:p-8"
+    class="{{ auth()->user()?->isSuperadmin() ? '' : 'p-4 md:p-6 lg:p-8' }}"
     x-data="{
         showAdd: false,
         showEdit: false,
@@ -44,10 +45,11 @@
                 Manajemen Shift
             </h1>
             <p class="mt-1 text-sm text-slate-500">
-                Kelola konfigurasi waktu shift petugas penjaga perlintasan.
+                {{ auth()->user()?->isSuperadmin() ? 'Pantau konfigurasi waktu shift yang digunakan dalam jadwal dinas.' : 'Kelola konfigurasi waktu shift petugas penjaga perlintasan.' }}
             </p>
         </div>
 
+        @unless (auth()->user()?->isSuperadmin())
         <button
             type="button"
             @click="showAdd = true"
@@ -56,6 +58,9 @@
             <span class="text-lg leading-none">+</span>
             Tambah Shift
         </button>
+        @else
+            <span class="inline-flex w-fit rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800">Hanya baca</span>
+        @endunless
     </div>
 
     {{-- NOTIFIKASI --}}
@@ -123,7 +128,9 @@
                         <th class="px-5 py-4 font-semibold">Jam Mulai</th>
                         <th class="px-5 py-4 font-semibold">Jam Selesai</th>
                         <th class="px-5 py-4 font-semibold">Jadwal Terkait</th>
-                        <th class="px-5 py-4 text-right font-semibold">Aksi</th>
+                        @unless (auth()->user()?->isSuperadmin())
+                            <th class="px-5 py-4 text-right font-semibold">Aksi</th>
+                        @endunless
                     </tr>
                 </thead>
 
@@ -165,6 +172,7 @@
                                 @endif
                             </td>
 
+                            @unless (auth()->user()?->isSuperadmin())
                             <td class="px-5 py-4">
                                 <div class="flex justify-end gap-2">
 
@@ -206,10 +214,11 @@
 
                                 </div>
                             </td>
+                            @endunless
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-5 py-12 text-center text-slate-500">
+                            <td colspan="{{ auth()->user()?->isSuperadmin() ? 5 : 6 }}" class="px-5 py-12 text-center text-slate-500">
                                 Belum ada data shift. Klik Tambah Shift untuk membuat konfigurasi pertama.
                             </td>
                         </tr>
@@ -221,14 +230,19 @@
 
     {{-- INFORMASI --}}
     <div class="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
-        <p class="font-semibold">Informasi Pengaturan Shift</p>
+        <p class="font-semibold">{{ auth()->user()?->isSuperadmin() ? 'Informasi Shift' : 'Informasi Pengaturan Shift' }}</p>
         <p class="mt-1 leading-relaxed">
-            Perubahan konfigurasi shift berlaku saat membuat atau menghitung ulang jadwal dinas.
-            Jam dinas yang sudah tersimpan tidak berubah otomatis.
-            Shift yang sudah memiliki jadwal dinas tidak dapat dihapus.
+            @if (auth()->user()?->isSuperadmin())
+                Data ini ditampilkan sebagai referensi pengawasan. Pengelolaan konfigurasi shift hanya tersedia pada area Admin.
+            @else
+                Perubahan konfigurasi shift berlaku saat membuat atau menghitung ulang jadwal dinas.
+                Jam dinas yang sudah tersimpan tidak berubah otomatis.
+                Shift yang sudah memiliki jadwal dinas tidak dapat dihapus.
+            @endif
         </p>
     </div>
 
+    @unless (auth()->user()?->isSuperadmin())
     {{-- MODAL TAMBAH --}}
     <div
         x-show="showAdd"
@@ -477,6 +491,7 @@
             </form>
         </div>
     </div>
+    @endunless
 
 </div>
 @endsection

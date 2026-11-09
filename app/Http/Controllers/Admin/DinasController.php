@@ -7,8 +7,11 @@ use App\Models\Dinas;
 use App\Models\Jpl;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use App\Services\DinasJadwalSnapshotService;
+use App\Services\DinasRosterWorkbookParser;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -25,7 +28,7 @@ class DinasController extends Controller
 
     public function index(Request $request)
     {
-        $this->sinkronkanStatus();
+        $this->sinkronkanStatus(app(ActivityLogService::class));
 
         $query = Dinas::with([
             'user',
@@ -76,7 +79,7 @@ class DinasController extends Controller
 
     public function updates(Request $request)
     {
-        $this->sinkronkanStatus();
+        $this->sinkronkanStatus(app(ActivityLogService::class));
 
         $query = Dinas::with([
             'user',
@@ -107,6 +110,20 @@ class DinasController extends Controller
 
     private function terapkanFilter($query, Request $request): void
     {
+        if ($request->filled('month') && filter_var($request->input('month'), FILTER_VALIDATE_INT) !== false) {
+            $month = (int) $request->input('month');
+            if ($month >= 1 && $month <= 12) {
+                $query->whereMonth('tanggal_dinas', $month);
+            }
+        }
+
+        if ($request->filled('year') && filter_var($request->input('year'), FILTER_VALIDATE_INT) !== false) {
+            $year = (int) $request->input('year');
+            if ($year >= 2000 && $year <= 2100) {
+                $query->whereYear('tanggal_dinas', $year);
+            }
+        }
+
         if ($request->filled('user_id')) {
             $query->where('user_id', $request->user_id);
         }
@@ -133,32 +150,60 @@ class DinasController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    private function sinkronkanStatus(): void
+    private function sinkronkanStatus(ActivityLogService $activityLogService): void
     {
         $now = now();
 
-        // Selesaikan jadwal yang waktu akhirnya telah tercapai.
-        Dinas::whereIn('status', [
-            'dijadwalkan',
-            'berlangsung',
-        ])
-            ->whereNotNull('jam_selesai')
-            ->where('jam_selesai', '<=', $now)
-            ->update([
-                'status' => 'selesai',
-                'updated_at' => $now,
-            ]);
+        DB::transaction(function () use ($activityLogService, $now): void {
+            $expiredDinas = Dinas::query()
+                ->whereIn('status', ['dijadwalkan', 'berlangsung'])
+                ->whereNotNull('jam_selesai')
+                ->where('jam_selesai', '<=', $now)
+                ->lockForUpdate()
+                ->get();
 
-        // Aktifkan jadwal yang sedang berada dalam rentang waktunya.
-        Dinas::where('status', 'dijadwalkan')
-            ->whereNotNull('jam_mulai')
-            ->whereNotNull('jam_selesai')
-            ->where('jam_mulai', '<=', $now)
-            ->where('jam_selesai', '>', $now)
-            ->update([
-                'status' => 'berlangsung',
-                'updated_at' => $now,
-            ]);
+            foreach ($expiredDinas as $dinas) {
+                $oldStatus = $dinas->status;
+                $dinas->update([
+                    'status' => 'selesai',
+                    'updated_at' => $now,
+                ]);
+
+                $activityLogService->log(
+                    'status_sync',
+                    'dinas',
+                    'Status Dinas diselesaikan otomatis setelah waktu dinas berakhir.',
+                    $dinas,
+                    ['status' => $oldStatus],
+                    ['status' => 'selesai'],
+                );
+            }
+
+            $activeDinas = Dinas::query()
+                ->where('status', 'dijadwalkan')
+                ->whereNotNull('jam_mulai')
+                ->whereNotNull('jam_selesai')
+                ->where('jam_mulai', '<=', $now)
+                ->where('jam_selesai', '>', $now)
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($activeDinas as $dinas) {
+                $dinas->update([
+                    'status' => 'berlangsung',
+                    'updated_at' => $now,
+                ]);
+
+                $activityLogService->log(
+                    'status_sync',
+                    'dinas',
+                    'Status Dinas diaktifkan otomatis saat waktu dinas dimulai.',
+                    $dinas,
+                    ['status' => 'dijadwalkan'],
+                    ['status' => 'berlangsung'],
+                );
+            }
+        });
     }
 
     /*
@@ -167,8 +212,11 @@ class DinasController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function store(Request $request, DinasJadwalSnapshotService $snapshotService)
-    {
+    public function store(
+        Request $request,
+        DinasJadwalSnapshotService $snapshotService,
+        ActivityLogService $activityLogService
+    ) {
         $validated = $this->validateSchedule($request);
 
         $petugas = $this->findActivePjl(
@@ -195,7 +243,8 @@ class DinasController extends Controller
             $request,
             $mulai,
             $selesai,
-            $snapshotService
+            $snapshotService,
+            $activityLogService
         ) {
             $lockedJpl = Jpl::query()
                 ->whereKey($jpl->id)
@@ -253,6 +302,15 @@ class DinasController extends Controller
             ]);
 
             $snapshotService->resolveAndStore((int) $dinas->id);
+
+            $activityLogService->log(
+                'create',
+                'dinas',
+                'Jadwal Dinas berhasil dibuat.',
+                $dinas,
+                null,
+                $this->activityValues($dinas),
+            );
         });
 
         return redirect()
@@ -306,8 +364,11 @@ class DinasController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function update(Request $request, Dinas $dina)
-    {
+    public function update(
+        Request $request,
+        Dinas $dina,
+        ActivityLogService $activityLogService
+    ) {
         $this->ensureCanModify($dina);
 
         $validated = $this->validateSchedule($request);
@@ -336,13 +397,16 @@ class DinasController extends Controller
             $validated,
             $request,
             $mulai,
-            $selesai
+            $selesai,
+            $activityLogService
         ) {
             $lockedDinas = Dinas::whereKey($dina->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
             $this->ensureCanModify($lockedDinas);
+
+            $oldValues = $this->activityValues($lockedDinas);
 
             $userDigantikanId = $request->boolean('is_pengganti')
                 ? ($validated['user_digantikan_id'] ?? null)
@@ -394,6 +458,19 @@ class DinasController extends Controller
                     ? $validated['user_digantikan_id']
                     : null,
             ]);
+
+            $newValues = $this->activityValues($lockedDinas);
+
+            if ($oldValues !== $newValues) {
+                $activityLogService->log(
+                    'update',
+                    'dinas',
+                    'Jadwal Dinas berhasil diperbarui.',
+                    $lockedDinas,
+                    $oldValues,
+                    $newValues,
+                );
+            }
         });
 
         return redirect()
@@ -410,9 +487,9 @@ class DinasController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function destroy(Dinas $dina)
+    public function destroy(Dinas $dina, ActivityLogService $activityLogService)
     {
-        DB::transaction(function () use ($dina): void {
+        DB::transaction(function () use ($dina, $activityLogService): void {
             $lockedDinas = Dinas::query()
                 ->whereKey($dina->id)
                 ->lockForUpdate()
@@ -425,7 +502,16 @@ class DinasController extends Controller
             }
 
             $this->ensureCanModify($lockedDinas);
+            $oldValues = $this->activityValues($lockedDinas);
             $lockedDinas->delete();
+
+            $activityLogService->log(
+                'delete',
+                'dinas',
+                'Jadwal Dinas berhasil dihapus.',
+                $lockedDinas,
+                $oldValues,
+            );
         });
 
         return redirect()
@@ -442,16 +528,17 @@ class DinasController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function export()
+    public function export(Request $request)
     {
-        $this->sinkronkanStatus();
-
-        $rows = Dinas::with([
+        $query = Dinas::with([
             'user',
             'userDigantikan',
             'jpl',
             'shift',
-        ])
+        ]);
+
+        $this->terapkanFilter($query, $request);
+        $rows = $query
             ->orderBy('tanggal_dinas')
             ->orderBy('jam_mulai')
             ->get();
@@ -518,17 +605,6 @@ class DinasController extends Controller
 
                 fputcsv($out, $this->csvHeaders(), ';');
 
-                fputcsv($out, [
-                    '',
-                    '',
-                    '',
-                    now()->format('Y-m-d'),
-                    '',
-                    '',
-                    '0',
-                    '',
-                ], ';');
-
                 fclose($out);
             },
             'template-jadwal-dinas.csv',
@@ -544,8 +620,50 @@ class DinasController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function import(Request $request)
-    {
+    public function previewImport(
+        Request $request,
+        DinasJadwalSnapshotService $snapshotService,
+        ActivityLogService $activityLogService,
+        DinasRosterImportController $rosterImportController,
+        DinasRosterWorkbookParser $rosterParser
+    ): JsonResponse {
+        if (strtolower((string) $request->file('file')?->getClientOriginalExtension()) === 'xlsx') {
+            return $rosterImportController->preview($request, $rosterParser);
+        }
+
+        $request->attributes->set('_dinas_import_preview_only', true);
+
+        return $this->import(
+            $request,
+            $snapshotService,
+            $activityLogService,
+            $rosterImportController,
+            $rosterParser,
+        );
+    }
+
+    public function import(
+        Request $request,
+        DinasJadwalSnapshotService $snapshotService,
+        ActivityLogService $activityLogService,
+        DinasRosterImportController $rosterImportController,
+        DinasRosterWorkbookParser $rosterParser
+    ) {
+        $previewOnly = $request->attributes->get('_dinas_import_preview_only') === true;
+
+        if (strtolower((string) $request->file('file')?->getClientOriginalExtension()) === 'xlsx') {
+            if ($previewOnly) {
+                return $rosterImportController->preview($request, $rosterParser);
+            }
+
+            return $rosterImportController->confirm(
+                $request,
+                $rosterParser,
+                $snapshotService,
+                $activityLogService,
+            );
+        }
+
         $request->validate([
             'file' => [
                 'required',
@@ -561,6 +679,14 @@ class DinasController extends Controller
         );
 
         if ($handle === false) {
+            if ($previewOnly) {
+                return response()->json([
+                    'message' => 'File CSV tidak dapat dibaca.',
+                    'valid' => false,
+                    'errors' => ['File CSV tidak dapat dibaca.'],
+                ], 422);
+            }
+
             return back()->with(
                 'error',
                 'File CSV tidak dapat dibaca.'
@@ -571,6 +697,14 @@ class DinasController extends Controller
             $header = fgetcsv($handle, 0, ';');
 
             if ($header === false) {
+                if ($previewOnly) {
+                    return response()->json([
+                        'message' => 'File CSV kosong.',
+                        'valid' => false,
+                        'errors' => ['File CSV kosong.'],
+                    ], 422);
+                }
+
                 return back()->with(
                     'error',
                     'File CSV kosong.'
@@ -596,6 +730,16 @@ class DinasController extends Controller
             );
 
             if ($header !== $this->csvHeaders()) {
+                if ($previewOnly) {
+                    $message = 'Header CSV tidak sesuai template. Unduh template terbaru dan jangan mengubah nama atau urutan 8 kolom.';
+
+                    return response()->json([
+                        'message' => $message,
+                        'valid' => false,
+                        'errors' => [$message],
+                    ], 422);
+                }
+
                 return back()->with(
                     'error',
                     'Header CSV tidak sesuai template. '.
@@ -607,6 +751,7 @@ class DinasController extends Controller
             $validRows = [];
             $errors = [];
             $line = 1;
+            $totalRows = 0;
 
             while (
                 ($data = fgetcsv($handle, 0, ';')) !== false
@@ -621,6 +766,8 @@ class DinasController extends Controller
                 ) {
                     continue;
                 }
+
+                $totalRows++;
 
                 if (count($data) !== count($this->csvHeaders())) {
                     $errors[] =
@@ -814,37 +961,201 @@ class DinasController extends Controller
                 }
 
                 $validRows[] = [
+                    'line' => $line,
                     'user_id' => $petugas->id,
                     'jpl_id' => $jpl->id,
                     'shift_id' => $shift->id,
                     'tanggal_dinas' => $tanggal,
                     'jam_mulai' => $mulai,
                     'jam_selesai' => $selesai,
-                    'status' => $this->tentukanStatus(
-                        $mulai,
-                        $selesai
-                    ),
+                    'jam_mulai_input' => $jamMulaiCsv,
+                    'jam_selesai_input' => $jamSelesaiCsv,
                     'is_pengganti' => $isPengganti === '1',
                     'user_digantikan_id' => $digantikan?->id,
                 ];
             }
 
             if ($errors !== []) {
+                if ($previewOnly) {
+                    return $this->csvImportPreviewResponse($errors, $totalRows, count($validRows));
+                }
+
                 return back()->with('import_errors', $errors);
             }
 
             if ($validRows === []) {
+                if ($previewOnly) {
+                    return response()->json([
+                        'message' => 'Tidak ada baris data yang dapat diimpor.',
+                        'valid' => false,
+                        'total_count' => $totalRows,
+                        'valid_count' => 0,
+                        'failed_count' => $totalRows,
+                        'errors' => ['Tidak ada baris data yang dapat diimpor.'],
+                    ], 422);
+                }
+
                 return back()->with(
                     'error',
                     'Tidak ada baris data yang dapat diimpor.'
                 );
             }
 
-            DB::transaction(function () use ($validRows) {
-                foreach ($validRows as $row) {
-                    Dinas::create($row);
+            if ($previewOnly) {
+                return response()->json([
+                    'valid' => true,
+                    'total_count' => $totalRows,
+                    'valid_count' => count($validRows),
+                    'failed_count' => 0,
+                    'errors' => [],
+                    'row_errors' => [],
+                ]);
+            }
+
+            DB::transaction(function () use ($validRows, $snapshotService, $activityLogService) {
+                $jplIds = collect($validRows)
+                    ->pluck('jpl_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->sort()
+                    ->values();
+
+                $lockedJpls = Jpl::query()
+                    ->whereIn('id', $jplIds->all())
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+
+                foreach ($jplIds as $jplId) {
+                    $jpl = $lockedJpls->get($jplId);
+
+                    if (! $jpl || ! $jpl->is_active) {
+                        throw ValidationException::withMessages([
+                            'import' => 'JPL pada file sudah tidak tersedia atau tidak aktif. Unggah ulang file setelah memperbaiki datanya.',
+                        ]);
+                    }
                 }
-            });
+
+                $userIds = collect($validRows)
+                    ->flatMap(fn ($row) => [
+                        $row['user_id'],
+                        $row['user_digantikan_id'],
+                    ])
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->sort()
+                    ->values();
+
+                $lockedUsers = User::query()
+                    ->whereIn('id', $userIds->all())
+                    ->where('is_active', true)
+                    ->whereHas('role', fn ($query) => $query->where('name', 'pjl'))
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+
+                if ($lockedUsers->count() !== $userIds->count()) {
+                    throw ValidationException::withMessages([
+                        'import' => 'Petugas pada file sudah tidak tersedia atau tidak aktif. Unggah ulang file setelah memperbaiki datanya.',
+                    ]);
+                }
+
+                foreach ($validRows as $row) {
+                    $shift = Shift::query()->find($row['shift_id']);
+
+                    if (! $shift) {
+                        throw ValidationException::withMessages([
+                            'import' => "Baris {$row['line']}: shift sudah tidak tersedia. Unggah ulang file setelah memperbaiki datanya.",
+                        ]);
+                    }
+
+                    [$mulai, $selesai] = $this->calculateSchedule(
+                        $row['tanggal_dinas'],
+                        $shift
+                    );
+
+                    if (
+                        ($row['jam_mulai_input'] !== ''
+                            && $row['jam_mulai_input'] !== $mulai->format('H:i:s'))
+                        || ($row['jam_selesai_input'] !== ''
+                            && $row['jam_selesai_input'] !== $selesai->format('H:i:s'))
+                    ) {
+                        throw ValidationException::withMessages([
+                            'import' => "Baris {$row['line']}: jam tidak lagi sesuai dengan konfigurasi shift. Unggah ulang file.",
+                        ]);
+                    }
+
+                    try {
+                        $this->ensureNoConflict(
+                            (int) $row['user_id'],
+                            $mulai,
+                            $selesai
+                        );
+                    } catch (ValidationException $exception) {
+                        $message = collect($exception->errors())
+                            ->flatten()
+                            ->first();
+
+                        throw ValidationException::withMessages([
+                            'import' => "Baris {$row['line']}: {$message}",
+                        ]);
+                    }
+
+                    $dinas = Dinas::create([
+                        'user_id' => $row['user_id'],
+                        'jpl_id' => $row['jpl_id'],
+                        'shift_id' => $row['shift_id'],
+                        'tanggal_dinas' => $row['tanggal_dinas'],
+                        'jam_mulai' => $mulai,
+                        'jam_selesai' => $selesai,
+                        'status' => $this->tentukanStatus($mulai, $selesai),
+                        'is_pengganti' => $row['is_pengganti'],
+                        'user_digantikan_id' => $row['user_digantikan_id'],
+                    ]);
+
+                    $lockedShift = Shift::query()
+                        ->whereKey($row['shift_id'])
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $lockedShift) {
+                        throw ValidationException::withMessages([
+                            'import' => "Baris {$row['line']}: shift berubah saat impor. Seluruh impor dibatalkan.",
+                        ]);
+                    }
+
+                    [$lockedMulai, $lockedSelesai] = $this->calculateSchedule(
+                        $row['tanggal_dinas'],
+                        $lockedShift
+                    );
+
+                    if (
+                        $lockedMulai->format('Y-m-d H:i:s') !== $mulai->format('Y-m-d H:i:s')
+                        || $lockedSelesai->format('Y-m-d H:i:s') !== $selesai->format('Y-m-d H:i:s')
+                    ) {
+                        throw ValidationException::withMessages([
+                            'import' => "Baris {$row['line']}: konfigurasi shift berubah saat impor. Seluruh impor dibatalkan.",
+                        ]);
+                    }
+
+                    $snapshotService->resolveAndStore((int) $dinas->id);
+                }
+
+                $activityLogService->log(
+                    'import',
+                    'dinas',
+                    'Impor jadwal Dinas berhasil diproses.',
+                    null,
+                    null,
+                    [
+                        'imported_count' => count($validRows),
+                        'failed_count' => 0,
+                    ],
+                );
+            }, 3);
 
             return redirect()
                 ->route('admin.dinas.index')
@@ -853,8 +1164,28 @@ class DinasController extends Controller
                     count($validRows).
                     ' jadwal dinas berhasil diimpor.'
                 );
+        } catch (ValidationException $exception) {
+            if ($previewOnly) {
+                return response()->json([
+                    'valid' => false,
+                    'errors' => collect($exception->errors())->flatten()->values(),
+                ], 422);
+            }
+
+            return back()->with(
+                'import_errors',
+                collect($exception->errors())->flatten()->all()
+            );
         } catch (Throwable $e) {
             report($e);
+
+            if ($previewOnly) {
+                return response()->json([
+                    'message' => 'Validasi file gagal diproses. Periksa format file dan coba kembali.',
+                    'valid' => false,
+                    'errors' => ['Validasi file gagal diproses. Periksa format file dan coba kembali.'],
+                ], 422);
+            }
 
             return back()->with(
                 'error',
@@ -1092,5 +1423,46 @@ class DinasController extends Controller
                     'karena sudah memiliki riwayat operasional.',
             ]);
         }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function activityValues(Dinas $dinas): array
+    {
+        return [
+            'user_id' => $dinas->user_id,
+            'jpl_id' => $dinas->jpl_id,
+            'shift_id' => $dinas->shift_id,
+            'tanggal_dinas' => $dinas->tanggal_dinas?->toDateString(),
+            'jam_mulai' => $dinas->jam_mulai?->toDateTimeString(),
+            'jam_selesai' => $dinas->jam_selesai?->toDateTimeString(),
+            'status' => $dinas->status,
+            'is_pengganti' => $dinas->is_pengganti,
+            'user_digantikan_id' => $dinas->user_digantikan_id,
+        ];
+    }
+
+    /**
+     * @param  list<string>  $errors
+     */
+    private function csvImportPreviewResponse(array $errors, int $totalRows, int $validRows): JsonResponse
+    {
+        $rowErrors = [];
+
+        foreach ($errors as $error) {
+            if (preg_match('/^Baris (\d+):\s*(.*)$/u', $error, $matches) === 1) {
+                $rowErrors[(int) $matches[1]] = $matches[2];
+            }
+        }
+
+        return response()->json([
+            'valid' => false,
+            'total_count' => $totalRows,
+            'valid_count' => $validRows,
+            'failed_count' => max(0, $totalRows - $validRows),
+            'errors' => array_values($errors),
+            'row_errors' => $rowErrors,
+        ], 422);
     }
 }

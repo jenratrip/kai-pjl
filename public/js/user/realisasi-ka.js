@@ -2,6 +2,16 @@
 
 const CONFIG = window.realisasiKaConfig;
 const SETTINGS = CONFIG.settings || {};
+const TIME_WINDOW = window.RealisasiKaTimeWindow;
+const INTERACTIONS = window.RealisasiKaInteractions;
+
+if (!TIME_WINDOW) {
+    throw new Error('Filter waktu Realisasi KA belum dimuat.');
+}
+
+if (!INTERACTIONS) {
+    throw new Error('Interaksi Realisasi KA belum dimuat.');
+}
 
 if (!Array.isArray(CONFIG.data)) {
     CONFIG.data = [];
@@ -11,14 +21,6 @@ const ZONA_WAKTU = CONFIG.timeZone || 'Asia/Jakarta';
 
 const BATAS_CEPAT_MENIT = 2;
 
-const BATAS_TELAT_MENIT = Number(
-    SETTINGS.toleransiKeterlambatanMenit ?? 5
-);
-
-const BATAS_TELAT_TINGGI_MENIT = Number(
-    SETTINGS.peringatanKeterlambatanTinggiMenit ?? 10
-);
-
 const BATAS_AWAS_MENIT = Number(
     SETTINGS.jarakMinimumAntarKaMenit ?? 0
 );
@@ -27,25 +29,15 @@ const BATAS_PENUTUPAN_PALANG_MENIT = Number(
     SETTINGS.batasPenutupanPalangMenit ?? 0
 );
 
-const WARNING_KETERLAMBATAN_AKTIF =
-    SETTINGS.warningKeterlambatanAktif === true;
-
-const WARNING_KETERLAMBATAN_TINGGI_AKTIF =
-    SETTINGS.warningKeterlambatanTinggiAktif === true;
-
 const WARNING_ANTAR_KA_AKTIF =
     SETTINGS.warningAntarKaAktif === true;
 
 const WARNING_PENUTUPAN_PALANG_AKTIF =
     SETTINGS.warningPenutupanPalangAktif === true;
 
-const JEDA_SIMPAN_STATUS = 300;
-const JEDA_SIMPAN_CHECK = 600;
-const JEDA_SIMPAN_KETIK = 800;
-const JEDA_COBA_ULANG = 10000;
-
-const JUMLAH_KOLOM_TABEL = 15;
+const JUMLAH_KOLOM_TABEL = 12;
 const BATAS_KARAKTER_CATATAN = 5000;
+let isPrinting = false;
 
 /*
  * BATAS_PENUTUPAN_PALANG_MENIT dan
@@ -77,10 +69,15 @@ let dataKA = CONFIG.data.map((ka, index) => ({
     pintu: ka.pintu ?? '',
     semboyan35: ka.semboyan35 ?? '',
     keterangan: ka.keterangan ?? '',
+    is_bersamaan: ka.is_bersamaan === true,
     jadwal_ka_id: ka.jadwal_ka_id ?? null,
     realisasi_ka_id: ka.realisasi_ka_id ?? null,
     is_manual: Boolean(ka.is_manual)
 }));
+
+const persistedRows = new Set(
+    dataKA.flatMap((ka, index) => TIME_WINDOW.hasRecordedRealization(ka) ? [index] : [])
+);
 
 let manualCheck = {
     semboyan21: '',
@@ -129,6 +126,12 @@ function getWIBTime() {
 function getCurrentMinutes() {
     const now = getWIBTime();
     return now.hour * 60 + now.minute;
+}
+
+function getCurrentPreciseMinutes() {
+    const now = getWIBTime();
+
+    return now.hour * 60 + now.minute + now.second / 60;
 }
 
 function getNowHHMM() {
@@ -190,24 +193,9 @@ function formatMinutes(totalMinutes) {
     );
 }
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 /* =====================================================
    JAM REALTIME DAN RENTANG JAM SAAT INI
 ===================================================== */
-
-function getCurrentHourWindowMinutes() {
-    const currentMinutes = getCurrentMinutes();
-    const startMinutes = Math.floor(currentMinutes / 60) * 60;
-    const endMinutes = startMinutes + 60;
-
-    return {
-        startMinutes,
-        endMinutes
-    };
-}
 
 function updateWindowRange() {
     const clock = document.getElementById('jamSekarang');
@@ -217,8 +205,7 @@ function updateWindowRange() {
         clock.textContent = getNowHHMMSS();
     }
 
-    const { startMinutes, endMinutes } =
-        getCurrentHourWindowMinutes();
+    const { startMinutes, endMinutes } = TIME_WINDOW.getWindow(getCurrentMinutes());
 
     if (range) {
         const jamMulai = formatMinutes(startMinutes).replace(':', '.');
@@ -233,34 +220,16 @@ function updateWindowRange() {
    FILTER JADWAL BERDASARKAN JAM SAAT INI
 ===================================================== */
 
-function isWithinCurrentHour(ka) {
-    if (ka.is_manual || !ka.jadwal || ka.jadwal === '-') {
-        return true;
-    }
-
-    const jadwalMinutes = timeToMinutes(ka.jadwal);
-
-    if (jadwalMinutes === null) {
-        return false;
-    }
-
-    const { startMinutes, endMinutes } =
-        getCurrentHourWindowMinutes();
-
-    if (endMinutes >= 1440) {
-        return jadwalMinutes >= startMinutes;
-    }
-
-    return (
-        jadwalMinutes >= startMinutes &&
-        jadwalMinutes < endMinutes
-    );
-}
-
 function getVisibleKA() {
-    return dataKA
-        .map((ka, index) => ({ ka, index }))
-        .filter(item => isWithinCurrentHour(item.ka));
+    return isPrinting
+        ? TIME_WINDOW.getShiftRows(dataKA)
+        : TIME_WINDOW.getWebRows(
+            dataKA,
+            getCurrentPreciseMinutes(),
+            (_, index) => persistedRows.has(index) && !dirtyRows.has(index),
+            CONFIG.shiftStart,
+            CONFIG.shiftEnd
+        );
 }
 
 function getVisibleIds() {
@@ -313,18 +282,9 @@ function getStatusColor(ka) {
      * Peringatan keterlambatan tinggi diperiksa lebih dahulu
      * agar tidak tertimpa kategori keterlambatan biasa.
      */
-    if (
-        WARNING_KETERLAMBATAN_TINGGI_AKTIF &&
-        selisih >= BATAS_TELAT_TINGGI_MENIT
-    ) {
-        return 'telat-tinggi';
-    }
-
-    if (
-        WARNING_KETERLAMBATAN_AKTIF &&
-        selisih > BATAS_TELAT_MENIT
-    ) {
-        return 'telat';
+    const delayStatus = TIME_WINDOW.getDelayStatus(selisih, SETTINGS);
+    if (delayStatus !== 'tepat') {
+        return delayStatus;
     }
 
     if (selisih < -BATAS_CEPAT_MENIT) {
@@ -559,7 +519,7 @@ function stateBaris(index) {
 
     if (
         savedRows.has(index) ||
-        (dataKA[index] && dataKA[index].realisasi_ka_id)
+        persistedRows.has(index)
     ) {
         return 'saved';
     }
@@ -593,7 +553,7 @@ function simpanBaris(index) {
     isDirty = true;
 
     refreshRowButtons();
-    simpanRealisasi({ otomatis: true, index });
+    simpanRealisasi({ index });
 }
 
 /* =====================================================
@@ -603,8 +563,10 @@ function simpanBaris(index) {
 function createCheckGroup(value, index, field) {
     const yesClass = value === 'yes' ? 'active-yes' : 'inactive';
     const noClass = value === 'no' ? 'active-no' : 'inactive';
+    const printLabel = TIME_WINDOW.getCheckPrintLabel(value);
 
     return `
+        <span class="check-print-label">${printLabel}</span>
         <div class="check-group">
             <button type="button"
                 class="check ${yesClass}"
@@ -624,15 +586,6 @@ function createCheckGroup(value, index, field) {
 function createStatus(ka, index) {
     const color = getStatusColor(ka);
 
-    const labelMap = {
-        belum: 'BELUM',
-        tepat: 'JALAN',
-        telat: 'TERLAMBAT',
-        'telat-tinggi': 'TELAT TINGGI',
-        cepat: 'LEBIH CEPAT',
-        batal: 'BATAL'
-    };
-
     const jalanClassMap = {
         tepat: 'is-tepat',
         telat: 'is-telat',
@@ -646,30 +599,43 @@ function createStatus(ka, index) {
 
     const batalActive = ka.status === 'BATAL' ? 'is-batal' : '';
     const note = getStatusNote(ka, color);
+    const selisih = ka.status === 'JALAN' ? getSelisihMenit(ka) : null;
+    const printDelayNote = selisih !== null && selisih > 0
+        ? TIME_WINDOW.getPrintDelayNote(selisih, SETTINGS)
+        : note;
+    const printLabel = ka.status === 'JALAN' || ka.status === 'BATAL'
+        ? ka.status
+        : 'BELUM';
 
     return `
-        <div class="status-badge ${color}">
-            ${labelMap[color] || 'BELUM'}
-        </div>
+        <span class="status-print-label">${printLabel}</span>
 
         <div class="status-group">
             <button type="button"
                 class="status-btn btn-jalan ${jalanActive}"
                 onclick="setStatus(${index}, 'JALAN')"
+                aria-label="Tandai KA ${escapeHtml(ka.nomor)} berjalan"
+                title="Jalan"
                 aria-pressed="${ka.status === 'JALAN'}">
-                JALAN
+                ✓
             </button>
 
             <button type="button"
                 class="status-btn btn-batal ${batalActive}"
                 onclick="setStatus(${index}, 'BATAL')"
+                aria-label="Tandai KA ${escapeHtml(ka.nomor)} batal"
+                title="Batal"
                 aria-pressed="${ka.status === 'BATAL'}">
-                BATAL
+                ✕
             </button>
         </div>
 
         ${note
             ? `<div class="status-note ${color}">${escapeHtml(note)}</div>`
+            : ''}
+
+        ${printDelayNote
+            ? `<div class="status-note-print ${color}">${escapeHtml(printDelayNote)}</div>`
             : ''}
     `;
 }
@@ -695,6 +661,7 @@ function renderTable() {
     }
 
     const awasInfo = cariAwas2Arah();
+    const bersamaanIndexes = TIME_WINDOW.getSimultaneousRowIndexes(dataKA);
     updateAwasBanner(awasInfo);
 
     const visibleKA = getVisibleKA();
@@ -704,7 +671,7 @@ function renderTable() {
     if (!visibleKA.length) {
         const message = dataKA.length === 0
             ? 'Belum ada jadwal KA untuk dinas aktif ini.'
-            : 'Tidak ada KA dalam rentang jam ini.';
+            : 'Tidak ada KA belum dicatat dalam 60 menit ke depan.';
 
         tbody.innerHTML = `
             <tr>
@@ -722,17 +689,22 @@ function renderTable() {
         return;
     }
 
-    visibleKA.forEach(({ ka, index }, visibleIndex) => {
+    visibleKA.forEach(({ ka, index }) => {
         const row = document.createElement('tr');
         row.dataset.index = index;
 
         if (awasInfo.indexSet.has(index)) {
             row.classList.add('awas-row');
         }
+        if (bersamaanIndexes.has(index)) {
+            row.classList.add('bersamaan-row');
+        }
+
+        const relasi = ka.relasi || [ka.hulu, ka.hilir]
+            .filter(Boolean)
+            .join(' – ') || '-';
 
         row.innerHTML = `
-            <td>${visibleIndex + 1}</td>
-
             <td>
                 <strong>${escapeHtml(ka.nomor)}</strong>
                 ${ka.is_manual
@@ -742,14 +714,15 @@ function renderTable() {
 
             <td>
                 ${escapeHtml(ka.nama)}
+                ${bersamaanIndexes.has(index)
+                    ? '<div class="bersamaan-badge"><span class="screen-only">⚠ BERSAMAAN</span><span class="print-only">BERSAMAAN</span></div>'
+                    : ''}
                 ${awasInfo.indexSet.has(index)
                     ? '<div class="awas-badge">⚠ AWAS 2 ARAH</div>'
                     : ''}
             </td>
 
-            <td>${escapeHtml(ka.hulu || '-')}</td>
-            <td>${escapeHtml(ka.hilir || '-')}</td>
-            <td>${escapeHtml(ka.relasi || '-')}</td>
+            <td>${escapeHtml(relasi)}</td>
             <td>${escapeHtml(ka.jadwal)}</td>
 
             <td>
@@ -757,6 +730,7 @@ function renderTable() {
                     class="actual-time"
                     value="${escapeHtml(ka.aktual)}"
                     onchange="updateActualTime(${index}, this.value)">
+                <span class="actual-time-print">${escapeHtml(ka.aktual || '-')}</span>
             </td>
 
             <td>${createStatus(ka, index)}</td>
@@ -772,6 +746,7 @@ function renderTable() {
                     value="${escapeHtml(ka.keterangan)}"
                     placeholder="Keterangan"
                     oninput="updateKeterangan(${index}, this.value)">
+                <span class="note-input-print">${escapeHtml(ka.keterangan || '-')}</span>
             </td>
 
             <td>${createRowAction(index)}</td>
@@ -796,47 +771,11 @@ function setStatus(index, status) {
         return;
     }
 
-    const fieldSemboyan = [
-        'semboyan21',
-        'genta',
-        'pintu',
-        'semboyan35'
-    ];
-
-    if (ka.status === status) {
-        ka.status = 'BELUM';
-        ka.aktual = '';
-
-        fieldSemboyan.forEach(field => {
-            if (ka[field] === 'no') {
-                ka[field] = '';
-            }
-        });
-    } else if (status === 'JALAN') {
-        const sebelumnya = ka.status;
-
-        ka.status = 'JALAN';
-        ka.aktual = getNowHHMM();
-
-        if (sebelumnya === 'BATAL') {
-            fieldSemboyan.forEach(field => {
-                if (ka[field] === 'no') {
-                    ka[field] = '';
-                }
-            });
-        }
-    } else {
-        ka.status = 'BATAL';
-        ka.aktual = '';
-
-        fieldSemboyan.forEach(field => {
-            ka[field] = 'no';
-        });
-    }
+    INTERACTIONS.toggleStatus(ka, status, getNowHHMM());
 
     incrementRowVersion(index);
+    tandaiBerubah(index);
     renderTable();
-    tandaiBerubah(JEDA_SIMPAN_STATUS, index);
 }
 
 function updateActualTime(index, value) {
@@ -847,8 +786,8 @@ function updateActualTime(index, value) {
     dataKA[index].aktual = value;
     incrementRowVersion(index);
 
+    tandaiBerubah(index);
     renderTable();
-    tandaiBerubah(JEDA_SIMPAN_STATUS, index);
 }
 
 function setCheck(button, index, field, value) {
@@ -856,22 +795,11 @@ function setCheck(button, index, field, value) {
         return;
     }
 
-    const group = button.parentElement;
-
-    group.querySelectorAll('.check').forEach(item => {
-        item.classList.remove('active-yes', 'active-no');
-        item.classList.add('inactive');
-    });
-
-    button.classList.remove('inactive');
-    button.classList.add(
-        value === 'yes' ? 'active-yes' : 'active-no'
-    );
-
-    dataKA[index][field] = value;
+    INTERACTIONS.setCheckValue(dataKA[index], field, value);
     incrementRowVersion(index);
 
-    tandaiBerubah(JEDA_SIMPAN_CHECK, index);
+    tandaiBerubah(index);
+    renderTable();
 }
 
 function updateKeterangan(index, value) {
@@ -882,7 +810,7 @@ function updateKeterangan(index, value) {
     dataKA[index].keterangan = value;
     incrementRowVersion(index);
 
-    tandaiBerubah(JEDA_SIMPAN_KETIK, index);
+    tandaiBerubah(index);
 }
 
 /* =====================================================
@@ -890,33 +818,8 @@ function updateKeterangan(index, value) {
 ===================================================== */
 
 function updateSummary() {
-    const visibleData = getVisibleKA().map(item => item.ka);
-    const total = visibleData.length;
-
-    let tepat = 0;
-    let telat = 0;
-    let cepat = 0;
-    let batal = 0;
-    let belum = 0;
-
-    visibleData.forEach(ka => {
-        const color = getStatusColor(ka);
-
-        if (color === 'tepat') {
-            tepat++;
-        } else if (
-            color === 'telat' ||
-            color === 'telat-tinggi'
-        ) {
-            telat++;
-        } else if (color === 'cepat') {
-            cepat++;
-        } else if (color === 'batal') {
-            batal++;
-        } else {
-            belum++;
-        }
-    });
+    const { total, tepat, telat, cepat, batal, belum } =
+        TIME_WINDOW.summarizeShiftRows(dataKA, getStatusColor);
 
     const setText = (id, value) => {
         const element = document.getElementById(id);
@@ -959,17 +862,13 @@ function updateSummary() {
 }
 
 /* =====================================================
-   PENYIMPANAN OTOMATIS
+   PENYIMPANAN MANUAL
 ===================================================== */
 
 let isSaving = false;
 let isDirty = false;
-let saveQueued = false;
-let queuedManual = false;
-let saveGagal = false;
-
-let autoSaveTimer = null;
-let retryTimer = null;
+const queuedSaveIndexes = new Set();
+let allowUnloadWithUnsavedChanges = false;
 
 function setSaveStatus(state, text) {
     const box = document.getElementById('saveStatus');
@@ -984,21 +883,13 @@ function setSaveStatus(state, text) {
     }
 }
 
-function tandaiBerubah(delay = JEDA_SIMPAN_STATUS, index) {
+function tandaiBerubah(index) {
     isDirty = true;
-
-    if (index !== undefined && index !== null) {
-        dirtyRows.add(index);
-    }
+    dirtyRows.add(index);
+    savedRows.delete(index);
 
     setSaveStatus('pending', 'Perubahan belum disimpan…');
     refreshRowButtons();
-
-    clearTimeout(autoSaveTimer);
-
-    autoSaveTimer = setTimeout(() => {
-        simpanRealisasi({ otomatis: true });
-    }, delay);
 }
 
 function ambilCsrfToken() {
@@ -1016,51 +907,58 @@ function formatJamStatusSimpan() {
 }
 
 async function simpanRealisasi(options = {}) {
-    const otomatis = options.otomatis === true;
     const tombol = document.getElementById('simpanBtn');
+    const labelTombol = tombol?.querySelector('[data-save-label]');
 
     if (dataKA.length === 0) {
-        if (!otomatis) {
-            alert('Belum ada data KA untuk disimpan.');
-        }
+        alert('Belum ada data KA untuk disimpan.');
+        return;
+    }
 
+    const targetIndexes = INTERACTIONS.getSaveIndexes(
+        [...dirtyRows],
+        options.index,
+        options.indices
+    ).filter(index => Number.isInteger(index) && index >= 0 && dataKA[index]);
+
+    if (options.index !== undefined && targetIndexes.length === 1) {
+        dirtyRows.add(targetIndexes[0]);
+        isDirty = true;
+    }
+
+    const indexesToSave = [...new Set(targetIndexes)].filter(index => dirtyRows.has(index));
+
+    if (indexesToSave.length === 0) {
+        setSaveStatus('idle', 'Tidak ada perubahan untuk disimpan.');
         return;
     }
 
     if (isSaving) {
-        saveQueued = true;
-
-        if (!otomatis) {
-            queuedManual = true;
-        }
-
+        indexesToSave.forEach(index => queuedSaveIndexes.add(index));
         return;
     }
-
-    clearTimeout(autoSaveTimer);
-    clearTimeout(retryTimer);
 
     isSaving = true;
 
     const versiDikirim = new Map();
-    const barisDikirim = new Set(dirtyRows);
-
-    dataKA.forEach((_, index) => {
+    const barisDikirim = new Set(indexesToSave);
+    const snapshot = indexesToSave.map(index => {
         versiDikirim.set(index, getRowVersion(index));
+        return { ...dataKA[index] };
     });
 
-    const snapshot = JSON.parse(JSON.stringify(dataKA));
-
-    isDirty = false;
     savingRows = new Set(barisDikirim);
-    dirtyRows = new Set();
 
     refreshRowButtons();
     setSaveStatus('saving', 'Menyimpan…');
 
-    if (!otomatis && tombol) {
+    if (tombol) {
         tombol.disabled = true;
-        tombol.textContent = 'Menyimpan...';
+        if (labelTombol) {
+            labelTombol.textContent = 'Menyimpan...';
+        } else {
+            tombol.textContent = 'Menyimpan...';
+        }
     }
 
     try {
@@ -1071,7 +969,10 @@ async function simpanRealisasi(options = {}) {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': ambilCsrfToken()
             },
-            body: JSON.stringify({ data: snapshot })
+            body: JSON.stringify({
+                save_mode: options.index === undefined ? 'batch' : 'row',
+                data: snapshot
+            })
         });
 
         const contentType = response.headers.get('content-type') || '';
@@ -1117,24 +1018,28 @@ async function simpanRealisasi(options = {}) {
             throw error;
         }
 
-        if (Array.isArray(result.data)) {
-            result.data.forEach(item => {
-                const index = Number(item.index);
+        const confirmedRows = TIME_WINDOW.getConfirmedRows(
+            result.data,
+            indexesToSave
+        );
 
-                if (
-                    Number.isInteger(index) &&
-                    index >= 0 &&
-                    dataKA[index] &&
-                    item.realisasi_ka_id !== undefined &&
-                    item.realisasi_ka_id !== null
-                ) {
-                    dataKA[index].realisasi_ka_id =
-                        item.realisasi_ka_id;
-                }
-            });
-        }
+        const snapshotByIndex = new Map(
+            indexesToSave.map((index, payloadIndex) => [index, snapshot[payloadIndex]])
+        );
+
+        confirmedRows.forEach((realizationId, index) => {
+            dataKA[index].realisasi_ka_id = realizationId;
+        });
 
         barisDikirim.forEach(index => {
+            const savedSnapshot = snapshotByIndex.get(index);
+
+            if (TIME_WINDOW.hasRecordedRealization(savedSnapshot)) {
+                persistedRows.add(index);
+            } else {
+                persistedRows.delete(index);
+            }
+
             if (
                 getRowVersion(index) === versiDikirim.get(index)
             ) {
@@ -1146,24 +1051,15 @@ async function simpanRealisasi(options = {}) {
         });
 
         savingRows = new Set();
-        saveGagal = false;
+        isDirty = dirtyRows.size > 0;
+        refreshTimeFilter();
 
-        if (dirtyRows.size > 0 || isDirty) {
-            isDirty = true;
-
+        if (isDirty) {
             setSaveStatus(
                 'pending',
                 'Ada perubahan baru yang belum disimpan…'
             );
-
-            clearTimeout(autoSaveTimer);
-
-            autoSaveTimer = setTimeout(() => {
-                simpanRealisasi({ otomatis: true });
-            }, JEDA_SIMPAN_STATUS);
         } else {
-            isDirty = false;
-
             const jam = formatJamStatusSimpan();
 
             if (result.serah_terima_sinkron === false) {
@@ -1174,14 +1070,12 @@ async function simpanRealisasi(options = {}) {
             } else {
                 setSaveStatus(
                     'saved',
-                    otomatis
-                        ? `Tersimpan otomatis pukul ${jam}`
-                        : `Tersimpan pukul ${jam}`
+                    `Tersimpan pukul ${jam}`
                 );
             }
         }
 
-        if (!otomatis) {
+        if (options.index === undefined) {
             alert(
                 result.message ||
                 'Realisasi KA berhasil disimpan ke database.'
@@ -1191,38 +1085,18 @@ async function simpanRealisasi(options = {}) {
     } catch (error) {
         console.error('Gagal menyimpan realisasi:', error);
 
-        saveGagal = true;
         isDirty = true;
 
         barisDikirim.forEach(index => dirtyRows.add(index));
         savingRows = new Set();
-
-        if (error.permanen) {
-            setSaveStatus(
-                'error',
-                `Gagal menyimpan: ${error.message}`
-            );
-        } else {
-            setSaveStatus(
-                'error',
-                'Gagal menyimpan. Mencoba lagi otomatis…'
-            );
-
-            clearTimeout(retryTimer);
-
-            retryTimer = setTimeout(() => {
-                if (navigator.onLine && isDirty) {
-                    simpanRealisasi({ otomatis: true });
-                }
-            }, JEDA_COBA_ULANG);
-        }
-
-        if (!otomatis) {
-            alert(
-                'Realisasi belum berhasil disimpan.\n\n' +
-                error.message
-            );
-        }
+        setSaveStatus(
+            'error',
+            `Gagal menyimpan: ${error.message}. Tekan Simpan untuk mencoba lagi.`
+        );
+        alert(
+            'Realisasi belum berhasil disimpan.\n\n' +
+            error.message
+        );
     } finally {
         isSaving = false;
 
@@ -1230,82 +1104,35 @@ async function simpanRealisasi(options = {}) {
 
         if (tombol) {
             tombol.disabled = false;
-            tombol.textContent = '▣  Simpan Semua';
+            if (labelTombol) {
+                labelTombol.textContent = 'Simpan Semua';
+            } else {
+                tombol.textContent = 'Simpan Semua';
+            }
         }
 
-        if (saveQueued) {
-            const manual = queuedManual;
+        if (queuedSaveIndexes.size > 0) {
+            const queuedIndexes = [...queuedSaveIndexes];
+            queuedSaveIndexes.clear();
 
-            saveQueued = false;
-            queuedManual = false;
-
-            if (isDirty || manual) {
-                simpanRealisasi({ otomatis: !manual });
+            if (queuedIndexes.some(index => dirtyRows.has(index))) {
+                simpanRealisasi({ indices: queuedIndexes });
             }
         }
     }
 }
 
-async function tungguSimpanSelesai() {
-    while (isSaving) {
-        await sleep(150);
-    }
-
-    if (isDirty) {
-        await simpanRealisasi({ otomatis: true });
-    }
-
-    while (isSaving) {
-        await sleep(150);
-    }
-
-    return !isDirty && !saveGagal;
-}
-
-function kirimSisaPerubahan() {
-    if (!isDirty || isSaving || dataKA.length === 0) {
-        return;
-    }
-
-    fetch(CONFIG.storeUrl, {
-        method: 'POST',
-        keepalive: true,
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': ambilCsrfToken()
-        },
-        body: JSON.stringify({ data: dataKA })
-    }).catch(error => {
-        console.error('Gagal mengirim sisa perubahan:', error);
-    });
-}
-
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-        kirimSisaPerubahan();
-    }
-});
-
-window.addEventListener('pagehide', kirimSisaPerubahan);
-
 window.addEventListener('beforeunload', event => {
-    if (isDirty && saveGagal) {
+    if ((isDirty || isSaving) && !allowUnloadWithUnsavedChanges) {
         event.preventDefault();
         event.returnValue = '';
-    }
-});
-
-window.addEventListener('online', () => {
-    if (isDirty) {
-        simpanRealisasi({ otomatis: true });
     }
 });
 
 window.addEventListener('offline', () => {
     setSaveStatus(
         'error',
-        'Tidak ada koneksi. Perubahan akan disimpan saat online.'
+        'Tidak ada koneksi. Perubahan tetap tersimpan sementara di halaman.'
     );
 });
 
@@ -1313,37 +1140,19 @@ window.addEventListener('offline', () => {
    TOMBOL SELESAI
 ===================================================== */
 
-const selesaiLink = document.getElementById('selesaiLink');
-
-if (selesaiLink) {
-    selesaiLink.addEventListener('click', async event => {
-        if (!isDirty && !isSaving && !saveGagal) {
-            return;
-        }
-
-        event.preventDefault();
-
-        const berhasil = await tungguSimpanSelesai();
-
-        if (berhasil) {
-            window.location.href = selesaiLink.href;
-            return;
-        }
-
-        const lanjut = confirm(
-            'Sebagian data belum berhasil tersimpan.\n\n' +
-            'Tetap lanjut ke Serah Terima Dinas?'
-        );
-
-        if (lanjut) {
-            window.location.href = selesaiLink.href;
-        }
-    });
-}
-
 function cetakDokumen() {
     window.print();
 }
+
+window.addEventListener('beforeprint', () => {
+    isPrinting = true;
+    renderTable();
+});
+
+window.addEventListener('afterprint', () => {
+    isPrinting = false;
+    renderTable();
+});
 
 /* =====================================================
    TAMBAH KA MANUAL
@@ -1422,8 +1231,6 @@ function resetFormManual() {
     [
         'manualNomor',
         'manualNama',
-        'manualHulu',
-        'manualHilir',
         'manualRelasi',
         'manualAktual',
         'manualKeterangan'
@@ -1446,8 +1253,6 @@ function ambilNilaiInput(id) {
 function tambahKAManual() {
     const nomor = ambilNilaiInput('manualNomor');
     const nama = ambilNilaiInput('manualNama');
-    const hulu = ambilNilaiInput('manualHulu');
-    const hilir = ambilNilaiInput('manualHilir');
     const relasi = ambilNilaiInput('manualRelasi');
     const keterangan = ambilNilaiInput('manualKeterangan');
     const aktual = ambilNilaiInput('manualAktual') || getNowHHMM();
@@ -1468,8 +1273,8 @@ function tambahKAManual() {
         no: dataKA.length + 1,
         nomor,
         nama,
-        hulu,
-        hilir,
+        hulu: '',
+        hilir: '',
         relasi,
         arah: '',
         jadwal: '-',
@@ -1494,7 +1299,7 @@ function tambahKAManual() {
 
     renderTable();
     toggleFormTambahKA(false);
-    tandaiBerubah(JEDA_SIMPAN_STATUS, indexBaru);
+    tandaiBerubah(indexBaru);
 }
 
 document.addEventListener('keydown', event => {
@@ -1609,7 +1414,7 @@ function initCatatanModal() {
     }
 
     if (form) {
-        form.addEventListener('submit', async event => {
+        form.addEventListener('submit', event => {
             if (sedangKirim) {
                 event.preventDefault();
                 return;
@@ -1630,21 +1435,20 @@ function initCatatanModal() {
             sedangKirim = true;
             setTombol(true, 'Menyimpan...');
 
-            if (isDirty || isSaving || saveGagal) {
-                const berhasil = await tungguSimpanSelesai();
+            if (isDirty || isSaving) {
+                const lanjut = confirm(
+                    'Ada perubahan Realisasi KA yang belum disimpan.\n\n' +
+                    'Simpan Realisasi KA melalui tombol Simpan terlebih dahulu, ' +
+                    'atau lanjut tanpa menyimpan perubahan tersebut?'
+                );
 
-                if (!berhasil) {
-                    const lanjut = confirm(
-                        'Sebagian data realisasi KA belum berhasil tersimpan.\n\n' +
-                        'Tetap simpan catatan dinas?'
-                    );
-
-                    if (!lanjut) {
-                        sedangKirim = false;
-                        setTombol(false, labelAwal);
-                        return;
-                    }
+                if (!lanjut) {
+                    sedangKirim = false;
+                    setTombol(false, labelAwal);
+                    return;
                 }
+
+                allowUnloadWithUnsavedChanges = true;
             }
 
             form.submit();
@@ -1695,7 +1499,7 @@ function initRealisasiKA() {
 
     updateWindowRange();
 
-    setSaveStatus('idle', 'Penyimpanan otomatis aktif');
+    setSaveStatus('idle', 'Perubahan disimpan hanya melalui tombol Simpan.');
 
     initCatatanModal();
 

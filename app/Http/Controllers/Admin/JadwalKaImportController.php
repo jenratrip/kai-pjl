@@ -8,6 +8,7 @@ use App\Models\JadwalKa;
 use App\Models\JadwalKaBatch;
 use App\Models\Jpl;
 use App\Models\KeretaApi;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -270,7 +271,7 @@ class JadwalKaImportController extends Controller
     /**
      * Menyimpan jadwal setelah pengguna mengonfirmasi preview.
      */
-    public function confirm(Request $request)
+    public function confirm(Request $request, ActivityLogService $activityLogService)
     {
         $request->validate([
             'token' => ['required', 'uuid'],
@@ -360,7 +361,8 @@ class JadwalKaImportController extends Controller
                 $tanggalBerlaku,
                 &$inserted,
                 &$skipped,
-                &$duplicates
+                &$duplicates,
+                $activityLogService
             ) {
                 $batchRecord = JadwalKaBatch::create([
                     'uuid' => $batch,
@@ -509,6 +511,21 @@ class JadwalKaImportController extends Controller
                 }
 
                 $batchRecord->jpls()->sync(array_values($jplIds));
+
+                $activityLogService->log(
+                    'import',
+                    'jadwal_ka',
+                    'Import batch jadwal KA berhasil dikonfirmasi.',
+                    $batchRecord,
+                    null,
+                    [
+                        'status' => 'draft',
+                        'tanggal_mulai_berlaku' => $tanggalBerlaku,
+                        'imported_count' => $inserted,
+                        'skipped_count' => $skipped,
+                        'covered_jpl_count' => count($jplIds),
+                    ]
+                );
 
                 $spreadsheet->disconnectWorksheets();
             });

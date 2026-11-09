@@ -21,14 +21,39 @@
             </div>
         </div>
 
-        <a href="{{ url('/user/dashboard') }}">
-            <span class="menu-icon">⌂</span>
-            Dashboard
-        </a>
-
         <a href="{{ url('/user/realisasi-ka') }}">
             <span class="menu-icon">▣</span>
             Jadwal KA
+        </a>
+
+        <a
+            href="{{ route('user.coaching-messages.index') }}"
+            class="{{ request()->routeIs('user.coaching-messages.*') ? 'active' : '' }}"
+            @if(request()->routeIs('user.coaching-messages.*')) aria-current="page" @endif
+        >
+            <span class="menu-icon">✉</span>
+            <span class="flex min-w-0 flex-1 items-center justify-between gap-2">
+                <span>Pesan Pembinaan</span>
+                @if (isset($unreadCount))
+                    <span
+                        class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800"
+                        data-coaching-unread-count
+                        data-count="{{ $unreadCount }}"
+                        data-label="baru"
+                        aria-label="{{ $unreadCount }} pesan belum dibaca"
+                        @if ($unreadCount === 0) hidden @endif
+                    >{{ $unreadCount }} baru</span>
+                @endif
+            </span>
+        </a>
+
+        <a
+            href="{{ route('user.inventaris.index') }}"
+            class="{{ request()->routeIs('user.inventaris.*') ? 'active' : '' }}"
+            @if(request()->routeIs('user.inventaris.*')) aria-current="page" @endif
+        >
+            <span class="menu-icon">▣</span>
+            Inventaris
         </a>
 
         <a href="{{ route('user.serah-terima-dinas') }}">
@@ -38,8 +63,8 @@
 
         <a
             href="{{ url('/user/catatan-dinas') }}"
-            class="active"
-            aria-current="page"
+            class="{{ request()->routeIs('user.catatan-dinas*') ? 'active' : '' }}"
+            @if(request()->routeIs('user.catatan-dinas*')) aria-current="page" @endif
         >
             <span class="menu-icon">◧</span>
             Catatan Dinas

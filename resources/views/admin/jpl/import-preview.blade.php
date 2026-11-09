@@ -83,39 +83,6 @@
 
     @endif
 
-    {{-- WILAYAH --}}
-    <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-
-            <div>
-
-                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Wilayah Tujuan
-                </p>
-
-                <h2 class="mt-1 text-xl font-bold text-[#1d2d50]">
-                    {{ $wilayahName }}
-                </h2>
-
-            </div>
-
-            <div class="rounded-xl bg-blue-50 px-4 py-3">
-
-                <p class="text-xs text-blue-600">
-                    Resort dari Excel akan dihubungkan
-                </p>
-
-                <p class="mt-1 text-sm font-semibold text-blue-800">
-                    ke wilayah ini
-                </p>
-
-            </div>
-
-        </div>
-
-    </div>
-
     {{-- STATISTIK --}}
     <div class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
 
@@ -217,22 +184,22 @@
             @else
 
                 <p class="mt-4 text-sm text-gray-500">
-                    Tidak ada Resort yang cocok dengan wilayah tujuan.
+                    Tidak ada Resort yang cocok pada data yang tersedia.
                 </p>
 
             @endif
 
         </div>
 
-        {{-- RESORT BARU --}}
+    {{-- RESORT YANG BELUM TERSEDIA --}}
         <div class="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
 
             <h2 class="font-semibold text-amber-900">
-                Resort yang Akan Dibuat
+                Resort yang Belum Tersedia
             </h2>
 
             <p class="mt-1 text-xs text-amber-700">
-                Resort baru akan dibuat otomatis saat konfirmasi.
+                Resort baru akan dibuat ketika import dikonfirmasi. Nama Resort yang ambigu akan ditandai error.
             </p>
 
             @if(count($newResortNames) > 0)
@@ -252,7 +219,7 @@
             @else
 
                 <p class="mt-4 text-sm text-amber-700">
-                    Semua Resort sudah tersedia.
+                    Tidak ada Resort baru yang terdeteksi.
                 </p>
 
             @endif
@@ -591,7 +558,7 @@
                         <form
                             action="{{ route($prefix . '.jpl.import.confirm') }}"
                             method="POST"
-                            onsubmit="return confirm('Lanjutkan import JPL? Hanya data valid yang akan disimpan. Data error dan duplikat akan dilewati. Resort baru akan dibuat otomatis.')"
+                            onsubmit="return confirm('Lanjutkan import JPL? Hanya data valid yang menggunakan Resort tersedia akan disimpan. Data error dan duplikat akan dilewati.')"
                         >
                             @csrf
 

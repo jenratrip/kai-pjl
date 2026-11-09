@@ -1,4 +1,4 @@
-@extends('layouts.admin')
+@extends(auth()->user()?->isSuperadmin() ? 'layouts.superadmin' : 'layouts.admin')
 
 @section('content')
 <div class="min-h-screen bg-slate-50">
@@ -56,21 +56,18 @@
                     Arsip Jadwal
                 </a>
 
+                @unless (auth()->user()?->isSuperadmin())
                     {{-- IMPORT EXCEL --}}
-                <a
-                    href="{{ route('admin.jadwal-ka.import') }}"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-200"
-                >
-                    <svg class="h-5 w-5"
-                         viewBox="0 0 24 24"
-                         fill="none"
-                         stroke="currentColor"
-                         stroke-width="1.8">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                              d="M12 16V4m0 0L7 9m5-5 5 5M5 15v4a1 1 0 001 1h12a1 1 0 001-1v-4"/>
-                    </svg>
-                    Import Excel
-                </a>
+                    <a
+                        href="{{ route('admin.jadwal-ka.import') }}"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-200"
+                    >
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L7 9m5-5 5 5M5 15v4a1 1 0 001 1h12a1 1 0 001-1v-4"/>
+                        </svg>
+                        Import Excel
+                    </a>
+                @endunless
             </div>
         </div>
 
@@ -171,7 +168,11 @@
             <div class="border-b border-slate-200 p-5 sm:p-6">
                 <h2 class="text-lg font-bold text-slate-900">Batch Jadwal KA</h2>
                 <p class="mt-1 text-sm text-slate-500">
-                    Jadwalkan batch draft. Batch terjadwal, aktif, dan arsip ditampilkan sebagai informasi.
+                    @if (auth()->user()?->isSuperadmin())
+                        Informasi versi jadwal untuk keperluan pengawasan.
+                    @else
+                        Jadwalkan batch draft. Batch terjadwal, aktif, dan arsip ditampilkan sebagai informasi.
+                    @endif
                 </p>
             </div>
 
@@ -183,7 +184,9 @@
                             <th class="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
                             <th class="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Tanggal efektif</th>
                             <th class="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">JPL yang termasuk</th>
-                            <th class="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Pengelolaan</th>
+                            @unless (auth()->user()?->isSuperadmin())
+                                <th class="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Pengelolaan</th>
+                            @endunless
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 bg-white">
@@ -222,7 +225,8 @@
                                         <span class="text-sm text-slate-500">Belum ada JPL tercatat</span>
                                     @endif
                                 </td>
-                                <td class="min-w-64 px-5 py-4">
+                                @unless (auth()->user()?->isSuperadmin())
+                                    <td class="min-w-64 px-5 py-4">
                                     @if ($batch->status === 'draft')
                                         <form method="POST" action="{{ route('admin.jadwal-ka-batches.schedule', $batch) }}" class="space-y-3">
                                             @csrf
@@ -252,11 +256,12 @@
                                     @else
                                         <p class="text-sm text-slate-500">Informasi arsip.</p>
                                     @endif
-                                </td>
+                                    </td>
+                                @endunless
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="px-5 py-10 text-center text-sm text-slate-500">
+                                <td colspan="{{ auth()->user()?->isSuperadmin() ? 4 : 5 }}" class="px-5 py-10 text-center text-sm text-slate-500">
                                     Belum ada batch Jadwal KA.
                                 </td>
                             </tr>

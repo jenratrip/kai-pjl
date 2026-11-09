@@ -12,6 +12,8 @@ use LogicException;
 
 class JadwalKaVersionService
 {
+    public function __construct(private ActivityLogService $activityLogService) {}
+
     /**
      * Schedule a draft batch and update its per-JPL effective date ranges.
      */
@@ -43,6 +45,7 @@ class JadwalKaVersionService
             $this->assertBatchHasSchedules($batchId, $jplIds);
             $ranges = $this->buildRanges($batches, $scopes, $batchId, $effectiveDate);
 
+            $oldStatus = $batch->status;
             $batch->tanggal_mulai_berlaku = $effectiveDate->toDateString();
             $batch->status = $effectiveDate->isSameDay($today) ? 'active' : 'scheduled';
             $batch->save();
@@ -54,6 +57,31 @@ class JadwalKaVersionService
                 $this->activateBatchForJpls($batchId, $effectiveJplIds);
                 $this->archiveExpiredBatches($batches, $today, $batchId);
             }
+
+            $effectiveJplIds = $batch->status === 'active'
+                ? $this->effectiveJplIds($ranges, $batchId, $today)
+                : $jplIds;
+            $this->activityLogService->log(
+                $batch->status === 'active' ? 'activate' : 'schedule',
+                'jadwal_ka',
+                $batch->status === 'active'
+                    ? 'Batch jadwal KA diaktifkan.'
+                    : 'Batch jadwal KA dijadwalkan.',
+                $batch,
+                [
+                    'status' => $oldStatus,
+                ],
+                [
+                    'status' => $batch->status,
+                    'tanggal_mulai_berlaku' => $effectiveDate->toDateString(),
+                    'covered_jpl_count' => count($jplIds),
+                    'affected_jpl_count' => count($effectiveJplIds),
+                    'schedule_count' => JadwalKa::query()
+                        ->where('jadwal_ka_batch_id', $batchId)
+                        ->whereIn('jpl_id', $jplIds)
+                        ->count(),
+                ]
+            );
 
             return $batch->fresh(['jpls']);
         }, 3);
@@ -113,6 +141,7 @@ class JadwalKaVersionService
             $ranges = $this->buildRanges($batches, $scopes);
             $this->saveScopeEndDates($ranges);
             $effectiveJplIds = $this->effectiveJplIds($ranges, $batchId, $today);
+            $oldStatus = $batch->status;
 
             if ($effectiveJplIds !== []) {
                 $this->assertBatchHasSchedules($batchId, $effectiveJplIds);
@@ -124,6 +153,29 @@ class JadwalKaVersionService
 
             $batch->save();
             $this->archiveExpiredBatches($batches, $today, $batchId);
+
+            $this->activityLogService->log(
+                $batch->status === 'active' ? 'activate' : 'archive',
+                'jadwal_ka',
+                $batch->status === 'active'
+                    ? 'Batch jadwal KA terjadwal diaktifkan otomatis.'
+                    : 'Batch jadwal KA terjadwal diarsipkan karena tidak lagi memiliki rentang efektif.',
+                $batch,
+                [
+                    'status' => $oldStatus,
+                ],
+                [
+                    'status' => $batch->status,
+                    'tanggal_mulai_berlaku' => $batch->tanggal_mulai_berlaku?->toDateString(),
+                    'affected_jpl_count' => count($effectiveJplIds),
+                    'activated_schedule_count' => $effectiveJplIds === []
+                        ? 0
+                        : JadwalKa::query()
+                            ->where('jadwal_ka_batch_id', $batchId)
+                            ->whereIn('jpl_id', $effectiveJplIds)
+                            ->count(),
+                ]
+            );
 
             return true;
         }, 3);
@@ -358,8 +410,24 @@ class JadwalKaVersionService
                 static fn (object $scope): bool => $scope->tanggal_akhir_berlaku !== null
                     && $scope->tanggal_akhir_berlaku < $todayString
             )) {
+                $oldStatus = $batch->status;
                 $batch->status = 'archived';
                 $batch->save();
+
+                $this->activityLogService->log(
+                    'archive',
+                    'jadwal_ka',
+                    'Batch jadwal KA diarsipkan setelah seluruh cakupan JPL berakhir.',
+                    $batch,
+                    [
+                        'status' => $oldStatus,
+                    ],
+                    [
+                        'status' => 'archived',
+                        'ended_jpl_count' => $batchScopes->count(),
+                        'archived_on' => $todayString,
+                    ]
+                );
             }
         }
     }

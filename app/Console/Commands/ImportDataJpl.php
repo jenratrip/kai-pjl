@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Models\Jpl;
 use App\Models\Resort;
-use App\Models\Wilayah;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -20,8 +19,9 @@ class ImportDataJpl extends Command
     {
         $path = storage_path('app/imports/Data JPL.csv');
 
-        if (!File::exists($path)) {
+        if (! File::exists($path)) {
             $this->error("File tidak ditemukan: {$path}");
+
             return self::FAILURE;
         }
 
@@ -29,15 +29,17 @@ class ImportDataJpl extends Command
 
         if ($handle === false) {
             $this->error('File CSV tidak dapat dibuka.');
+
             return self::FAILURE;
         }
 
         // CSV menggunakan delimiter titik koma (;).
         $header = fgetcsv($handle, 0, ';', '"', '\\');
 
-        if (!$header) {
+        if (! $header) {
             fclose($handle);
             $this->error('Header CSV tidak ditemukan.');
+
             return self::FAILURE;
         }
 
@@ -57,7 +59,6 @@ class ImportDataJpl extends Command
             'NAMA JLN / DAERAH',
             'KOTA / KABUPATEN',
             'STATUS PENJAGAAN',
-            'PROVINSI',
             'JENIS JALUR KA',
             'TITIK KOORDINAT',
         ];
@@ -70,6 +71,7 @@ class ImportDataJpl extends Command
             if ($index === false) {
                 fclose($handle);
                 $this->error("Kolom wajib tidak ditemukan: {$column}");
+
                 return self::FAILURE;
             }
 
@@ -84,6 +86,7 @@ class ImportDataJpl extends Command
 
         try {
             $line = 1;
+            $knownResorts = Resort::query()->get();
 
             while (($row = fgetcsv($handle, 0, ';', '"', '\\')) !== false) {
                 $line++;
@@ -94,39 +97,57 @@ class ImportDataJpl extends Command
                     fn ($value) => trim((string) $value) !== ''
                 )) === 0) {
                     $skipped++;
+
                     continue;
                 }
 
                 $get = function (string $column) use ($row, $indexes): string {
-                    return trim((string) ($row[$indexes[$column]] ?? ''));
+                    $index = $indexes[$column] ?? null;
+
+                    return $index === null
+                        ? ''
+                        : trim((string) ($row[$index] ?? ''));
                 };
 
                 $resortName = $get('RESORT');
                 $kodeJpl = $get('NO JPL');
                 $provinsi = $get('PROVINSI');
 
-                // Baris data harus mempunyai kode, resort, dan provinsi.
+                // Baris data harus mempunyai kode JPL dan resort.
                 if (
                     $resortName === '' ||
-                    $kodeJpl === '' ||
-                    $provinsi === ''
+                    $kodeJpl === ''
                 ) {
                     $skipped++;
+
                     continue;
                 }
 
-                $wilayah = Wilayah::firstOrCreate(
-                    ['nama_wilayah' => $provinsi],
-                    ['is_active' => true]
-                );
+                $resortMatches = $knownResorts
+                    ->filter(fn (Resort $resort): bool => mb_strtoupper(trim($resort->nama_resort)) === mb_strtoupper(trim($resortName)));
 
-                $resort = Resort::firstOrCreate(
-                    [
-                        'wilayah_id' => $wilayah->id,
+                if ($resortMatches->count() > 1) {
+                    throw new \RuntimeException(
+                        'Nama Resort "'.$resortName.'" cocok dengan beberapa data. Import dibatalkan; periksa Resort sebelum mencoba kembali.'
+                    );
+                }
+
+                if ($resortMatches->isNotEmpty()) {
+                    $resort = $resortMatches->first();
+
+                    if (! $resort->is_active) {
+                        throw new \RuntimeException(
+                            'Resort "'.$resortName.'" sedang nonaktif. Import dibatalkan; aktifkan Resort atau periksa file.'
+                        );
+                    }
+                } else {
+                    $resort = Resort::query()->create([
                         'nama_resort' => $resortName,
-                    ],
-                    ['is_active' => true]
-                );
+                        'is_active' => true,
+                    ]);
+
+                    $knownResorts->push($resort);
+                }
 
                 Jpl::updateOrCreate(
                     [
@@ -134,7 +155,7 @@ class ImportDataJpl extends Command
                         'resort_id' => $resort->id,
                     ],
                     [
-                        'nama_jpl' => $resortName . ' - JPL ' . $kodeJpl,
+                        'nama_jpl' => $resortName.' - JPL '.$kodeJpl,
                         'antara' => $get('ANTARA') ?: null,
                         'km_hm' => $get('KM / HM') ?: null,
                         'lokasi' => $get('NAMA JLN / DAERAH') ?: null,

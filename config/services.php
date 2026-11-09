@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'coaching_messages' => [
+        'api_key' => env('COACHING_MESSAGE_API_KEY'),
+        'shared_secret' => env('COACHING_MESSAGE_SHARED_SECRET'),
+        'source_system' => env('COACHING_MESSAGE_SOURCE_SYSTEM', 'sistem-pemeriksaan-jpl'),
+        'timestamp_tolerance_seconds' => (int) env('COACHING_MESSAGE_TIMESTAMP_TOLERANCE_SECONDS', 300),
+        'max_body_bytes' => (int) env('COACHING_MESSAGE_MAX_BODY_BYTES', 32768),
+    ],
+
 ];

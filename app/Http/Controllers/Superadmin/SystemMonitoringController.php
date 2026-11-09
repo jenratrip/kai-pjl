@@ -70,7 +70,16 @@ class SystemMonitoringController extends Controller
 
         $selectedLevel = strtoupper($validated['level'] ?? 'ALL');
         $search = trim($validated['search'] ?? '');
-        [$allErrors, $errorsToday, $logExists, $logReadable, $logsTruncated] = $this->readRecentErrors(
+        [
+            $allErrors,
+            $errorsToday,
+            $uniqueErrorGroupsToday,
+            $logExists,
+            $logReadable,
+            $logsTruncated,
+            $logCoverageComplete,
+            $logCoverageSummary,
+        ] = $this->readRecentErrors(
             $fromDate,
             $toDate,
             $selectedLevel,
@@ -99,10 +108,13 @@ class SystemMonitoringController extends Controller
             'integrity' => $integrity,
             'activitiesToday' => $activitiesToday,
             'errorsToday' => $errorsToday,
+            'uniqueErrorGroupsToday' => $uniqueErrorGroupsToday,
             'recentErrors' => $recentErrors,
             'logExists' => $logExists,
             'logReadable' => $logReadable,
             'logsTruncated' => $logsTruncated,
+            'logCoverageComplete' => $logCoverageComplete,
+            'logCoverageSummary' => $logCoverageSummary,
             'fromDate' => $fromDate->toDateString(),
             'toDate' => $toDate->toDateString(),
             'selectedLevel' => $selectedLevel,
@@ -382,6 +394,12 @@ class SystemMonitoringController extends Controller
                 ->orderBy('cakupan.jpl_id')
                 ->orderBy('batch.tanggal_mulai_berlaku')
                 ->orderBy('batch.id')
+                ->select([
+                    'cakupan.jadwal_ka_batch_id as batch_id',
+                    'cakupan.jpl_id',
+                    'batch.tanggal_mulai_berlaku',
+                    'cakupan.tanggal_akhir_berlaku',
+                ])
                 ->cursor();
 
             $overlaps = 0;
@@ -451,7 +469,7 @@ class SystemMonitoringController extends Controller
     }
 
     /**
-     * @return array{0: array<int, array<string, mixed>>, 1: int, 2: bool, 3: bool, 4: bool}
+     * @return array{0: array<int, array<string, mixed>>, 1: int, 2: int, 3: bool, 4: bool, 5: bool, 6: bool, 7: string}
      */
     private function readRecentErrors(
         CarbonImmutable $fromDate,
@@ -473,21 +491,44 @@ class SystemMonitoringController extends Controller
 
         usort($logFiles, fn (string $left, string $right): int => filemtime($right) <=> filemtime($left));
         $logExists = $logFiles !== [];
-        $logsTruncated = count($logFiles) > self::MAX_LOG_FILES;
+        $availableFileCount = count($logFiles);
+        $logsTruncated = $availableFileCount > self::MAX_LOG_FILES;
+        $coverageComplete = $logExists && ! $logsTruncated;
+        $coverageReasons = [];
+
+        if (! $logExists) {
+            $coverageReasons[] = 'file log tidak ditemukan';
+        } elseif ($logsTruncated) {
+            $coverageReasons[] = 'jumlah file melebihi batas pemindaian';
+        }
+
+        $availableBytes = array_sum(array_map(static fn (string $path): int => (int) (filesize($path) ?: 0), $logFiles));
         $logFiles = array_slice($logFiles, 0, self::MAX_LOG_FILES);
         $allErrors = [];
         $errorsToday = 0;
+        $uniqueErrorsToday = [];
+        $scannedBytes = 0;
         $logReadable = false;
 
         foreach ($logFiles as $logPath) {
             if (! is_readable($logPath)) {
+                $coverageComplete = false;
+                $coverageReasons[] = 'satu atau lebih file tidak dapat dibaca';
+
                 continue;
             }
 
             $logReadable = true;
             $size = filesize($logPath) ?: 0;
             $startOffset = max(0, $size - self::MAX_LOG_BYTES_PER_FILE);
+            $scannedBytes += $size - $startOffset;
             $logsTruncated = $logsTruncated || $startOffset > 0;
+
+            if ($startOffset > 0) {
+                $coverageComplete = false;
+                $coverageReasons[] = 'ukuran satu atau lebih file melebihi batas 2 MB';
+            }
+
             $logFile = new SplFileObject($logPath, 'r');
 
             if ($startOffset > 0) {
@@ -502,7 +543,7 @@ class SystemMonitoringController extends Controller
 
                 if (preg_match('/^\[([^\]]+)\]\s+[^.\s]+\.([A-Z]+):\s*(.*)$/i', $line, $matches)) {
                     if ($currentEntry !== null) {
-                        $this->appendEntryIfInRange($currentEntry, $fromDate, $toDate, $selectedLevel, $search, $allErrors, $errorsToday);
+                        $this->appendEntryIfInRange($currentEntry, $fromDate, $toDate, $selectedLevel, $search, $allErrors, $errorsToday, $uniqueErrorsToday);
                     }
 
                     $level = strtoupper($matches[2]);
@@ -552,20 +593,35 @@ class SystemMonitoringController extends Controller
             }
 
             if ($currentEntry !== null) {
-                $this->appendEntryIfInRange($currentEntry, $fromDate, $toDate, $selectedLevel, $search, $allErrors, $errorsToday);
+                $this->appendEntryIfInRange($currentEntry, $fromDate, $toDate, $selectedLevel, $search, $allErrors, $errorsToday, $uniqueErrorsToday);
             }
 
             unset($logFile, $currentEntry);
         }
 
         $logsTruncated = $logsTruncated || count($allErrors) >= self::MAX_LOG_ENTRIES;
+        $logCoverageSummary = $coverageComplete
+            ? sprintf('Lengkap: seluruh %d file log (%s) berhasil dipindai.', $availableFileCount, number_format($scannedBytes / 1_000_000, 2, ',', '.').' MB')
+            : sprintf(
+                'Parsial: %d dari %d file log diperiksa (%s dari %s). %s.',
+                count($logFiles),
+                $availableFileCount,
+                number_format($scannedBytes / 1_000_000, 2, ',', '.').' MB',
+                number_format($availableBytes / 1_000_000, 2, ',', '.').' MB tersedia',
+                implode('; ', array_unique($coverageReasons)),
+            );
 
-        return [$allErrors, $errorsToday, $logExists, $logReadable, $logsTruncated];
+        if (! $logReadable && $logExists) {
+            $logCoverageSummary = 'Parsial: tidak ada file log yang dapat dibaca; total error harian tidak dapat dipastikan.';
+        }
+
+        return [$allErrors, $errorsToday, count($uniqueErrorsToday), $logExists, $logReadable, $logsTruncated, $coverageComplete, $logCoverageSummary];
     }
 
     /**
      * @param  array<string, mixed>  $entry
      * @param  array<int, array<string, mixed>>  $allErrors
+     * @param  array<string, true>  $uniqueErrorsToday
      */
     private function appendEntryIfInRange(
         array $entry,
@@ -575,6 +631,7 @@ class SystemMonitoringController extends Controller
         string $search,
         array &$allErrors,
         int &$errorsToday,
+        array &$uniqueErrorsToday,
     ): void {
         if (empty($entry['timestamp'])) {
             return;
@@ -584,6 +641,13 @@ class SystemMonitoringController extends Controller
 
         if ($entryDate->isToday() && in_array($entry['level'], ['ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY'], true)) {
             $errorsToday++;
+            $fingerprint = hash('sha256', implode("\0", [
+                (string) $entry['level'],
+                (string) ($entry['file'] ?? ''),
+                (string) ($entry['line'] ?? ''),
+                (string) ($entry['message'] ?? ''),
+            ]));
+            $uniqueErrorsToday[$fingerprint] = true;
         }
 
         if ($entryDate->lt($fromDate) || $entryDate->gt($toDate)) {

@@ -355,7 +355,10 @@ class UserImportController extends Controller
 
         Cache::put(
             'user_import_preview:'.$previewToken,
-            $validRows,
+            [
+                'rows' => $validRows,
+                'failed_count' => count($errors),
+            ],
             now()->addMinutes(10)
         );
 
@@ -422,7 +425,7 @@ class UserImportController extends Controller
             'user_import_preview:'.
             $validated['token'];
 
-        $validRows = Cache::get($cacheKey);
+        $preview = Cache::get($cacheKey);
 
         /*
         |--------------------------------------------------------------------------
@@ -430,7 +433,7 @@ class UserImportController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if ($validRows === null) {
+        if ($preview === null) {
 
             return response()->json([
                 'success' => false,
@@ -446,7 +449,7 @@ class UserImportController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if (! is_array($validRows)) {
+        if (! is_array($preview)) {
 
             Cache::forget($cacheKey);
 
@@ -464,7 +467,14 @@ class UserImportController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if (count($validRows) === 0) {
+        $validRows = array_key_exists('rows', $preview)
+            ? $preview['rows']
+            : $preview;
+        $previewFailedCount = array_key_exists('rows', $preview)
+            ? (int) ($preview['failed_count'] ?? 0)
+            : 0;
+
+        if (! is_array($validRows) || count($validRows) === 0) {
 
             Cache::forget($cacheKey);
 
@@ -487,7 +497,7 @@ class UserImportController extends Controller
         try {
 
             $result = DB::transaction(
-                function () use ($validRows) {
+                function () use ($validRows, $previewFailedCount) {
 
                     $imported = 0;
 
@@ -741,36 +751,6 @@ class UserImportController extends Controller
 
                         /*
                         |--------------------------------------------------------------------------
-                        | Activity Log
-                        |--------------------------------------------------------------------------
-                        */
-
-                        $this->activityLogService->log(
-                            'create',
-                            'users',
-                            'Superadmin mengimport pengguna melalui Excel: '.
-                                $user->name,
-                            $user,
-                            null,
-                            [
-                                'nip' => $user->nip,
-
-                                'name' => $user->name,
-
-                                'email' => $user->email,
-
-                                'phone' => $user->phone,
-
-                                'role_id' => $user->role_id,
-
-                                'is_active' => $user->is_active,
-
-                                'import_source' => 'excel',
-                            ]
-                        );
-
-                        /*
-                        |--------------------------------------------------------------------------
                         | Counter
                         |--------------------------------------------------------------------------
                         */
@@ -783,6 +763,19 @@ class UserImportController extends Controller
                     | Return Hasil
                     |--------------------------------------------------------------------------
                     */
+
+                    $this->activityLogService->log(
+                        'import',
+                        'users',
+                        'Superadmin mengimpor akun pengguna melalui Excel.',
+                        null,
+                        null,
+                        [
+                            'imported_count' => $imported,
+                            'failed_count' => $previewFailedCount + count($failed),
+                            'import_source' => 'excel',
+                        ]
+                    );
 
                     return [
                         'imported' => $imported,

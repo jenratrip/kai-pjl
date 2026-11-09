@@ -1,6 +1,7 @@
 @extends('layouts.superadmin')
 
 @section('title', 'Detail Arsip Jadwal KA')
+@section('page-title', 'Detail Arsip Jadwal KA')
 
 @section('content')
 <div class="mx-auto max-w-7xl space-y-6">
@@ -20,7 +21,10 @@
                 @endif
             </p>
         </div>
-        <a href="{{ route('superadmin.jadwal-ka.arsip') }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Kembali ke Arsip</a>
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800">Riwayat · Hanya baca</span>
+            <a href="{{ route('superadmin.jadwal-ka.arsip') }}" class="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Kembali ke Arsip</a>
+        </div>
     </div>
 
     <div class="grid gap-4 sm:grid-cols-3">

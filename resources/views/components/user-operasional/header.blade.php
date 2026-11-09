@@ -3,14 +3,8 @@
 
     $namaPetugas = $petugas->name ?? 'Petugas';
 
-    // Dinas aktif: pakai yang dikirim layout ($dinasHeader) supaya tidak
-    // query dua kali. Jika header dipakai tanpa layout, cari sendiri.
-    $dinasSaatIni = $dinasHeader
-        ?? \App\Models\Dinas::with(['jpl', 'shift'])
-            ->where('user_id', $petugas?->id)
-            ->where('status', 'berlangsung')
-            ->latest('id')
-            ->first();
+    // Layout hanya menggunakan konteks Dinas yang disediakan oleh halaman.
+    $dinasSaatIni = $dinasHeader ?? ($dinasAktif ?? null);
 
     $nomorPjl = $dinasSaatIni?->jpl?->nomor_jpl
         ?? $petugas?->nomor_jpl
@@ -42,14 +36,15 @@
             id="opMenuButton"
             aria-label="Buka atau tutup sidebar"
             aria-controls="opSidebar"
-            aria-expanded="false"
+            :aria-expanded="sidebarOpen.toString()"
+            @click="sidebarOpen = !sidebarOpen"
         >
             <span></span>
             <span></span>
             <span></span>
         </button>
 
-        <a href="{{ url('/user/dashboard') }}" class="op-brand">
+        <a href="{{ route('user.realisasi-ka') }}" class="op-brand">
             <div class="op-brand-logo">
                 <img
                     src="{{ asset('images/logo-kai.jpg') }}"
@@ -80,5 +75,10 @@
                 </span>
             </div>
         </div>
+        <a href="{{ route('user.profile.show') }}"
+           class="op-header-avatar rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d2d50] focus-visible:ring-offset-2"
+           aria-label="Buka profil {{ $namaPetugas }}" title="Profil Saya">
+            <x-user-operasional.user-avatar :user="$petugas" size="h-10 w-10" />
+        </a>
     </div>
 </header>

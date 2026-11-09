@@ -16,17 +16,25 @@
                 </h1>
 
                 <p class="mt-1 text-sm text-gray-500">
-                    Import data JPL dari file Excel. Sistem akan menghubungkan
-                    data secara otomatis ke Wilayah Daop 6 dan Resort terkait.
+                    Import data JPL dari file Excel menggunakan Resort yang sudah tersedia.
                 </p>
             </div>
 
-            <a
-                href="{{ route('admin.jpl.index') }}"
-                class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-            >
-                Kembali
-            </a>
+            <div class="flex flex-wrap gap-2">
+                <a
+                    href="{{ route('admin.jpl.import.template') }}"
+                    class="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-800 transition hover:bg-blue-100"
+                >
+                    Unduh Template
+                </a>
+
+                <a
+                    href="{{ route('admin.jpl.index') }}"
+                    class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                >
+                    Kembali
+                </a>
+            </div>
 
         </div>
     </div>
@@ -82,9 +90,7 @@
                     </h2>
 
                     <p class="mt-1 text-sm text-gray-500">
-                        Unggah file Excel. Sistem akan menggunakan Wilayah
-                        <strong>{{ $wilayahName ?? 'default yang dikonfigurasi' }}</strong>
-                        secara otomatis.
+                        Unggah file Excel dengan kolom data JPL dan Resort.
                     </p>
                 </div>
 
@@ -96,49 +102,6 @@
                 >
 
                     @csrf
-
-                    {{-- Wilayah Default --}}
-                    <div class="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
-
-                        <div class="flex items-start gap-3">
-
-                            <div class="mt-0.5 text-blue-600">
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    class="h-5 w-5"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="2"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11Z"
-                                    />
-                                    <circle cx="12" cy="10" r="2.5" />
-                                </svg>
-                            </div>
-
-                            <div>
-                                <p class="text-sm font-semibold text-blue-900">
-                                    Wilayah Tujuan Otomatis
-                                </p>
-
-                                <p class="mt-1 text-sm text-blue-800">
-                                    {{ $wilayahName ?? 'Wilayah default belum tersedia' }}
-                                </p>
-
-                                <p class="mt-1 text-xs leading-5 text-blue-700">
-                                    Wilayah ditentukan oleh konfigurasi sistem
-                                    dan tidak perlu dipilih saat mengunggah Excel.
-                                    Semua Resort baru akan terhubung ke Wilayah ini.
-                                </p>
-                            </div>
-
-                        </div>
-
-                    </div>
 
                     {{-- File Excel --}}
                     <div class="mb-6">
@@ -188,18 +151,18 @@
                                     Mekanisme Import
                                 </p>
 
+                        <p class="mt-2 text-sm leading-5 text-amber-800">
+                            Gunakan template JPL. Kolom Resort wajib diisi. Template tidak membawa contoh data agar tidak terimpor sebagai JPL nyata.
+                        </p>
+
                                 <ul class="mt-2 space-y-2 text-sm leading-5 text-amber-800">
 
                                     <li>
-                                        • Wilayah Daop 6 ditentukan otomatis oleh sistem.
+                                        • Resort yang sudah ada akan digunakan kembali berdasarkan nama.
                                     </li>
 
                                     <li>
-                                        • Resort yang sudah ada di Wilayah tujuan akan digunakan kembali.
-                                    </li>
-
-                                    <li>
-                                        • Resort yang belum ada akan dibuat otomatis dan dihubungkan ke Wilayah tujuan.
+                                        • Resort yang belum ada akan dibuat otomatis saat konfirmasi.
                                     </li>
 
                                     <li>
@@ -361,20 +324,6 @@
 
                     <div>
                         <p class="text-xs font-medium uppercase tracking-wide text-gray-400">
-                            Wilayah
-                        </p>
-
-                        <p class="mt-1 text-sm font-semibold text-gray-700">
-                            {{ $wilayahName ?? 'Belum dikonfigurasi' }}
-                        </p>
-
-                        <p class="mt-1 text-xs text-gray-500">
-                            Ditentukan otomatis oleh sistem.
-                        </p>
-                    </div>
-
-                    <div>
-                        <p class="text-xs font-medium uppercase tracking-wide text-gray-400">
                             Resort
                         </p>
 
@@ -383,7 +332,7 @@
                         </p>
 
                         <p class="mt-1 text-xs text-gray-500">
-                            Dicari berdasarkan nama di Wilayah tujuan.
+                            Dicari berdasarkan nama pada seluruh data Resort.
                         </p>
                     </div>
 
@@ -420,17 +369,8 @@
                 <div class="mt-6 rounded-xl bg-gray-50 p-4">
 
                     <p class="text-sm leading-6 text-gray-600">
-                        <strong>Contoh alur:</strong>
-
-                        Sistem menggunakan Wilayah
-                        <strong>
-                            {{ $wilayahName ?? 'Daop 6' }}
-                        </strong>.
-
-                        Jika Excel memiliki Resort
-                        <strong>6.1 Jenar</strong>,
-                        sistem akan mencari Resort tersebut di Wilayah tujuan.
-                        Jika belum tersedia, Resort akan dibuat secara otomatis.
+                        <strong>Catatan skema:</strong>
+                        Resort baru akan dibuat otomatis. Nama yang cocok dengan lebih dari satu Resort akan ditolak.
                     </p>
 
                 </div>
@@ -463,7 +403,7 @@
 
                     <li class="flex items-start gap-2">
                         <span class="mt-0.5 text-green-600">✓</span>
-                        <span>Pastikan data yang akan diimpor memang ditujukan untuk Wilayah default.</span>
+                        <span>Pastikan nama Resort pada Excel cocok dengan data Resort yang tersedia.</span>
                     </li>
 
                 </ul>

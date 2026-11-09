@@ -1,6 +1,7 @@
 @extends('layouts.superadmin')
 
 @section('title', 'Jadwal KA')
+@section('page-title', 'Jadwal KA')
 
 @section('content')
 <div class="mx-auto max-w-7xl space-y-6">
@@ -11,9 +12,12 @@
             <p class="mt-2 text-sm text-gray-500">Pantau jadwal perjalanan kereta api berdasarkan JPL.</p>
             <p class="mt-2 text-sm font-semibold text-blue-700">Jadwal hari ini: {{ \Carbon\Carbon::parse($tanggalHariIni)->locale('id')->translatedFormat('l, d F Y') }}</p>
         </div>
-        <a href="{{ route('superadmin.jadwal-ka.arsip') }}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50">
-            Arsip Jadwal
-        </a>
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800">Hanya baca</span>
+            <a href="{{ route('superadmin.jadwal-ka.arsip') }}" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                Arsip Jadwal
+            </a>
+        </div>
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2">

@@ -1,6 +1,7 @@
 @extends('layouts.superadmin')
 
 @section('title', 'Arsip Jadwal KA')
+@section('page-title', 'Arsip Jadwal KA')
 
 @section('content')
 <div class="mx-auto max-w-7xl space-y-6">
@@ -10,7 +11,10 @@
             <h1 class="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">Arsip Jadwal KA</h1>
             <p class="mt-2 text-sm text-gray-500">Pantau periode versi batch yang telah berakhir dan arsip tanggal jadwal legacy.</p>
         </div>
-        <a href="{{ route('superadmin.jadwal-ka.index') }}" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Jadwal Hari Ini</a>
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800">Arsip · Hanya baca</span>
+            <a href="{{ route('superadmin.jadwal-ka.index') }}" class="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Jadwal Hari Ini</a>
+        </div>
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2">

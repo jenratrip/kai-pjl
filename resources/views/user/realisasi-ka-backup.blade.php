@@ -1722,11 +1722,8 @@ td {
         </div>
 
         <nav class="sidebar-menu">
-            <a href="{{ url('/user/dashboard') }}" class="menu-item">
+            <a href="{{ url('/user/realisasi-ka') }}" class="menu-item">
                 <span class="menu-icon">⌂</span>
-                <span>Dashboard</span>
-            </a>
-
             <a href="{{ url('/user/realisasi-ka') }}" class="menu-item active">
                 <span class="menu-icon">▣</span>
                 <span>Realisasi KA</span>

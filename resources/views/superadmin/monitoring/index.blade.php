@@ -1,6 +1,7 @@
 @extends('layouts.superadmin')
 
 @section('title', 'Monitoring Sistem')
+@section('page-title', 'Monitoring Sistem')
 
 @section('content')
 <div class="space-y-6">
@@ -39,10 +40,21 @@
 
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <p class="text-sm text-gray-500">Error Hari Ini</p>
-            <p class="mt-3 text-3xl font-bold {{ $errorsToday > 0 ? 'text-red-600' : ($logsTruncated ? 'text-amber-600' : 'text-green-700') }}">
-                {{ $logsTruncated ? '≥ ' : '' }}{{ number_format($errorsToday) }}
+            <p class="mt-3 text-3xl font-bold {{ $errorsToday > 0 ? 'text-red-600' : ($logCoverageComplete ? 'text-green-700' : 'text-amber-600') }}">
+                @if (!$logExists || !$logReadable)
+                    —
+                @else
+                    {{ $logCoverageComplete ? '' : '≥ ' }}{{ number_format($errorsToday) }}
+                @endif
             </p>
-            <p class="mt-1 text-xs text-gray-500">Level ERROR, CRITICAL, ALERT, dan EMERGENCY pada log yang dipindai</p>
+            <p class="mt-1 text-xs text-gray-500">
+                @if ($logExists && $logReadable)
+                    {{ number_format($uniqueErrorGroupsToday) }} kelompok unik dari {{ number_format($errorsToday) }} kejadian terdeteksi.
+                @else
+                    Jumlah kejadian dan kelompok tidak tersedia.
+                @endif
+            </p>
+            <p class="mt-2 text-xs {{ $logCoverageComplete ? 'text-slate-500' : 'font-medium text-amber-700' }}">{{ $logCoverageSummary }}</p>
         </div>
     </div>
 
@@ -118,6 +130,10 @@
                 <span class="text-sm text-gray-500">Pemindaian log</span>
                 <span class="text-sm font-medium">Maksimal 7 file terbaru dan 2 MB per file</span>
             </div>
+            <div class="flex flex-wrap justify-between gap-2 py-3">
+                <span class="text-sm text-gray-500">Cakupan error hari ini</span>
+                <span class="text-sm font-medium {{ $logCoverageComplete ? 'text-green-700' : 'text-amber-700' }}">{{ $logCoverageSummary }}</span>
+            </div>
         </div>
     </section>
 
@@ -130,8 +146,12 @@
                     Secara default menampilkan log tiga bulan terakhir. Hasil dipaginasi 20 entri per halaman dan isi log dibatasi agar pemeriksaan tetap ringan.
                 </p>
             </div>
-            <span class="rounded-full px-3 py-1 text-sm font-semibold {{ $errorsToday > 0 ? 'bg-red-50 text-red-700' : ($logsTruncated ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700') }}">
-                {{ $logsTruncated ? '≥ ' : '' }}{{ number_format($errorsToday) }} error hari ini
+            <span class="rounded-full px-3 py-1 text-sm font-semibold {{ $errorsToday > 0 ? 'bg-red-50 text-red-700' : ($logCoverageComplete ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700') }}">
+                @if (!$logExists || !$logReadable)
+                    Error hari ini tidak dapat dihitung
+                @else
+                    {{ $logCoverageComplete ? '' : '≥ ' }}{{ number_format($errorsToday) }} kejadian · {{ number_format($uniqueErrorGroupsToday) }} kelompok unik
+                @endif
             </span>
         </div>
 
@@ -295,7 +315,7 @@
         <div id="error-results">
         @if ($logsTruncated)
             <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                Pemindaian dibatasi pada file dan ukuran terbaru. Sebagian log lama mungkin tidak tercakup.
+                Pemindaian file, ukuran, atau daftar detail mencapai batas. Cakupan hitungan harian dijelaskan terpisah; daftar riwayat dapat dibatasi.
             </div>
         @endif
         @if ($errors->any())
