@@ -1,4 +1,4 @@
-@extends('layouts.admin')
+@extends(auth()->user()?->isSuperadmin() ? 'layouts.superadmin' : 'layouts.admin')
 
 @section('content')
 <div class="container mx-auto px-4 py-6">

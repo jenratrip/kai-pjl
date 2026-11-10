@@ -86,9 +86,6 @@
                             <option value="{{ $resort->id }}"
                                 @selected((string) old('resort_id', $jpl->resort_id) === (string) $resort->id)>
                                 {{ $resort->nama_resort }}
-                                @if($resort->wilayah)
-                                    — {{ $resort->wilayah->nama_wilayah }}
-                                @endif
                             </option>
                         @endforeach
                     </select>

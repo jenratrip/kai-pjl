@@ -1,4 +1,4 @@
-@extends('layouts.admin')
+@extends(auth()->user()?->isSuperadmin() ? 'layouts.superadmin' : 'layouts.admin')
 
 @section('content')
 <div class="container mx-auto max-w-4xl px-4 py-6">
@@ -212,7 +212,13 @@
         @endif
     </section>
 
-    {{-- Form keputusan Admin --}}
+    {{-- Keputusan hanya tersedia untuk Admin --}}
+    @if (auth()->user()?->isSuperadmin())
+        <section class="rounded-xl border border-blue-200 bg-blue-50 p-5">
+            <h2 class="text-lg font-semibold text-blue-900">Informasi pemantauan</h2>
+            <p class="mt-2 text-sm text-blue-800">Halaman ini bersifat hanya baca untuk Superadmin.</p>
+        </section>
+    @else
     <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <h2 class="mb-2 text-lg font-semibold text-gray-900">
             Keputusan Admin
@@ -293,6 +299,7 @@
             Kembali
         </a>
     </section>
+    @endif
 
 </div>
 @endsection

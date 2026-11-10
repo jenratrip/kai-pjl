@@ -11,7 +11,7 @@ class JplController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Jpl::with('resort.wilayah');
+        $query = Jpl::with('resort');
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -35,19 +35,17 @@ class JplController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        $resorts = Resort::with('wilayah')
+        $resorts = Resort::query()
             ->where('is_active', true)
             ->orderBy('nama_resort')
             ->get();
 
         $totalJpl = Jpl::count();
-        $totalResort = Resort::count();
 
         return view('superadmin.jpl.index', compact(
             'jpls',
             'resorts',
-            'totalJpl',
-            'totalResort'
+            'totalJpl'
         ));
     }
 }

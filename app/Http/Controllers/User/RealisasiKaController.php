@@ -4,9 +4,11 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\Dinas;
+use App\Models\JadwalKa;
 use App\Models\KeretaApi;
 use App\Models\RealisasiKa;
 use App\Models\RealisasiKaSetting;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -39,7 +41,7 @@ class RealisasiKaController extends Controller
 
         if (is_numeric($dinasId) && (int) $dinasId > 0) {
             $dinas = Dinas::with([
-                'jpl.resort.wilayah',
+                'jpl.resort',
                 'shift',
                 'user',
                 'userDigantikan',
@@ -58,6 +60,18 @@ class RealisasiKaController extends Controller
             $jadwalList = is_array($snapshot) && is_array($snapshot['jadwal'] ?? null)
                 ? $snapshot['jadwal']
                 : [];
+            $jadwalIds = collect($jadwalList)
+                ->filter(fn ($jadwal) => is_array($jadwal) && isset($jadwal['jadwal_ka_id']))
+                ->pluck('jadwal_ka_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn (int $id) => $id > 0)
+                ->unique()
+                ->values();
+            $jadwalKeterangan = $jadwalIds->isEmpty()
+                ? collect()
+                : JadwalKa::query()
+                    ->whereIn('id', $jadwalIds)
+                    ->pluck('keterangan', 'id');
 
             /*
             |--------------------------------------------------------------------------
@@ -147,6 +161,9 @@ class RealisasiKaController extends Controller
                     ),
 
                     'keterangan' => $realisasi?->catatan ?? '',
+                    'is_bersamaan' => $this->isBersamaanSchedule(
+                        $jadwalKeterangan->get($jadwalId)
+                    ),
 
                     'jadwal_ka_id' => $jadwalId,
                     'realisasi_ka_id' => $realisasi?->id,
@@ -193,6 +210,9 @@ class RealisasiKaController extends Controller
                         'pintu' => $this->checkValue($realisasi->status_pintu_perlintasan),
                         'semboyan35' => $this->checkValue($realisasi->status_s35),
                         'keterangan' => $realisasi->catatan ?? '',
+                        'is_bersamaan' => $this->isBersamaanSchedule(
+                            $jadwal?->keterangan
+                        ),
                         'jadwal_ka_id' => $realisasi->jadwal_ka_id,
                         'realisasi_ka_id' => $realisasi->id,
                         'is_manual' => false,
@@ -260,6 +280,7 @@ class RealisasiKaController extends Controller
                     ),
 
                     'keterangan' => $realisasi->catatan ?? '',
+                    'is_bersamaan' => false,
 
                     'jadwal_ka_id' => null,
                     'realisasi_ka_id' => $realisasi->id,
@@ -296,7 +317,7 @@ class RealisasiKaController extends Controller
         |--------------------------------------------------------------------------
         |
         | $dinasAktif sudah memuat:
-        | - jpl.resort.wilayah
+        | - jpl.resort
         | - shift
         | - user
         | - userDigantikan
@@ -315,9 +336,14 @@ class RealisasiKaController extends Controller
     /**
      * Menyimpan realisasi KA ke database.
      */
-    public function store(Request $request)
+    public function store(Request $request, ActivityLogService $activityLogService)
     {
         $validated = $request->validate([
+            'save_mode' => [
+                'nullable',
+                Rule::in(['row', 'batch']),
+            ],
+
             'data' => [
                 'required',
                 'array',
@@ -432,9 +458,12 @@ class RealisasiKaController extends Controller
         |--------------------------------------------------------------------------
         */
 
+        $saveMode = $validated['save_mode'] ?? (count($validated['data']) > 1 ? 'batch' : 'row');
+
         $hasilSimpan = DB::transaction(
-            function () use ($validated, $dinas) {
+            function () use ($validated, $dinas, $saveMode, $activityLogService) {
                 $hasil = [];
+                $changedRows = [];
 
                 foreach ($validated['data'] as $index => $item) {
                     $isManual = (bool) $item['is_manual'];
@@ -519,6 +548,10 @@ class RealisasiKaController extends Controller
                             }
                         }
 
+                        $oldValues = $realisasi->exists
+                            ? $this->activityValues($realisasi)
+                            : null;
+
                         $realisasi->kereta_api_id = $kereta->id;
 
                         // Simpan detail perjalanan KA manual.
@@ -594,6 +627,10 @@ class RealisasiKaController extends Controller
                             ]);
                         }
 
+                        $oldValues = $realisasi->exists
+                            ? $this->activityValues($realisasi)
+                            : null;
+
                         $realisasi->kereta_api_id = $jadwal['kereta_api_id'] ?? null;
                         $realisasi->is_manual = false;
                     }
@@ -645,7 +682,51 @@ class RealisasiKaController extends Controller
                     $realisasi->catatan = $item['keterangan'] ?? null;
                     $realisasi->diedit_terakhir_pada = now();
 
+                    $changedFields = array_values(array_diff(
+                        array_keys($realisasi->getDirty()),
+                        ['created_at', 'updated_at', 'diedit_terakhir_pada']
+                    ));
+
                     $realisasi->save();
+
+                    if ($changedFields !== []) {
+                        $newValues = $this->activityValues($realisasi);
+                        $newValues['changed_fields'] = $changedFields;
+                        $indicatorFields = [
+                            'status_s21',
+                            'status_genta',
+                            'status_pintu_perlintasan',
+                            'status_s35',
+                        ];
+                        $oldHadStatusOrIndicator = $oldValues !== null && (
+                            $oldValues['status_lewat'] !== null
+                            || collect($indicatorFields)->contains(
+                                fn (string $field): bool => $oldValues[$field] !== null
+                            )
+                        );
+                        $newHasStatusOrIndicator = $newValues['status_lewat'] !== null
+                            || collect($indicatorFields)->contains(
+                                fn (string $field): bool => $newValues[$field] !== null
+                            );
+                        $newValues['status_reset'] = $oldHadStatusOrIndicator
+                            && ! $newHasStatusOrIndicator;
+
+                        $changedRows[] = [
+                            'old' => $oldValues,
+                            'new' => $newValues,
+                        ];
+
+                        if ($saveMode === 'row') {
+                            $activityLogService->log(
+                                $oldValues === null ? 'create' : 'update',
+                                'realisasi_ka',
+                                'Realisasi KA berhasil disimpan per baris.',
+                                $realisasi,
+                                $oldValues,
+                                $newValues
+                            );
+                        }
+                    }
 
                     /*
                     |--------------------------------------------------------------------------
@@ -659,6 +740,53 @@ class RealisasiKaController extends Controller
                     ];
                 }
 
+                if ($saveMode === 'batch' && $changedRows !== []) {
+                    $indicatorFields = [
+                        'status_s21',
+                        'status_genta',
+                        'status_pintu_perlintasan',
+                        'status_s35',
+                    ];
+                    $activitySummary = [
+                        'submitted_count' => count($validated['data']),
+                        'updated_count' => count($changedRows),
+                        'jalan_count' => 0,
+                        'batal_count' => 0,
+                        'status_reset_count' => 0,
+                        'indicator_rows_changed_count' => 0,
+                    ];
+
+                    foreach ($changedRows as $changedRow) {
+                        $oldStatus = $changedRow['old']['status_lewat'] ?? null;
+                        $newStatus = $changedRow['new']['status_lewat'];
+
+                        if ($oldStatus !== $newStatus) {
+                            if ($newStatus === 'centang') {
+                                $activitySummary['jalan_count']++;
+                            } elseif ($newStatus === 'silang') {
+                                $activitySummary['batal_count']++;
+                            }
+                        }
+
+                        if ($changedRow['new']['status_reset']) {
+                            $activitySummary['status_reset_count']++;
+                        }
+
+                        if (array_intersect($indicatorFields, $changedRow['new']['changed_fields']) !== []) {
+                            $activitySummary['indicator_rows_changed_count']++;
+                        }
+                    }
+
+                    $activityLogService->log(
+                        'bulk_update',
+                        'realisasi_ka',
+                        'Realisasi KA berhasil disimpan melalui Simpan Semua.',
+                        $dinas,
+                        null,
+                        $activitySummary
+                    );
+                }
+
                 return $hasil;
             }
         );
@@ -667,6 +795,29 @@ class RealisasiKaController extends Controller
             'message' => 'Realisasi KA berhasil disimpan ke database.',
             'data' => $hasilSimpan,
         ]);
+    }
+
+    /**
+     * @return array<string, bool|int|string|null>
+     */
+    private function activityValues(RealisasiKa $realisasi): array
+    {
+        return [
+            'dinas_id' => (int) $realisasi->dinas_id,
+            'jadwal_ka_id' => $realisasi->jadwal_ka_id === null
+                ? null
+                : (int) $realisasi->jadwal_ka_id,
+            'kereta_api_id' => $realisasi->kereta_api_id === null
+                ? null
+                : (int) $realisasi->kereta_api_id,
+            'is_manual' => (bool) $realisasi->is_manual,
+            'status_lewat' => $realisasi->status_lewat,
+            'jam_aktual' => $realisasi->jam_aktual,
+            'status_s21' => $realisasi->status_s21,
+            'status_genta' => $realisasi->status_genta,
+            'status_pintu_perlintasan' => $realisasi->status_pintu_perlintasan,
+            'status_s35' => $realisasi->status_s35,
+        ];
     }
 
     /**
@@ -691,5 +842,11 @@ class RealisasiKaController extends Controller
             'no' => 'silang',
             default => null,
         };
+    }
+
+    private function isBersamaanSchedule(?string $description): bool
+    {
+        return is_string($description)
+            && str_contains(mb_strtolower($description), 'bersamaan');
     }
 }

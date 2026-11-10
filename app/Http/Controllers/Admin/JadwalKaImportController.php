@@ -8,6 +8,7 @@ use App\Models\JadwalKa;
 use App\Models\JadwalKaBatch;
 use App\Models\Jpl;
 use App\Models\KeretaApi;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -173,7 +174,7 @@ class JadwalKaImportController extends Controller
                 Storage::disk('local')->delete($path);
 
                 return redirect()
-                    ->route('admin.jadwal-ka.import.form')
+                    ->route('admin.jadwal-ka.import')
                     ->withErrors([
                         'file' => 'Tidak ditemukan baris jadwal KA yang dapat dibaca.',
                     ])
@@ -259,7 +260,7 @@ class JadwalKaImportController extends Controller
             }
 
             return redirect()
-                ->route('admin.jadwal-ka.import.form')
+                ->route('admin.jadwal-ka.import')
                 ->withErrors(['file' => $message])
                 ->withInput([
                     'tanggal_berlaku' => $tanggalBerlaku,
@@ -270,7 +271,7 @@ class JadwalKaImportController extends Controller
     /**
      * Menyimpan jadwal setelah pengguna mengonfirmasi preview.
      */
-    public function confirm(Request $request)
+    public function confirm(Request $request, ActivityLogService $activityLogService)
     {
         $request->validate([
             'token' => ['required', 'uuid'],
@@ -282,7 +283,7 @@ class JadwalKaImportController extends Controller
         // Sesi preview tidak ditemukan.
         if (! $import || empty($import['path'])) {
             return redirect()
-                ->route('admin.jadwal-ka.import.form')
+                ->route('admin.jadwal-ka.import')
                 ->withErrors([
                     'file' => 'Sesi preview tidak ditemukan. Silakan upload ulang.',
                 ]);
@@ -296,7 +297,7 @@ class JadwalKaImportController extends Controller
             session()->forget($key);
 
             return redirect()
-                ->route('admin.jadwal-ka.import.form')
+                ->route('admin.jadwal-ka.import')
                 ->withErrors([
                     'file' => 'Preview kedaluwarsa. Silakan upload ulang.',
                 ]);
@@ -310,7 +311,7 @@ class JadwalKaImportController extends Controller
          */
         if (! is_string($tanggalBerlaku)) {
             return redirect()
-                ->route('admin.jadwal-ka.import.form')
+                ->route('admin.jadwal-ka.import')
                 ->withErrors([
                     'file' => 'Tanggal berlaku tidak ditemukan pada sesi preview. Silakan upload ulang.',
                 ]);
@@ -328,7 +329,7 @@ class JadwalKaImportController extends Controller
             || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $tanggalBerlaku)
         ) {
             return redirect()
-                ->route('admin.jadwal-ka.import.form')
+                ->route('admin.jadwal-ka.import')
                 ->withErrors([
                     'file' => 'Tanggal berlaku pada sesi preview tidak valid. Silakan upload ulang.',
                 ]);
@@ -341,7 +342,7 @@ class JadwalKaImportController extends Controller
             session()->forget($key);
 
             return redirect()
-                ->route('admin.jadwal-ka.import.form')
+                ->route('admin.jadwal-ka.import')
                 ->withErrors([
                     'file' => 'File sementara tidak ditemukan. Silakan upload ulang.',
                 ]);
@@ -360,7 +361,8 @@ class JadwalKaImportController extends Controller
                 $tanggalBerlaku,
                 &$inserted,
                 &$skipped,
-                &$duplicates
+                &$duplicates,
+                $activityLogService
             ) {
                 $batchRecord = JadwalKaBatch::create([
                     'uuid' => $batch,
@@ -510,6 +512,21 @@ class JadwalKaImportController extends Controller
 
                 $batchRecord->jpls()->sync(array_values($jplIds));
 
+                $activityLogService->log(
+                    'import',
+                    'jadwal_ka',
+                    'Import batch jadwal KA berhasil dikonfirmasi.',
+                    $batchRecord,
+                    null,
+                    [
+                        'status' => 'draft',
+                        'tanggal_mulai_berlaku' => $tanggalBerlaku,
+                        'imported_count' => $inserted,
+                        'skipped_count' => $skipped,
+                        'covered_jpl_count' => count($jplIds),
+                    ]
+                );
+
                 $spreadsheet->disconnectWorksheets();
             });
 
@@ -544,7 +561,7 @@ class JadwalKaImportController extends Controller
             }
 
             return redirect()
-                ->route('admin.jadwal-ka.import.form')
+                ->route('admin.jadwal-ka.import')
                 ->withErrors(['file' => $message]);
         }
     }

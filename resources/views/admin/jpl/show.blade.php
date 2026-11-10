@@ -187,10 +187,10 @@
             </div>
         </div>
 
-        {{-- INFORMASI WILAYAH --}}
+        {{-- INFORMASI RESORT --}}
         <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h2 class="text-lg font-bold text-[#1d2d50]">
-                Informasi Wilayah
+                Informasi Resort
             </h2>
 
             <div class="mt-5 space-y-5">
@@ -198,13 +198,6 @@
                     <p class="text-xs text-gray-500">Resort</p>
                     <p class="mt-1 font-semibold text-gray-800">
                         {{ $jpl->resort?->nama_resort ?? 'Belum ditentukan' }}
-                    </p>
-                </div>
-
-                <div>
-                    <p class="text-xs text-gray-500">Wilayah / Daop</p>
-                    <p class="mt-1 font-semibold text-gray-800">
-                        {{ $jpl->resort?->wilayah?->nama_wilayah ?? 'Belum ditentukan' }}
                     </p>
                 </div>
 
@@ -225,8 +218,7 @@
 
             <div class="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4">
                 <p class="text-xs leading-relaxed text-blue-800">
-                    Data Resort dan Wilayah ditampilkan melalui relasi JPL.
-                    Pengelolaannya tetap dilakukan melalui halaman Master Resort.
+                    Resort ditampilkan sebagai bagian dari informasi JPL.
                 </p>
             </div>
         </div>

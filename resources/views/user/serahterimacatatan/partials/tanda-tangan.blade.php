@@ -2,13 +2,25 @@
     $modeLihat = !empty($modeLihat);
     $serahTerima = $serahTerima ?? null;
 
+    // Tanda tangan penyerah
     $ttdLama = $serahTerima?->tanda_tangan_penyerah;
-    $urlTtdLama = $ttdLama
-        ? \Illuminate\Support\Facades\Storage::disk('public')->url($ttdLama)
+    $urlTtdLama = $ttdLama && $serahTerima
+        ? route('user.serah-terima-dinas.tanda-tangan', [$serahTerima, 'penyerah'])
+        : null;
+
+    // Tanda tangan penerima
+    $ttdPenerima = $serahTerima?->tanda_tangan_penerima;
+
+    $ttdPenerimaAda = $ttdPenerima !== null && $serahTerima !== null;
+
+    $urlTtdPenerima = $ttdPenerimaAda
+        ? route('user.serah-terima-dinas.tanda-tangan', [$serahTerima, 'penerima'])
         : null;
 @endphp
 
 <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+
+    {{-- JUDUL --}}
     <div class="mb-4 flex items-center gap-3">
         <span
             class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1d2d50] text-sm font-bold text-white"
@@ -17,10 +29,13 @@
         </span>
 
         <div>
-            <h2 class="font-bold text-[#1d2d50]">Tanda tangan</h2>
+            <h2 class="font-bold text-[#1d2d50]">
+                Tanda tangan
+            </h2>
+
             <p class="mt-0.5 text-xs text-slate-500">
                 @if ($modeLihat)
-                    Tanda tangan yang tersimpan pada serah terima ini.
+                    Tanda tangan penyerah dan penerima yang tersimpan pada serah terima ini.
                 @elseif ($urlTtdLama)
                     Tanda tangan sudah tersimpan. Klik Ganti jika ingin membuat yang baru.
                 @else
@@ -30,108 +45,179 @@
         </div>
     </div>
 
-    {{-- Hanya tanda tangan penyerah. Admin tidak perlu menandatangani. --}}
-    <div class="max-w-xl">
-        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <h3 class="font-bold text-[#1d2d50]">
-                PJL yang menyerahkan dinas
-            </h3>
+    {{-- TANDA TANGAN PENYERAH DAN PENERIMA BERDAMPINGAN --}}
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 
-            <p class="mt-1 text-sm text-slate-600">
-                {{ data_get($serahTerima, 'ringkasan.nama_penyerah') ?: auth()->user()->name }}
-            </p>
+        {{-- ================================================= --}}
+        {{-- KOLOM PENYERAH --}}
+        {{-- ================================================= --}}
+        <div class="min-w-0">
+            <div class="h-full rounded-lg border border-slate-200 bg-slate-50 p-3">
 
-            <p class="text-xs text-slate-500">
-                NIP: {{ data_get($serahTerima, 'ringkasan.nip_penyerah') ?: (auth()->user()->nip ?: '-') }}
-            </p>
+                <h3 class="font-bold text-[#1d2d50]">
+                    PJL yang menyerahkan dinas
+                </h3>
 
-            {{-- 1) Tanda tangan tersimpan --}}
-            @if ($urlTtdLama)
-                <div id="signatureSavedBox" class="mt-3">
-                    <img
-                        src="{{ $urlTtdLama }}"
-                        alt="Tanda tangan penyerah tersimpan"
-                        class="h-40 w-full rounded-lg border border-slate-300 bg-white object-contain"
-                    >
-
-                    @unless ($modeLihat)
-                        <div class="mt-2 flex justify-end">
-                            <button
-                                type="button"
-                                id="changeSignature"
-                                class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                            >
-                                Ganti tanda tangan
-                            </button>
-                        </div>
-                    @endunless
-                </div>
-            @elseif ($modeLihat)
-                <p class="mt-3 text-sm text-slate-500">
-                    Tanda tangan penyerah belum tersedia.
+                <p class="mt-1 text-sm text-slate-600">
+                    {{ data_get($serahTerima, 'ringkasan.nama_penyerah') ?: auth()->user()->name }}
                 </p>
-            @endif
 
-            {{-- 2) Area menggambar: tersembunyi jika sudah ada tanda tangan --}}
-            @unless ($modeLihat)
-                <div
-                    id="signatureDrawArea"
-                    class="{{ $urlTtdLama ? 'hidden' : '' }}"
-                >
-                    <canvas
-                        id="signatureCanvas"
-                        aria-label="Area tanda tangan penyerah"
-                        class="mt-3 block h-40 w-full touch-none rounded-lg border border-slate-300 bg-white"
-                    ></canvas>
+                <p class="text-xs text-slate-500">
+                    NIP: {{ data_get($serahTerima, 'ringkasan.nip_penyerah') ?: (auth()->user()->nip ?: '-') }}
+                </p>
 
-                    <div class="mt-2 flex flex-wrap justify-end gap-2">
-                        @if ($urlTtdLama)
+                {{-- Tanda tangan penyerah tersimpan --}}
+                @if ($urlTtdLama)
+                    <div id="signatureSavedBox" class="mt-3">
+
+                        <div class="flex h-40 items-center justify-center rounded-lg border border-slate-300 bg-white p-3">
+                            <img
+                                src="{{ $urlTtdLama }}"
+                                alt="Tanda tangan penyerah tersimpan"
+                                class="max-h-full max-w-full object-contain"
+                            >
+                        </div>
+
+                        @unless ($modeLihat)
+                            <div class="mt-2 flex justify-end">
+                                <button
+                                    type="button"
+                                    id="changeSignature"
+                                    class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                                >
+                                    Ganti tanda tangan
+                                </button>
+                            </div>
+                        @endunless
+
+                    </div>
+                @elseif ($modeLihat)
+                    <div class="mt-3 flex h-40 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white p-4">
+                        <p class="text-center text-sm text-slate-500">
+                            Tanda tangan penyerah belum tersedia.
+                        </p>
+                    </div>
+                @endif
+
+                {{-- Area menggambar tanda tangan penyerah --}}
+                @unless ($modeLihat)
+                    <div
+                        id="signatureDrawArea"
+                        class="{{ $urlTtdLama ? 'hidden' : '' }}"
+                    >
+                        <canvas
+                            id="signatureCanvas"
+                            aria-label="Area tanda tangan penyerah"
+                            class="mt-3 block h-40 w-full touch-none rounded-lg border border-slate-300 bg-white"
+                        ></canvas>
+
+                        <div class="mt-2 flex flex-wrap justify-end gap-2">
+
+                            @if ($urlTtdLama)
+                                <button
+                                    type="button"
+                                    id="cancelChangeSignature"
+                                    class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                                >
+                                    Batal, pakai yang lama
+                                </button>
+                            @endif
+
                             <button
                                 type="button"
-                                id="cancelChangeSignature"
+                                id="clearSignature"
                                 class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
                             >
-                                Batal, pakai yang lama
+                                Hapus tanda tangan
                             </button>
-                        @endif
 
-                        <button
-                            type="button"
-                            id="clearSignature"
-                            class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                        >
-                            Hapus tanda tangan
-                        </button>
+                        </div>
+
+                        <p class="mt-2 text-xs leading-relaxed text-slate-500">
+                            Tanda tangani area putih menggunakan mouse, touchpad,
+                            atau sentuhan layar.
+                        </p>
                     </div>
 
-                    <p class="mt-2 text-xs leading-relaxed text-slate-500">
-                        Tanda tangani area putih menggunakan mouse, touchpad,
-                        atau sentuhan layar.
+                    {{-- Input dibaca JavaScript di actions.blade.php --}}
+                    <input
+                        type="hidden"
+                        id="signatureData"
+                        value=""
+                    >
+
+                    <p
+                        id="signatureError"
+                        class="mt-2 hidden text-xs font-medium text-red-600"
+                        role="alert"
+                    >
+                        Tanda tangan penyerah wajib diisi.
                     </p>
-                </div>
+                @endunless
 
-                {{-- Input ini dibaca JavaScript di actions.blade.php --}}
-                <input
-                    type="hidden"
-                    id="signatureData"
-                    value=""
-                >
-
-                <p
-                    id="signatureError"
-                    class="mt-2 hidden text-xs font-medium text-red-600"
-                    role="alert"
-                >
-                    Tanda tangan penyerah wajib diisi.
-                </p>
-            @endunless
+            </div>
         </div>
+
+        {{-- ================================================= --}}
+        {{-- KOLOM PENERIMA --}}
+        {{-- ================================================= --}}
+        <div class="min-w-0">
+            <div class="h-full rounded-lg border border-slate-200 bg-slate-50 p-3">
+
+                <h3 class="font-bold text-[#1d2d50]">
+                    PJL yang menerima dinas
+                </h3>
+
+                <p class="mt-1 text-sm text-slate-600">
+                    {{ data_get($serahTerima, 'ringkasan.nama_penerima') ?: ($serahTerima?->penerima?->name ?? '-') }}
+                </p>
+
+                <p class="text-xs text-slate-500">
+                    NIP: {{ data_get($serahTerima, 'ringkasan.nip_penerima') ?: ($serahTerima?->penerima?->nip ?? '-') }}
+                </p>
+
+                {{-- Tanda tangan penerima tersimpan --}}
+                @if ($ttdPenerimaAda)
+
+                    <div class="mt-3">
+
+                        <p class="mb-2 text-xs font-medium text-slate-500">
+                            Tanda tangan penerima:
+                        </p>
+
+                        <div class="flex h-40 items-center justify-center rounded-lg border border-slate-300 bg-white p-3">
+                            <img
+                                src="{{ $urlTtdPenerima }}"
+                                alt="Tanda tangan penerima"
+                                class="max-h-full max-w-full object-contain"
+                            >
+                        </div>
+
+                    </div>
+
+                @else
+
+                    <div class="mt-3 flex h-40 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white p-4">
+                        <p class="text-center text-sm text-slate-500">
+                            Penerima belum memberikan tanda tangan.
+                        </p>
+                    </div>
+
+                @endif
+
+            </div>
+        </div>
+
     </div>
 </section>
 
+{{-- ====================================================== --}}
+{{-- JAVASCRIPT TANDA TANGAN PENYERAH --}}
+{{-- ====================================================== --}}
 @unless ($modeLihat)
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+
     const canvas = document.getElementById('signatureCanvas');
     const hidden = document.getElementById('signatureData');
     const clearButton = document.getElementById('clearSignature');
@@ -179,7 +265,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function resizeCanvas() {
         const rect = canvas.getBoundingClientRect();
 
-        // Canvas tersembunyi (ukuran 0): lewati, dihitung ulang saat tampil.
+        // Canvas tersembunyi: hitung ulang ketika ditampilkan.
         if (!rect.width || !rect.height) {
             return;
         }
@@ -201,7 +287,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const image = new Image();
 
             image.onload = function () {
-                context.drawImage(image, 0, 0, rect.width, rect.height);
+                context.drawImage(
+                    image,
+                    0,
+                    0,
+                    rect.width,
+                    rect.height
+                );
+
                 saveSignature();
             };
 
@@ -221,8 +314,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         canvas.setPointerCapture?.(event.pointerId);
 
-        // Tetap mencatat tanda tangan walau hanya satu ketukan.
+        // Tetap mencatat tanda tangan walaupun hanya satu ketukan.
         context.beginPath();
+
         context.arc(
             lastPoint.x,
             lastPoint.y,
@@ -230,10 +324,13 @@ document.addEventListener('DOMContentLoaded', function () {
             0,
             Math.PI * 2
         );
+
         context.fill();
 
         hasSignature = true;
+
         errorMessage?.classList.add('hidden');
+
         saveSignature();
     }
 
@@ -264,13 +361,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
         drawing = false;
         lastPoint = null;
+
         saveSignature();
     }
 
     function clearSignature() {
         context.save();
+
         context.setTransform(1, 0, 0, 1, 0, 0);
-        context.clearRect(0, 0, canvas.width, canvas.height);
+
+        context.clearRect(
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
+
         context.restore();
 
         hasSignature = false;
@@ -285,12 +391,14 @@ document.addEventListener('DOMContentLoaded', function () {
     function showDrawArea() {
         savedBox?.classList.add('hidden');
         drawArea?.classList.remove('hidden');
+
         resizeCanvas();
     }
 
-    // Batal: hapus coretan baru, kembali ke tanda tangan lama (action "keep").
+    // Batal: hapus coretan baru dan kembali ke tanda tangan lama.
     function showSavedBox() {
         clearSignature();
+
         drawArea?.classList.add('hidden');
         savedBox?.classList.remove('hidden');
     }
@@ -302,18 +410,25 @@ document.addEventListener('DOMContentLoaded', function () {
     canvas.addEventListener('lostpointercapture', stopDrawing);
 
     clearButton.addEventListener('click', clearSignature);
+
     changeButton?.addEventListener('click', showDrawArea);
+
     cancelButton?.addEventListener('click', showSavedBox);
 
-    // Validasi saat submit dilakukan di actions.blade.php.
+    // Validasi submit tetap dilakukan di actions.blade.php.
     // Tidak ada listener submit di sini agar tidak bentrok.
 
     resizeCanvas();
 
     window.addEventListener('resize', function () {
         window.clearTimeout(resizeTimer);
-        resizeTimer = window.setTimeout(resizeCanvas, 150);
+
+        resizeTimer = window.setTimeout(
+            resizeCanvas,
+            150
+        );
     });
+
 });
 </script>
 @endunless

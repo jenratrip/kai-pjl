@@ -2,26 +2,29 @@
 
 namespace App\Exports;
 
-use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\WithHeadings;
+use Illuminate\Support\Collection;
+use Maatwebsite\Excel\Concerns\Export;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
-class JadwalKaTemplateExport implements FromArray, WithHeadings
+class JadwalKaTemplateExport implements Export, WithMultipleSheets
 {
-    public function array(): array
-    {
-        return [];
-    }
+    public function __construct(private readonly Collection $jpls) {}
 
-    public function headings(): array
+    /**
+     * @return array<int, JadwalKaTemplateSheetExport>
+     */
+    public function sheets(): array
     {
-        return [
-            'nomor_ka',
-            'kode_jpl',
-            'jam_lewat',
-            'hari_berlaku',
-            'tanggal_berlaku',
-            'keterangan',
-            'is_active',
-        ];
+        $sheets = $this->jpls
+            ->filter(fn ($jpl): bool => filled($jpl->kode_jpl))
+            ->map(fn ($jpl): JadwalKaTemplateSheetExport => new JadwalKaTemplateSheetExport(
+                (string) $jpl->kode_jpl
+            ))
+            ->values()
+            ->all();
+
+        return $sheets !== []
+            ? $sheets
+            : [new JadwalKaTemplateSheetExport('GANTI DENGAN KODE JPL')];
     }
 }

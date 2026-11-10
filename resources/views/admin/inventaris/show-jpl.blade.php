@@ -39,6 +39,7 @@
             ['label' => 'Baik', 'value' => $statistik['baik'], 'color' => 'text-green-600'],
             ['label' => 'Perlu Perbaikan', 'value' => $statistik['perlu_perbaikan'], 'color' => 'text-amber-600'],
             ['label' => 'Rusak', 'value' => $statistik['rusak'], 'color' => 'text-red-600'],
+            ['label' => 'Perlu Tinjauan', 'value' => $statistik['perlu_tinjauan'], 'color' => 'text-orange-600'],
         ];
     @endphp
 
@@ -63,6 +64,7 @@
             'perlu_perbaikan' => 'Perlu Perbaikan',
             'rusak' => 'Rusak',
             'hilang' => 'Hilang',
+            'perlu_tinjauan' => 'Perlu Tinjauan',
         ];
     @endphp
 
@@ -125,6 +127,7 @@
                         <th class="px-5 py-4 text-center">Jumlah</th>
                         <th class="px-5 py-4">Kondisi</th>
                         <th class="px-5 py-4">Status</th>
+                        <th class="px-5 py-4">Tinjauan</th>
                         <th class="px-5 py-4 text-right">Aksi</th>
                     </tr>
                 </thead>
@@ -188,6 +191,18 @@
                                 </span>
                             </td>
 
+                            <td class="px-5 py-4">
+                                @if($item->status_tinjauan === 'perlu_tinjauan')
+                                    <span class="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">
+                                        Perlu Tinjauan
+                                    </span>
+                                @else
+                                    <span class="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                                        Normal
+                                    </span>
+                                @endif
+                            </td>
+
                             <td class="px-5 py-4 text-right">
                                 <a
                                     href="{{ route('admin.inventaris.show', $item->id) }}"
@@ -199,7 +214,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-5 py-12 text-center text-gray-500">
+                            <td colspan="7" class="px-5 py-12 text-center text-gray-500">
                                 Tidak ada inventaris yang sesuai dengan filter.
                             </td>
                         </tr>

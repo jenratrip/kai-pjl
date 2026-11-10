@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\SerahTerima;
+use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,7 @@ class SerahTerimaDinasController extends Controller
     {
         return [
             'dinasPenyerah.user',
-            'dinasPenyerah.jpl.resort.wilayah',
+            'dinasPenyerah.jpl.resort',
             'dinasPenyerah.shift',
             'penerima',
             'ditinjauOleh',
@@ -266,7 +267,8 @@ class SerahTerimaDinasController extends Controller
      */
     public function update(
         Request $request,
-        SerahTerima $serahTerima
+        SerahTerima $serahTerima,
+        ActivityLogService $activityLogService
     ): RedirectResponse {
         $this->pastikanAdmin();
 
@@ -291,20 +293,18 @@ class SerahTerimaDinasController extends Controller
                 'max:5000',
             ],
         ], [
-            'status_review.required' =>
-                'Pilih hasil review terlebih dahulu.',
-            'status_review.in' =>
-                'Pilihan review tidak valid.',
-            'catatan_revisi.required_if' =>
-                'Catatan wajib diisi jika meminta revisi.',
-            'catatan_revisi.max' =>
-                'Catatan revisi maksimal 5000 karakter.',
+            'status_review.required' => 'Pilih hasil review terlebih dahulu.',
+            'status_review.in' => 'Pilihan review tidak valid.',
+            'catatan_revisi.required_if' => 'Catatan wajib diisi jika meminta revisi.',
+            'catatan_revisi.max' => 'Catatan revisi maksimal 5000 karakter.',
         ]);
 
         DB::transaction(function () use (
             $serahTerima,
-            $validated
+            $validated,
+            $activityLogService
         ) {
+            $oldStatusReview = $serahTerima->status_review;
             $serahTerima->status_review =
                 $validated['status_review'];
 
@@ -318,6 +318,17 @@ class SerahTerimaDinasController extends Controller
 
             // Status serah terima dan tanda tangan tidak diubah.
             $serahTerima->save();
+
+            $activityLogService->log(
+                'review',
+                'serah_terima',
+                $validated['status_review'] === 'disetujui'
+                    ? 'Admin menyetujui Serah Terima.'
+                    : 'Admin meminta revisi Serah Terima.',
+                $serahTerima,
+                ['status_review' => $oldStatusReview],
+                ['status_review' => $serahTerima->status_review]
+            );
         });
 
         return redirect()

@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="w-full min-w-0 px-2 py-6 sm:px-5 lg:px-8 lg:py-7">
-    <section class="mx-auto w-full max-w-5xl">
+    <section class="mx-auto w-full max-w-5xl" data-inventory-inspection>
 
         {{-- HEADER --}}
         <div class="mb-6">
@@ -83,6 +83,23 @@
                 </div>
             </div>
 
+            <form
+                method="POST"
+                action="{{ route('user.inventaris.prepare') }}"
+                class="mb-6 flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+                @csrf
+                <p class="text-sm text-blue-900">
+                    Salin hasil pemeriksaan terakhir ke Dinas ini jika diperlukan. Rusak atau Hilang memerlukan konfirmasi bukti dan keterangan.
+                </p>
+                <button
+                    type="submit"
+                    class="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#1d2d50] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#14213d]"
+                >
+                    Salin Pemeriksaan Terakhir
+                </button>
+            </form>
+
             {{-- PROGRESS --}}
             @php
                 $totalItem     = $inventaris->count();
@@ -95,7 +112,7 @@
                     <span class="font-semibold text-slate-700">
                         Kemajuan Pemeriksaan
                     </span>
-                    <span class="text-slate-500">
+                    <span class="text-slate-500" data-progress>
                         {{ $sudahDiperiksa }} / {{ $totalItem }} item diperiksa
                     </span>
                 </div>
@@ -124,6 +141,14 @@
 
                         <div
                             x-data="{ open: false }"
+                            data-item
+                            data-state="{{ $sudahIsi ? 'sudah' : 'belum' }}"
+                            data-jumlah-master="{{ $item->jumlah }}"
+                            data-saved-inspected="{{ $sudahIsi ? '1' : '0' }}"
+                            data-saved-condition="{{ $hasil?->kondisi ?? '' }}"
+                            data-saved-quantity="{{ $hasil?->jumlah_aktual ?? '' }}"
+                            data-saved-note="{{ $hasil?->catatan ?? '' }}"
+                            data-saved-photo-url="{{ $hasil?->bukti_foto_path ? route('user.inventaris.foto-bukti', $item) : '' }}"
                             class="overflow-hidden rounded-xl border shadow-sm transition
                                 {{ $adaMasalah  ? 'border-red-200 bg-red-50'
                                   : ($sudahIsi  ? 'border-green-200 bg-green-50'
@@ -161,6 +186,8 @@
                                     <div>
                                         <p class="font-semibold text-slate-800">{{ $item->nama_barang }}</p>
                                         <p class="text-xs text-slate-500">Jumlah standar: {{ $item->jumlah }} pcs</p>
+                                        <p data-status class="mt-1 text-xs text-slate-500" aria-live="polite"></p>
+                                        <p data-tinjauan class="mt-1 hidden text-xs font-medium text-amber-700"></p>
                                     </div>
                                 </div>
 
@@ -185,7 +212,11 @@
                             </button>
 
                             {{-- FORM PEMERIKSAAN --}}
-                            <div x-show="open" x-collapse class="border-t border-slate-200 px-4 pb-4 pt-3">
+                            <div x-show="open" x-collapse data-detail class="border-t border-slate-200 px-4 pb-4 pt-3">
+                                <div data-saved-evidence @if (!$hasil?->bukti_foto_path) hidden @endif class="mb-4">
+                                    <p class="mb-1 text-xs font-semibold text-slate-600">Bukti foto tersimpan</p>
+                                    <img data-saved-evidence-image src="{{ $hasil?->bukti_foto_path ? route('user.inventaris.foto-bukti', $item) : '' }}" alt="Bukti foto inventaris" class="max-h-48 rounded-lg border border-slate-200 object-contain">
+                                </div>
                                 <form
                                     method="POST"
                                     action="{{ route('user.inventaris.update', $item->id) }}"
@@ -203,6 +234,7 @@
                                             </label>
                                             <select
                                                 name="kondisi"
+                                                data-kondisi
                                                 required
                                                 class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20"
                                             >
@@ -231,6 +263,7 @@
                                             <input
                                                 type="number"
                                                 name="jumlah_aktual"
+                                                data-jumlah
                                                 min="0"
                                                 value="{{ $hasil?->jumlah_aktual ?? '' }}"
                                                 placeholder="{{ $item->jumlah }}"
@@ -246,9 +279,10 @@
                                         </label>
                                         <textarea
                                             name="catatan"
+                                            data-catatan
                                             rows="2"
                                             maxlength="2000"
-                                            placeholder="Keterangan kondisi (opsional)..."
+                                            placeholder="Keterangan kondisi (opsional, wajib untuk Rusak/Hilang)..."
                                             class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20"
                                         >{{ $hasil?->catatan ?? '' }}</textarea>
                                     </div>
@@ -267,6 +301,39 @@
                     @endforeach
                 </div>
             @endif
+
+            <dialog data-evidence-dialog aria-labelledby="evidence-title" class="w-[min(92vw,36rem)] rounded-2xl border border-slate-200 p-0 shadow-2xl backdrop:bg-slate-900/50">
+                <div class="border-b border-slate-200 px-5 py-4">
+                    <h2 id="evidence-title" data-evidence-title class="text-lg font-semibold text-slate-900"></h2>
+                    <p data-evidence-help class="mt-1 text-sm text-slate-600"></p>
+                </div>
+                <div class="space-y-4 px-5 py-4">
+                    <div data-existing-evidence hidden>
+                        <p class="mb-1 text-xs font-semibold text-slate-600">Bukti sebelumnya</p>
+                        <img src="" alt="Bukti foto yang tersimpan" class="max-h-40 rounded-lg border border-slate-200 object-contain">
+                    </div>
+                    <div>
+                        <label for="evidence-photo" class="mb-1 block text-sm font-medium text-slate-700">Foto bukti</label>
+                        <input id="evidence-photo" data-evidence-photo type="file" accept="image/jpeg,image/png,image/webp" class="block w-full rounded-lg border border-slate-300 p-2 text-sm">
+                        <p data-photo-required class="mt-1 text-xs text-red-700" hidden>Wajib untuk kondisi Rusak.</p>
+                        <p data-photo-optional class="mt-1 text-xs text-slate-500">Untuk kondisi Hilang, foto bersifat opsional. JPEG, PNG, atau WebP, maksimal 5 MB.</p>
+                        <p data-error-photo role="alert" class="mt-1 text-xs text-red-700" hidden></p>
+                    </div>
+                    <div data-evidence-preview-wrap hidden>
+                        <p class="mb-1 text-xs font-semibold text-slate-600">Pratinjau foto baru</p>
+                        <img data-evidence-preview src="" alt="Pratinjau foto bukti" class="max-h-48 rounded-lg border border-slate-200 object-contain">
+                    </div>
+                    <div>
+                        <label for="evidence-description" class="mb-1 block text-sm font-medium text-slate-700">Keterangan <span class="text-red-600">*</span></label>
+                        <textarea id="evidence-description" data-evidence-description rows="3" maxlength="2000" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"></textarea>
+                        <p data-error-description role="alert" class="mt-1 text-xs text-red-700" hidden></p>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
+                    <button type="button" data-evidence-cancel class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Batal</button>
+                    <button type="button" data-evidence-confirm class="rounded-lg bg-[#1d2d50] px-4 py-2 text-sm font-semibold text-white hover:bg-[#14213d]">Simpan</button>
+                </div>
+            </dialog>
 
         @endif
 

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Imports\UsersImport;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -126,7 +127,10 @@ class UserImportController extends Controller
 
         Cache::put(
             'admin_user_import_'.$token,
-            $validRows,
+            [
+                'rows' => $validRows,
+                'failed_count' => count($errors),
+            ],
             now()->addMinutes(10)
         );
 
@@ -140,22 +144,29 @@ class UserImportController extends Controller
     /**
      * Menyimpan data yang lolos validasi.
      */
-    public function confirm(Request $request)
+    public function confirm(Request $request, ActivityLogService $activityLogService)
     {
         $request->validate([
             'token' => ['required', 'uuid'],
         ]);
 
         $cacheKey = 'admin_user_import_'.$request->input('token');
-        $rows = Cache::get($cacheKey);
+        $preview = Cache::get($cacheKey);
 
-        if (! is_array($rows)) {
+        if (! is_array($preview)) {
             return redirect()
                 ->route('admin.users.index')
                 ->with('error', 'Data preview sudah kedaluwarsa. Silakan unggah ulang file.');
         }
 
-        if (empty($rows)) {
+        $rows = array_key_exists('rows', $preview)
+            ? $preview['rows']
+            : $preview;
+        $previewFailedCount = array_key_exists('rows', $preview)
+            ? (int) ($preview['failed_count'] ?? 0)
+            : 0;
+
+        if (! is_array($rows) || empty($rows)) {
             return redirect()
                 ->route('admin.users.index')
                 ->with('error', 'Tidak ada data valid untuk diimpor.');
@@ -172,7 +183,7 @@ class UserImportController extends Controller
         $created = 0;
 
         try {
-            DB::transaction(function () use ($rows, $role, &$created) {
+            DB::transaction(function () use ($rows, $role, &$created, $previewFailedCount, $activityLogService) {
                 foreach ($rows as $row) {
                     // Periksa ulang untuk menghindari data duplikat
                     // yang masuk setelah proses preview.
@@ -196,6 +207,18 @@ class UserImportController extends Controller
 
                     $created++;
                 }
+
+                $activityLogService->log(
+                    'import',
+                    'users',
+                    'Admin mengimpor akun PJL.',
+                    null,
+                    null,
+                    [
+                        'imported_count' => $created,
+                        'failed_count' => $previewFailedCount,
+                    ]
+                );
             });
         } catch (\RuntimeException $exception) {
             return redirect()

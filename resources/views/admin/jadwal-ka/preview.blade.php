@@ -17,7 +17,7 @@
         </div>
 
         <a
-            href="{{ route('admin.jadwal-ka.import.form') }}"
+            href="{{ route('admin.jadwal-ka.import') }}"
             class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
         >
             &larr; Kembali ke Import
@@ -304,20 +304,20 @@
             </span>
         </div>
 
-        <div class="overflow-x-auto">
+        <div class="max-h-[550px] overflow-auto overscroll-contain">
             <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
+                <thead class="sticky top-0 z-10 bg-gray-100 shadow-sm">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">No.</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Sheet / JPL</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Baris Excel</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Nomor KA</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Nama KA</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Dari</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Ke</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Jam Lewat</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Keterangan</th>
-                        <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                        <th class="whitespace-nowrap bg-gray-100 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">No.</th>
+                        <th class="whitespace-nowrap bg-gray-100 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Sheet / JPL</th>
+                        <th class="whitespace-nowrap bg-gray-100 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Baris Excel</th>
+                        <th class="whitespace-nowrap bg-gray-100 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Nomor KA</th>
+                        <th class="whitespace-nowrap bg-gray-100 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Nama KA</th>
+                        <th class="whitespace-nowrap bg-gray-100 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Dari</th>
+                        <th class="whitespace-nowrap bg-gray-100 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Ke</th>
+                        <th class="whitespace-nowrap bg-gray-100 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Jam Lewat</th>
+                        <th class="whitespace-nowrap bg-gray-100 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Keterangan</th>
+                        <th class="whitespace-nowrap bg-gray-100 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
                     </tr>
                 </thead>
 
@@ -412,7 +412,7 @@
 
         <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <a
-                href="{{ route('admin.jadwal-ka.import.form') }}"
+                href="{{ route('admin.jadwal-ka.import') }}"
                 class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
             >
                 Batal dan Upload Ulang

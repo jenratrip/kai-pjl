@@ -1,10 +1,10 @@
-﻿@extends('layouts.superadmin')
+@extends('layouts.superadmin')
 
 @section('title', 'Detail Inventaris')
 @section('page-title', 'Detail Inventaris')
 
 @section('content')
-<div class="p-4 md:p-6">
+<div>
 
     <div class="mb-5">
         <a
@@ -20,6 +20,7 @@
 
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
+            <p class="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Pemantauan operasional · Baca saja</p>
             <h1 class="text-2xl font-bold text-[#1d2d50]">
                 {{ $inventaris->nama_barang }}
             </h1>
@@ -186,7 +187,7 @@
             </div>
 
             <div class="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4 text-xs leading-relaxed text-blue-800">
-                Jika inventaris memiliki riwayat pemeriksaan, tindakan hapus akan menonaktifkan inventaris agar riwayat tetap terjaga.
+                Halaman ini hanya menampilkan informasi inventaris untuk pemantauan.
             </div>
         </div>
 

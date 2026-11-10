@@ -105,6 +105,127 @@ test('logging in to an existing Dinas with an empty snapshot keeps the empty sna
     Carbon::setTestNow();
 });
 
+test('a scheduled PJL reguler can log in to the Dinas assigned by Admin', function () {
+    Carbon::setTestNow('2026-11-05 09:00:00');
+    $role = $this->kaiRole('pjl');
+    $user = $this->kaiUser($role, 'PJL-REGULER-SCHEDULED', ['password' => bcrypt('secret123')]);
+    $jpl = $this->kaiJpl();
+    $shift = $this->kaiShift();
+    $dinas = $this->kaiDinas($user, $jpl, $shift, [
+        'tanggal_dinas' => '2026-11-05',
+        'is_pengganti' => false,
+        'jadwal_ka_snapshot' => null,
+    ]);
+
+    $this->post(route('login.store'), [
+        'nip' => $user->nip,
+        'password' => 'secret123',
+        'nomor_pjl' => $jpl->kode_jpl,
+        'dinasan' => $shift->id,
+        'jenis_petugas' => 'reguler',
+    ])->assertRedirect(route('user.realisasi-ka'));
+
+    expect(session('dinas_id'))->toBe($dinas->id)
+        ->and($dinas->fresh()->jadwal_ka_snapshot)->toBeNull();
+});
+
+test('an unscheduled PJL reguler is rejected without creating a Dinas', function () {
+    $role = $this->kaiRole('pjl');
+    $user = $this->kaiUser($role, 'PJL-REGULER-UNSCHEDULED', ['password' => bcrypt('secret123')]);
+    $jpl = $this->kaiJpl();
+    $shift = $this->kaiShift();
+
+    $this->from(route('login'))->post(route('login.store'), [
+        'nip' => $user->nip,
+        'password' => 'secret123',
+        'nomor_pjl' => $jpl->kode_jpl,
+        'dinasan' => $shift->id,
+        'jenis_petugas' => 'reguler',
+    ])->assertRedirect(route('login'))
+        ->assertSessionHasErrors('nomor_pjl');
+
+    expect(DB::table('dinas')->count())->toBe(0)
+        ->and(Auth::check())->toBeFalse();
+});
+
+test('the login role check endpoint returns PJL without authenticating or creating a Dinas', function () {
+    $role = $this->kaiRole('pjl');
+    $user = $this->kaiUser($role, 'PJL-CHECK', ['password' => bcrypt('secret123')]);
+
+    $this->postJson(route('login.cek'), [
+        'nip' => $user->nip,
+        'password' => 'secret123',
+    ])->assertOk()->assertJson(['role' => 'pjl']);
+
+    expect(Auth::check())->toBeFalse()
+        ->and(DB::table('dinas')->count())->toBe(0);
+});
+
+test('the login page links its role check request to the registered route', function () {
+    $this->get(route('login'))
+        ->assertOk()
+        ->assertSee('data-cek-url="'.route('login.cek').'"', false)
+        ->assertDontSee('login-tab');
+});
+
+test('relogging to a Dinas with a non-empty snapshot preserves its snapshot and wakilan identity', function () {
+    Carbon::setTestNow('2026-11-05 09:00:00');
+    $role = $this->kaiRole('pjl');
+    $user = $this->kaiUser($role, 'PJL-LOCKED-WAKILAN', ['password' => bcrypt('secret123')]);
+    $jpl = $this->kaiJpl();
+    $shift = $this->kaiShift();
+    $replacementUser = $this->kaiUser($role, 'PJL-REPLACED');
+    $dinas = $this->kaiDinas($user, $jpl, $shift, [
+        'is_pengganti' => true,
+        'user_digantikan_id' => $replacementUser->id,
+        'jadwal_ka_snapshot' => [
+            'format_version' => 1,
+            'snapshot_at' => now()->toIso8601String(),
+            'dinas_id' => 1,
+            'jpl_id' => $jpl->id,
+            'shift_id' => $shift->id,
+            'tanggal_dinas' => '2026-11-05',
+            'jadwal_ka_batch_id' => null,
+            'source' => 'legacy',
+            'jadwal' => [['jadwal_ka_id' => 991]],
+        ],
+    ]);
+    $snapshot = $dinas->jadwal_ka_snapshot;
+    $snapshot['dinas_id'] = $dinas->id;
+    $dinas->update(['jadwal_ka_snapshot' => $snapshot]);
+
+    $this->post(route('login.store'), [
+        'nip' => $user->nip,
+        'password' => 'secret123',
+        'nomor_pjl' => $jpl->kode_jpl,
+        'dinasan' => $shift->id,
+        'jenis_petugas' => 'wakilan',
+    ])->assertRedirect(route('user.realisasi-ka'));
+
+    expect($dinas->fresh()->jadwal_ka_snapshot)->toBe($snapshot)
+        ->and($dinas->fresh()->user_digantikan_id)->toBe($replacementUser->id);
+});
+
+test('Admin and Superadmin still log in without PJL operational fields', function () {
+    $adminRole = $this->kaiRole('admin');
+    $superadminRole = $this->kaiRole('superadmin');
+    $admin = $this->kaiUser($adminRole, 'ADMIN-LOGIN', ['password' => bcrypt('secret123')]);
+    $superadmin = $this->kaiUser($superadminRole, 'SUPERADMIN-LOGIN', ['password' => bcrypt('secret123')]);
+
+    $this->post(route('login.store'), ['nip' => $admin->nip, 'password' => 'secret123'])
+        ->assertRedirect(route('admin.dashboard'));
+
+    expect(DB::table('dinas')->count())->toBe(0);
+
+    Auth::logout();
+    $this->flushSession();
+
+    $this->post(route('login.store'), ['nip' => $superadmin->nip, 'password' => 'secret123'])
+        ->assertRedirect(route('superadmin.dashboard'));
+
+    expect(DB::table('dinas')->count())->toBe(0);
+});
+
 test('a regular PJL login selects only the matching JPL and shift Dinas context', function () {
     Carbon::setTestNow('2026-11-05 09:00:00');
     $role = $this->kaiRole('pjl');
@@ -129,24 +250,4 @@ test('a regular PJL login selects only the matching JPL and shift Dinas context'
         ->and($selectedDinas->fresh()->status)->toBe('berlangsung');
 
     Carbon::setTestNow();
-});
-
-test('Admin and Superadmin still log in without PJL operational fields', function () {
-    $adminRole = $this->kaiRole('admin');
-    $superadminRole = $this->kaiRole('superadmin');
-    $admin = $this->kaiUser($adminRole, 'ADMIN-LOGIN', ['password' => bcrypt('secret123')]);
-    $superadmin = $this->kaiUser($superadminRole, 'SUPERADMIN-LOGIN', ['password' => bcrypt('secret123')]);
-
-    $this->post(route('login.store'), ['nip' => $admin->nip, 'password' => 'secret123'])
-        ->assertRedirect(route('admin.dashboard'));
-
-    expect(DB::table('dinas')->count())->toBe(0);
-
-    Auth::logout();
-    $this->flushSession();
-
-    $this->post(route('login.store'), ['nip' => $superadmin->nip, 'password' => 'secret123'])
-        ->assertRedirect(route('superadmin.dashboard'));
-
-    expect(DB::table('dinas')->count())->toBe(0);
 });

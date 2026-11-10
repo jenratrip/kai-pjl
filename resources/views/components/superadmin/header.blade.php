@@ -1,55 +1,35 @@
-<header class="flex h-20 items-center justify-between border-b border-gray-200 bg-white px-8">
+<header class="sticky top-0 z-20 flex min-h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 shadow-sm backdrop-blur sm:px-6 xl:px-8">
 
     {{-- Left --}}
-    <div>
-        <h2 class="text-xl font-semibold text-gray-800">
-            @yield('page-title', 'Dashboard')
-        </h2>
+    <div class="flex min-w-0 items-center gap-3">
+        <button
+            type="button"
+            x-on:click="sidebarOpen = true"
+            aria-controls="superadmin-sidebar"
+            x-bind:aria-expanded="sidebarOpen.toString()"
+            aria-label="Buka navigasi"
+            class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 lg:hidden"
+        >
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+        </button>
 
-        <p class="mt-1 text-sm text-gray-500">
-            Sistem Operasional PJL
-        </p>
+        <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-900 sm:text-base">KAI-PJL</p>
+            <p class="mt-0.5 hidden text-xs text-slate-500 sm:block">
+                Area pengawasan Superadmin
+            </p>
+        </div>
     </div>
 
     {{-- Right --}}
-    <div class="flex items-center gap-4">
-
-        {{-- Notification --}}
-        <button
-            type="button"
-            class="relative flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
-        >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="1.8"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5"
-                />
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M10 20h4"
-                />
-            </svg>
-
-            {{-- Notification indicator --}}
-            <span class="absolute right-2 top-2 h-2 w-2 rounded-full bg-orange-500"></span>
-        </button>
-
-        {{-- Divider --}}
-        <div class="h-8 w-px bg-gray-200"></div>
+    <div class="flex items-center gap-3">
 
         {{-- User --}}
         <div class="flex items-center gap-3">
 
-            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#0b1f3a] text-sm font-semibold text-white">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0b1f3a] text-sm font-semibold text-white ring-4 ring-blue-50">
                 {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
             </div>
 
@@ -58,7 +38,7 @@
                     {{ auth()->user()->name }}
                 </p>
 
-                <p class="text-xs text-gray-500">
+                <p class="text-xs font-medium text-slate-500">
                     Superadmin
                 </p>
             </div>

@@ -1,4 +1,4 @@
-<section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+<section class="serah-terima-ka-section rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
     @php
         $kaBatal = collect($ringkasanKA['batal'] ?? [])
             ->map(function ($ka) {
@@ -25,6 +25,23 @@
             ->filter(fn ($nomor) => $nomor !== '' && $nomor !== '-')
             ->unique()
             ->implode(', ');
+        $kaBatalTeks = $kaBatal
+            ->map(function ($ka) {
+                if ($ka['nomor'] === '' || $ka['nomor'] === '-') {
+                    return $ka['nama'] !== '' && $ka['nama'] !== '-'
+                        ? $ka['nama']
+                        : '-';
+                }
+
+                return $ka['nama'] !== '' && $ka['nama'] !== '-'
+                    ? $ka['nomor'] . ' - ' . $ka['nama']
+                    : $ka['nomor'];
+            })
+            ->filter(fn ($teks) => $teks !== '-')
+            ->unique()
+            ->values()
+            ->implode("\n");
+
     @endphp
 
     {{-- Header bagian --}}
@@ -56,44 +73,21 @@
     >
 
     {{-- Daftar KA batal dari realisasi --}}
-    <div class="space-y-2">
-        @forelse($kaBatal as $ka)
-            <div
-                class="rounded-lg border border-slate-200 bg-slate-50 p-3"
-                wire:key="ka-batal-{{ $ka['id'] ?? $loop->index }}"
-            >
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <p class="text-sm font-semibold text-slate-800">
-                            {{ $ka['nomor'] !== '' ? $ka['nomor'] : '-' }}
-                        </p>
-
-                        @if($ka['nama'] !== '' && $ka['nama'] !== '-')
-                            <p class="mt-1 text-sm text-slate-600">
-                                {{ $ka['nama'] }}
-                            </p>
-                        @endif
-                    </div>
-
-                    <span class="shrink-0 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
-                        BATAL
-                    </span>
-                </div>
-
-                @include('user.serahterimacatatan.partials.ka-check-indicators', ['ka' => $ka])
-            </div>
-        @empty
-            <div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center">
-                <p class="text-sm font-medium text-slate-600">
-                    Tidak ada KA yang batal.
-                </p>
-
-                <p class="mt-1 text-xs text-slate-500">
-                    Daftar akan terisi otomatis jika terdapat realisasi KA berstatus batal.
-                </p>
-            </div>
-        @endforelse
+    <div class="serah-terima-ka-list-screen">
+        <textarea
+            id="ka_batal_daftar"
+            rows="4"
+            readonly
+            placeholder="Tidak ada KA yang batal"
+            class="w-full rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        >{{ $kaBatalTeks !== '' ? $kaBatalTeks : 'Tidak ada' }}</textarea>
     </div>
+
+    @include('user.serahterimacatatan.partials.ka-print-table', [
+        'rows' => $ringkasanKA['batal'] ?? [],
+        'statusLabel' => 'Batal',
+        'showDetails' => false,
+    ])
 
     <p class="mt-3 flex items-start gap-2 text-xs leading-relaxed text-slate-500">
         <span aria-hidden="true">ⓘ</span>

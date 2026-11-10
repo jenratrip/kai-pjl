@@ -24,6 +24,13 @@
             </p>
         </div>
 
+        <div class="flex flex-wrap gap-2">
+        <a href="{{ route('admin.jadwal-ka.template') }}"
+           class="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200
+                  bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-800
+                  transition hover:bg-blue-100">
+            Unduh Template
+        </a>
         <a href="{{ route('admin.jadwal-ka.index') }}"
            class="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300
                   bg-white px-4 py-2.5 text-sm font-semibold text-slate-700
@@ -39,6 +46,7 @@
             </svg>
             Kembali ke Jadwal
         </a>
+        </div>
     </div>
 
     {{-- Notifikasi sukses --}}
@@ -403,7 +411,7 @@
                                 Unggah Excel
                             </p>
                             <p class="mt-1 text-xs leading-5 text-slate-500">
-                                Pilih workbook yang berisi sheet jadwal JPL.
+                                Gunakan template yang menyediakan satu sheet untuk setiap JPL aktif. Nama sheet harus tetap sama dengan kode JPL agar importer dapat menghubungkannya.
                             </p>
                         </div>
                     </li>

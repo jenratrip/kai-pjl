@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Http\Controllers\Auth\LoginController;
 use App\Services\ActivityLogService;
 use App\Models\Resort;
-use App\Models\Wilayah;
 use App\Models\Dinas;
 use App\Models\Jpl;
 use App\Models\Shift;
@@ -25,7 +24,6 @@ protected User $wakilan;
 protected User $reguler;
 protected Jpl $jpl;
 protected Shift $shift;
-protected Wilayah $wilayah;
 protected Resort $resort;
 
 protected function setUp(): void
@@ -53,13 +51,7 @@ $this->reguler = User::create([
 'is_active' => true,
 ]);
 
-$this->wilayah = Wilayah::create([
-'nama_wilayah' => 'Wilayah Testing',
-'is_active' => true,
-]);
-
 $this->resort = Resort::create([
-'wilayah_id' => $this->wilayah->id,
 'nama_resort' => 'Resort Testing',
 'is_active' => true,
 ]);

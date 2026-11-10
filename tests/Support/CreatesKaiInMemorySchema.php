@@ -50,18 +50,9 @@ trait CreatesKaiInMemorySchema
             $table->timestamps();
         });
 
-        Schema::create('wilayah', function (Blueprint $table): void {
-            $table->id();
-            $table->string('nama_wilayah')->nullable();
-            $table->text('keterangan')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-        });
-
         Schema::create('resorts', function (Blueprint $table): void {
             $table->id();
             $table->string('nama_resort')->nullable();
-            $table->foreignId('wilayah_id')->nullable();
             $table->text('keterangan')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
@@ -235,6 +226,7 @@ trait CreatesKaiInMemorySchema
             $table->string('kondisi')->nullable();
             $table->unsignedInteger('jumlah_aktual')->nullable();
             $table->text('catatan')->nullable();
+            $table->string('bukti_foto_path')->nullable();
             $table->dateTime('diperiksa_pada')->nullable();
             $table->foreignId('diperiksa_oleh')->nullable();
             $table->timestamps();

@@ -54,7 +54,8 @@ test('CSV import creates all valid rows without inventing schedule snapshots', f
         ->and($dinas->jpl_id)->toBe($jpl->id)
         ->and($dinas->shift_id)->toBe($shift->id)
         ->and($dinas->tanggal_dinas->toDateString())->toBe('2099-10-01')
-        ->and($dinas->jadwal_ka_snapshot)->toBeNull()
+        ->and($dinas->jadwal_ka_snapshot)->toBeArray()
+        ->and($dinas->jadwal_ka_snapshot['source'])->toBe('legacy')
         ->and($dinas->jadwal_ka_batch_id)->toBeNull();
 });
 
@@ -122,7 +123,7 @@ test('CSV import rechecks PJL active status inside the transaction', function ()
             'file' => dinasCsvUpload($pjl->nip),
         ])
         ->assertRedirect(route('admin.dinas.index'))
-        ->assertSessionHas('error');
+        ->assertSessionHas('import_errors');
 
     expect($deactivated)->toBeTrue()
         ->and(Dinas::query()->count())->toBe(0);
@@ -152,7 +153,7 @@ test('CSV import rechecks PJL role inside the transaction', function () {
             'file' => dinasCsvUpload($pjl->nip),
         ])
         ->assertRedirect(route('admin.dinas.index'))
-        ->assertSessionHas('error');
+        ->assertSessionHas('import_errors');
 
     expect($roleChanged)->toBeTrue()
         ->and(Dinas::query()->count())->toBe(0);
@@ -180,7 +181,7 @@ test('CSV import rechecks JPL active status inside the transaction', function ()
             'file' => dinasCsvUpload($pjl->nip),
         ])
         ->assertRedirect(route('admin.dinas.index'))
-        ->assertSessionHas('error');
+        ->assertSessionHas('import_errors');
 
     expect($deactivated)->toBeTrue()
         ->and(Dinas::query()->count())->toBe(0);
@@ -226,7 +227,7 @@ test('CSV import rechecks schedule conflicts inside the transaction', function (
             'file' => dinasCsvUpload($pjl->nip),
         ])
         ->assertRedirect(route('admin.dinas.index'))
-        ->assertSessionHas('error');
+        ->assertSessionHas('import_errors');
 
     expect($conflictInserted)->toBeTrue()
         ->and(Dinas::query()->count())->toBe(1);

@@ -105,6 +105,7 @@
             margin: 0;
             color: #B91C1C;
             font-size: 12px;
+            line-height: 1.5;
         }
 
         @media (max-width: 360px) {
@@ -117,11 +118,12 @@
 
 <body>
     @php
-        // Dikirim dari LoginController::showLoginForm() => [id_shift => nama_shift]
+        // Data dinasan dari LoginController::showLoginForm()
         $dinasanList = $dinasanList ?? [];
+
         $jenis = old('jenis_petugas', 'reguler');
 
-        // Tampilkan bagian PJL jika ada input/error PJL dari submit sebelumnya.
+        // Tampilkan bagian PJL jika terdapat input atau error sebelumnya.
         $showPjl = old('nomor_pjl') || old('dinasan')
             || $errors->has('nomor_pjl')
             || $errors->has('dinasan')
@@ -131,6 +133,7 @@
     <main class="flex min-h-screen items-center justify-center px-5 py-6">
         <div class="w-full max-w-[410px] rounded-[10px] bg-white px-[30px] pt-6 pb-5 shadow-[0_8px_25px_rgba(0,0,0,0.16)] max-[600px]:max-w-[380px] max-[600px]:px-[22px] max-[360px]:px-4">
 
+            {{-- Logo --}}
             <div class="mb-2 text-center">
                 <img
                     src="{{ asset('images/logo-kai.jpg') }}"
@@ -139,6 +142,7 @@
                 >
             </div>
 
+            {{-- Identitas sistem --}}
             <div class="mt-[5px] text-center text-[17px] leading-[1.3] font-bold text-[#1F3157] max-[600px]:text-base max-[360px]:text-[15px]">
                 Sistem Operasional PJL
             </div>
@@ -149,20 +153,31 @@
 
             <hr class="my-4 border-0 border-t border-[#E5E7EB]">
 
+            {{-- Error validasi dari server --}}
             @if ($errors->any())
-                <div class="mb-4 rounded-[7px] border border-red-200 bg-red-50 px-[13px] py-[11px] text-xs leading-[1.5] text-red-700">
+                <div
+                    class="mb-4 rounded-[7px] border border-red-200 bg-red-50 px-[13px] py-[11px] text-xs leading-[1.5] text-red-700"
+                    role="alert"
+                >
                     @foreach ($errors->all() as $error)
                         <p>{{ $error }}</p>
                     @endforeach
                 </div>
             @endif
 
-            {{-- Error dari pengecekan via JavaScript --}}
+            {{-- Error pengecekan melalui JavaScript --}}
             <div
                 class="mb-4 rounded-[7px] border border-red-200 bg-red-50 px-[13px] py-[11px] text-xs leading-[1.5] text-red-700"
                 id="clientError"
+                role="alert"
                 hidden
             ></div>
+
+            @if (session('status'))
+                <div class="mb-4 rounded-[7px] border border-green-200 bg-green-50 px-[13px] py-[11px] text-xs leading-[1.5] text-green-800" role="status">
+                    {{ session('status') }}
+                </div>
+            @endif
 
             <form
                 method="POST"
@@ -211,6 +226,7 @@
                     </div>
                 </div>
 
+                {{-- Password --}}
                 <div class="mb-3">
                     <label
                         for="password"
@@ -331,6 +347,7 @@
                                         {{ (string) old('dinasan') === (string) $shiftId ? 'checked' : '' }}
                                         required
                                     >
+
                                     <label for="dinasan{{ $shiftId }}">
                                         {{ $shiftNama }}
                                     </label>
@@ -358,7 +375,10 @@
                                     value="reguler"
                                     {{ $jenis === 'reguler' ? 'checked' : '' }}
                                 >
-                                <label for="jenisReguler">Reguler</label>
+
+                                <label for="jenisReguler">
+                                    Reguler
+                                </label>
                             </div>
 
                             <div class="jenis-option">
@@ -369,12 +389,16 @@
                                     value="wakilan"
                                     {{ $jenis === 'wakilan' ? 'checked' : '' }}
                                 >
-                                <label for="jenisWakilan">Wakilan (Pengganti)</label>
+
+                                <label for="jenisWakilan">
+                                    Wakilan (Pengganti)
+                                </label>
                             </div>
                         </div>
                     </div>
                 </fieldset>
 
+                {{-- Tombol login --}}
                 <button
                     type="submit"
                     class="login-button mt-0.5 h-11 w-full cursor-pointer rounded-lg border-0 bg-[#E3943D] font-[Arial] text-sm font-bold text-white transition-all hover:-translate-y-px hover:bg-[#D5822B] active:translate-y-0 focus:outline-none focus:ring-[3px] focus:ring-[#E3943D]/25 disabled:cursor-wait disabled:opacity-70 disabled:transform-none max-[600px]:h-[46px] max-[600px]:text-[13px] max-[360px]:h-11 max-[360px]:text-xs"
@@ -383,6 +407,13 @@
                 </button>
             </form>
 
+            <div class="mt-3 text-center text-xs">
+                <a href="{{ route('password.request') }}" class="font-semibold text-[#1F3157] underline underline-offset-2">
+                    Lupa kata sandi?
+                </a>
+            </div>
+
+            {{-- Informasi --}}
             <div class="mt-3 flex items-center justify-center gap-1.5 text-center text-[10px] leading-[1.4] text-[#7B8491] max-[600px]:text-[9px] max-[360px]:text-[8px]">
                 <span class="flex h-[13px] w-[13px] shrink-0 items-center justify-center">
                     <svg
@@ -403,5 +434,141 @@
             </div>
         </div>
     </main>
+
+    {{-- JavaScript login --}}
+    <script>
+        (function () {
+            const EYE = `
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+            `;
+
+            const EYE_OFF = `
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+                <line x1="4" y1="4" x2="20" y2="20"></line>
+            `;
+
+            // Tampilkan atau sembunyikan password.
+            document.querySelectorAll('.password-toggle').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const input = document.getElementById(btn.dataset.target);
+
+                    if (!input) {
+                        return;
+                    }
+
+                    const show = input.type === 'password';
+
+                    input.type = show ? 'text' : 'password';
+
+                    btn.setAttribute(
+                        'aria-label',
+                        show ? 'Sembunyikan password' : 'Tampilkan password'
+                    );
+
+                    btn.querySelector('svg').innerHTML = show ? EYE_OFF : EYE;
+                });
+            });
+
+            const form = document.getElementById('loginForm');
+            const nipInput = document.getElementById('nip');
+            const passInput = document.getElementById('password');
+            const pjlFields = document.getElementById('pjlFields');
+            const submitBtn = form.querySelector('.login-button');
+            const errorBox = document.getElementById('clientError');
+
+            const tokenInput = form.querySelector('input[name="_token"]');
+
+            if (!form || !nipInput || !passInput || !pjlFields || !submitBtn || !errorBox || !tokenInput) {
+                return;
+            }
+
+            const token = tokenInput.value;
+
+            function setPjl(show) {
+                pjlFields.hidden = !show;
+                pjlFields.disabled = !show;
+            }
+
+            function showError(message) {
+                errorBox.textContent = message;
+                errorBox.hidden = false;
+            }
+
+            function clearError() {
+                errorBox.textContent = '';
+                errorBox.hidden = true;
+            }
+
+            // Jika NIP atau password berubah, lakukan pengecekan ulang.
+            [nipInput, passInput].forEach(function (element) {
+                element.addEventListener('input', function () {
+                    setPjl(false);
+                    clearError();
+                });
+            });
+
+            form.addEventListener('submit', async function (event) {
+                // Jika field PJL sudah tampil, lanjutkan validasi server.
+                if (!pjlFields.hidden) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                clearError();
+
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Memeriksa...';
+
+                try {
+                    const response = await fetch(form.dataset.cekUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': token,
+                        },
+                        body: JSON.stringify({
+                            nip: nipInput.value,
+                            password: passInput.value,
+                        }),
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        showError(
+                            data.message || 'NIPP / NIPKWT atau password tidak valid.'
+                        );
+
+                        return;
+                    }
+
+                    if (data.role === 'pjl') {
+                        setPjl(true);
+
+                        document.getElementById('nomorPjl').focus();
+
+                        return;
+                    }
+
+                    if (data.role === 'admin') {
+                        form.submit();
+                        return;
+                    }
+
+                    showError('Role pengguna tidak dikenali.');
+                } catch (error) {
+                    showError(
+                        'Gagal menghubungi server. Periksa koneksi Anda dan coba kembali.'
+                    );
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Masuk ke Sistem';
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

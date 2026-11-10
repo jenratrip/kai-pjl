@@ -6,8 +6,6 @@
 
         init() {
             const masterActive = {{ request()->routeIs(
-                'admin.wilayah.*',
-                'admin.resort.*',
                 'admin.jpl.*'
             ) ? 'true' : 'false' }};
 
@@ -167,58 +165,6 @@
                 x-cloak
                 class="ml-5 mt-1 space-y-1 border-l border-white/10 pl-4"
             >
-                <!-- WILAYAH -->
-                <a
-                    href="{{ route('admin.wilayah.index') }}"
-                    @click="closeSidebar()"
-                    class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition
-                    {{ request()->routeIs('admin.wilayah.*')
-                        ? 'bg-orange-500/10 text-orange-400'
-                        : 'text-gray-400 hover:bg-white/5 hover:text-white' }}"
-                >
-                    <svg
-                        class="h-4 w-4 shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="1.8"
-                            d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6zm6-3v15m6-12v15"
-                        />
-                    </svg>
-
-                    <span>Wilayah</span>
-                </a>
-
-                <!-- RESORT -->
-                <a
-                    href="{{ route('admin.resort.index') }}"
-                    @click="closeSidebar()"
-                    class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition
-                    {{ request()->routeIs('admin.resort.*')
-                        ? 'bg-orange-500/10 text-orange-400'
-                        : 'text-gray-400 hover:bg-white/5 hover:text-white' }}"
-                >
-                    <svg
-                        class="h-4 w-4 shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="1.8"
-                            d="M3 21h18M5 21V7l7-4 7 4v14M9 10h1m4 0h1m-6 4h1m4 0h1m-5 7v-4h2v4"
-                        />
-                    </svg>
-
-                    <span>Resort</span>
-                </a>
-
                 <!-- JPL -->
                 <a
                     href="{{ route('admin.jpl.index') }}"

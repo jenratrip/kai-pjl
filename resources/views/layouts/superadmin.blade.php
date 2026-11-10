@@ -29,19 +29,28 @@
 
 </head>
 
-<body class="min-h-screen bg-gray-100 text-gray-800">
+<body class="superadmin-shell min-h-screen bg-slate-50 text-slate-800" x-data="{ sidebarOpen: false }" x-on:keydown.escape.window="sidebarOpen = false">
+
+    <div
+        x-cloak
+        x-show="sidebarOpen"
+        x-transition.opacity
+        x-on:click="sidebarOpen = false"
+        class="fixed inset-0 z-30 bg-slate-950/50 lg:hidden"
+        aria-hidden="true"
+    ></div>
 
     {{-- Sidebar --}}
     <x-superadmin.sidebar />
 
     {{-- Main Content --}}
-    <div class="min-h-screen pl-64">
+    <div class="min-h-screen lg:pl-64">
 
         {{-- Header --}}
         <x-superadmin.header />
 
         {{-- Page Content --}}
-        <main class="p-8">
+        <main class="superadmin-content px-4 py-5 sm:px-6 sm:py-7 xl:px-8">
 
             @yield('content')
 

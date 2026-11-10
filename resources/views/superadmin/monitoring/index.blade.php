@@ -1,13 +1,14 @@
 @extends('layouts.superadmin')
 
 @section('title', 'Monitoring Sistem')
+@section('page-title', 'Monitoring Sistem')
 
 @section('content')
 <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="text-2xl font-bold text-gray-800">Monitoring Sistem</h1>
-            <p class="mt-1 text-sm text-gray-500">Pantau koneksi database, aktivitas, dan riwayat error aplikasi.</p>
+            <p class="mt-1 text-sm text-gray-500">Pemeriksaan aktual aplikasi, infrastruktur, integritas data, dan log error.</p>
         </div>
 
         <a href="{{ route('superadmin.monitoring.index', request()->query()) }}"
@@ -16,37 +17,87 @@
         </a>
     </div>
 
-    {{-- Status utama --}}
+    {{-- Ringkasan aktual --}}
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <p class="text-sm text-gray-500">Koneksi Database</p>
-            <div class="mt-3 flex items-center gap-2">
-                <span class="h-3 w-3 rounded-full {{ $databaseConnected ? 'bg-green-500' : 'bg-red-500' }}"></span>
-                <span class="font-semibold {{ $databaseConnected ? 'text-green-700' : 'text-red-700' }}">
-                    {{ $databaseConnected ? 'Terhubung' : 'Bermasalah' }}
-                </span>
+        @foreach ([['Aplikasi', $application], ['Koneksi Database', $database], ['Storage', $storage], ['Scheduler', $scheduler], ['Queue', $queue]] as [$healthTitle, $health])
+            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <p class="text-sm text-gray-500">{{ $healthTitle }}</p>
+                <div class="mt-3 flex items-start gap-2">
+                    <span class="mt-1.5 h-3 w-3 shrink-0 rounded-full {{ $health['state'] === 'ok' ? 'bg-green-500' : ($health['state'] === 'error' ? 'bg-red-500' : 'bg-amber-500') }}"></span>
+                    <div>
+                        <p class="font-semibold {{ $health['state'] === 'ok' ? 'text-green-700' : ($health['state'] === 'error' ? 'text-red-700' : 'text-amber-700') }}">{{ $health['label'] }}</p>
+                        <p class="mt-1 text-xs text-gray-500">{{ $health['detail'] }}</p>
+                    </div>
+                </div>
             </div>
-        </div>
+        @endforeach
 
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <p class="text-sm text-gray-500">Aktivitas Hari Ini</p>
-            <p class="mt-3 text-3xl font-bold text-gray-800">{{ number_format($activitiesToday) }}</p>
-            <p class="mt-1 text-xs text-gray-500">Berdasarkan Activity Log</p>
+            <p class="mt-3 text-3xl font-bold text-gray-800">{{ $activitiesToday === null ? '—' : number_format($activitiesToday) }}</p>
+            <p class="mt-1 text-xs text-gray-500">{{ $activitiesToday === null ? 'Activity Log tidak dapat diperiksa' : 'Berdasarkan Activity Log' }}</p>
         </div>
 
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <p class="text-sm text-gray-500">Error Hari Ini</p>
-            <p class="mt-3 text-3xl font-bold {{ $errorsToday > 0 ? 'text-red-600' : 'text-green-700' }}">
-                {{ number_format($errorsToday) }}
+            <p class="mt-3 text-3xl font-bold {{ $errorsToday > 0 ? 'text-red-600' : ($logCoverageComplete ? 'text-green-700' : 'text-amber-600') }}">
+                @if (!$logExists || !$logReadable)
+                    —
+                @else
+                    {{ $logCoverageComplete ? '' : '≥ ' }}{{ number_format($errorsToday) }}
+                @endif
             </p>
-            <p class="mt-1 text-xs text-gray-500">Level ERROR, CRITICAL, ALERT, dan EMERGENCY</p>
+            <p class="mt-1 text-xs text-gray-500">
+                @if ($logExists && $logReadable)
+                    {{ number_format($uniqueErrorGroupsToday) }} kelompok unik dari {{ number_format($errorsToday) }} kejadian terdeteksi.
+                @else
+                    Jumlah kejadian dan kelompok tidak tersedia.
+                @endif
+            </p>
+            <p class="mt-2 text-xs {{ $logCoverageComplete ? 'text-slate-500' : 'font-medium text-amber-700' }}">{{ $logCoverageSummary }}</p>
         </div>
     </div>
 
+    <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-800">Integritas Data</h2>
+                <p class="mt-1 text-sm text-gray-500">Pemeriksaan baca-saja pada snapshot Dinas dan cakupan versi Jadwal KA.</p>
+            </div>
+            <p class="text-xs text-gray-500">Terakhir diperiksa: {{ $checkedAt->format('d-m-Y H:i:s') }}</p>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            @foreach ([['Dinas dan Snapshot', $integrity['dinas']], ['Batch Jadwal KA', $integrity['jadwal']]] as [$integrityTitle, $result])
+                <article class="rounded-lg border border-gray-200 p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <h3 class="font-semibold text-gray-800">{{ $integrityTitle }}</h3>
+                        <span class="rounded-full px-3 py-1 text-xs font-semibold {{ $result['state'] === 'ok' ? 'bg-green-50 text-green-700' : ($result['state'] === 'error' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700') }}">
+                            {{ $result['label'] }}
+                        </span>
+                    </div>
+                    <ul class="mt-3 space-y-1 text-sm text-gray-600">
+                        @foreach ($result['details'] as $detail)
+                            <li>{{ $detail }}</li>
+                        @endforeach
+                    </ul>
+                </article>
+            @endforeach
+        </div>
+    </section>
+
     {{-- Informasi aplikasi --}}
     <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 class="text-lg font-semibold text-gray-800">Informasi Aplikasi</h2>
+        <h2 class="text-lg font-semibold text-gray-800">Informasi Aplikasi dan Pemeriksaan</h2>
         <div class="mt-4 divide-y divide-gray-100">
+            <div class="flex flex-wrap justify-between gap-2 py-3">
+                <span class="text-sm text-gray-500">Status aplikasi</span>
+                <span class="text-sm font-medium">{{ $application['label'] }}</span>
+            </div>
+            <div class="flex flex-wrap justify-between gap-2 py-3">
+                <span class="text-sm text-gray-500">Pemeriksaan terakhir</span>
+                <span class="text-sm font-medium">{{ $checkedAt->format('d-m-Y H:i:s T') }}</span>
+            </div>
             <div class="flex flex-wrap justify-between gap-2 py-3">
                 <span class="text-sm text-gray-500">Versi Laravel</span>
                 <span class="text-sm font-medium">{{ $laravelVersion }}</span>
@@ -75,6 +126,14 @@
                     @endif
                 </span>
             </div>
+            <div class="flex flex-wrap justify-between gap-2 py-3">
+                <span class="text-sm text-gray-500">Pemindaian log</span>
+                <span class="text-sm font-medium">Maksimal 7 file terbaru dan 2 MB per file</span>
+            </div>
+            <div class="flex flex-wrap justify-between gap-2 py-3">
+                <span class="text-sm text-gray-500">Cakupan error hari ini</span>
+                <span class="text-sm font-medium {{ $logCoverageComplete ? 'text-green-700' : 'text-amber-700' }}">{{ $logCoverageSummary }}</span>
+            </div>
         </div>
     </section>
 
@@ -84,11 +143,15 @@
             <div>
                 <h2 class="text-lg font-semibold text-gray-800">Riwayat Error Sistem</h2>
                 <p class="mt-1 text-sm text-gray-500">
-                    Secara default menampilkan log tiga bulan terakhir. Hasil dipaginasi 20 entri per halaman.
+                    Secara default menampilkan log tiga bulan terakhir. Hasil dipaginasi 20 entri per halaman dan isi log dibatasi agar pemeriksaan tetap ringan.
                 </p>
             </div>
-            <span class="rounded-full px-3 py-1 text-sm font-semibold {{ $errorsToday > 0 ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700' }}">
-                {{ number_format($errorsToday) }} error hari ini
+            <span class="rounded-full px-3 py-1 text-sm font-semibold {{ $errorsToday > 0 ? 'bg-red-50 text-red-700' : ($logCoverageComplete ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700') }}">
+                @if (!$logExists || !$logReadable)
+                    Error hari ini tidak dapat dihitung
+                @else
+                    {{ $logCoverageComplete ? '' : '≥ ' }}{{ number_format($errorsToday) }} kejadian · {{ number_format($uniqueErrorGroupsToday) }} kelompok unik
+                @endif
             </span>
         </div>
 
@@ -250,6 +313,11 @@
         </script>
 
         <div id="error-results">
+        @if ($logsTruncated)
+            <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Pemindaian file, ukuran, atau daftar detail mencapai batas. Cakupan hitungan harian dijelaskan terpisah; daftar riwayat dapat dibatasi.
+            </div>
+        @endif
         @if ($errors->any())
             <div class="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                 @foreach ($errors->all() as $errorMessage)

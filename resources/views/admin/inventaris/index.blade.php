@@ -40,6 +40,7 @@
             ['label' => 'Rusak', 'value' => $statistik['rusak'], 'color' => 'text-red-600'],
             ['label' => 'Hilang', 'value' => $statistik['hilang'], 'color' => 'text-rose-700'],
             ['label' => 'Belum Diperiksa', 'value' => $statistik['belum_diperiksa'], 'color' => 'text-gray-600'],
+            ['label' => 'Perlu Tinjauan', 'value' => $statistik['perlu_tinjauan'], 'color' => 'text-orange-600'],
         ];
     @endphp
 
@@ -69,6 +70,7 @@
             'perlu_perbaikan' => 'Perlu Perbaikan',
             'rusak' => 'Rusak',
             'hilang' => 'Hilang',
+            'perlu_tinjauan' => 'Perlu Tinjauan',
         ];
     @endphp
 
@@ -125,6 +127,7 @@
                         <th class="px-5 py-4 text-center">Aktif</th>
                         <th class="px-5 py-4 text-center">Baik</th>
                         <th class="px-5 py-4 text-center">Rusak</th>
+                        <th class="px-5 py-4 text-center">Perlu Tinjauan</th>
                         <th class="px-5 py-4 text-right">Aksi</th>
                     </tr>
                 </thead>
@@ -161,6 +164,10 @@
                                 {{ $jpl->inventaris_rusak_count }}
                             </td>
 
+                            <td class="px-5 py-4 text-center font-semibold text-orange-600">
+                                {{ $jpl->inventaris_perlu_tinjauan_count }}
+                            </td>
+
                             <td class="px-5 py-4 text-right">
                                 <a href="{{ route('admin.inventaris.jpl.show', $jpl->id) }}"
                                    class="inline-flex rounded-lg bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100">
@@ -170,7 +177,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-5 py-12 text-center text-gray-500">
+                            <td colspan="8" class="px-5 py-12 text-center text-gray-500">
                                 Tidak ada JPL yang sesuai dengan pencarian atau filter.
                             </td>
                         </tr>

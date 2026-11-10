@@ -15,6 +15,7 @@ class RealisasiInventaris extends Model
         'status',
         'kondisi',
         'catatan',
+        'bukti_foto_path',
         'diperiksa_pada',
         'diperiksa_oleh',
         'jumlah_aktual',

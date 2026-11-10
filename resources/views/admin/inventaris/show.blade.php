@@ -5,6 +5,29 @@
 @section('content')
 <div class="p-4 md:p-6">
 
+    @if(session('success'))
+        <div role="alert" class="mb-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div role="alert" class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {{ session('error') }}
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div role="alert" class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <p class="font-semibold">Periksa kembali data berikut:</p>
+            <ul class="mt-2 list-inside list-disc">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     <div class="mb-5">
         @if($inventaris->jpl_id)
             <a
@@ -176,6 +199,11 @@
                 </div>
 
                 <div>
+                    <p class="text-xs font-semibold text-gray-500">Dilaporkan Oleh</p>
+                    <p class="mt-1 text-sm text-gray-700">{{ $inventaris->pelapor?->name ?? '-' }}</p>
+                </div>
+
+                <div>
                     <p class="text-xs font-semibold text-gray-500">
                         Catatan Tinjauan
                     </p>
@@ -194,13 +222,39 @@
                             : '-' }}
                     </p>
                 </div>
+
+                <div>
+                    <p class="text-xs font-semibold text-gray-500">Ditinjau Oleh</p>
+                    <p class="mt-1 text-sm text-gray-700">{{ $inventaris->peninjau?->name ?? '-' }}</p>
+                </div>
             </div>
 
-            <div class="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4 text-xs leading-relaxed text-blue-800">
-                Aksi peninjauan dan penyelesaian masalah perlu dihubungkan
-                dengan controller tindak lanjut yang digunakan aplikasi,
-                agar riwayat pemeriksaan tetap terjaga.
-            </div>
+            @if($inventaris->status_tinjauan === 'perlu_tinjauan')
+                <form action="{{ route('admin.inventaris.review', $inventaris->id) }}" method="POST" class="mt-6 border-t border-gray-100 pt-5">
+                    @csrf
+                    <label for="catatan_tinjauan" class="block text-sm font-semibold text-gray-700">
+                        Catatan Hasil Tinjauan <span class="text-red-500">*</span>
+                    </label>
+                    <textarea
+                        id="catatan_tinjauan"
+                        name="catatan_tinjauan"
+                        rows="5"
+                        required
+                        maxlength="2000"
+                        class="mt-2 w-full rounded-xl border border-gray-300 p-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    >{{ old('catatan_tinjauan') }}</textarea>
+                    @error('catatan_tinjauan')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                    <button type="submit" class="mt-4 w-full rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white hover:bg-green-700">
+                        Selesaikan Tinjauan
+                    </button>
+                </form>
+            @else
+                <div class="mt-6 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                    Tinjauan inventaris sudah diselesaikan.
+                </div>
+            @endif
         </div>
 
     </div>

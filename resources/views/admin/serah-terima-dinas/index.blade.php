@@ -1,6 +1,7 @@
-@extends('layouts.admin')
+@extends(auth()->user()?->isSuperadmin() ? 'layouts.superadmin' : 'layouts.admin')
 
 @section('title', 'Serah Terima Dinas')
+@section('page-title', 'Serah Terima Dinas')
 
 @section('content')
 <div class="p-6 lg:p-8">
@@ -11,7 +12,7 @@
         </h1>
         <p class="mt-1 text-sm text-gray-500">
             Daftar pengajuan serah terima dinas dari petugas PJL
-            yang ditujukan kepada akun Anda.
+            {{ auth()->user()?->isSuperadmin() ? 'yang dapat dipantau secara baca saja.' : 'yang ditujukan kepada akun Anda.' }}
         </p>
     </div>
 

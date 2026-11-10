@@ -1,14 +1,15 @@
-﻿@extends('layouts.superadmin')
+@extends('layouts.superadmin')
 
 @section('title', 'Master Inventaris')
 @section('page-title', 'Master Inventaris')
 
 @section('content')
-<div class="p-4 md:p-6">
+<div>
 
     {{-- HEADER --}}
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Pemantauan operasional · Baca saja</p>
             <h1 class="text-2xl font-bold text-[#1d2d50]">
                 Master Inventaris
             </h1>
@@ -28,18 +29,13 @@
     {{-- STATISTIK GLOBAL --}}
     @php
         $cards = [
-            ['label' => 'Total Jenis Inventaris', 'value' => $statistik['total_jenis'], 'color' => 'text-[#1d2d50]'],
-            ['label' => 'Total Unit Barang', 'value' => $statistik['total_unit'], 'color' => 'text-[#1d2d50]'],
-            ['label' => 'Inventaris Aktif', 'value' => $statistik['aktif'], 'color' => 'text-green-600'],
-            ['label' => 'Kondisi Baik', 'value' => $statistik['baik'], 'color' => 'text-green-600'],
-            ['label' => 'Perlu Perbaikan', 'value' => $statistik['perlu_perbaikan'], 'color' => 'text-amber-600'],
-            ['label' => 'Rusak', 'value' => $statistik['rusak'], 'color' => 'text-red-600'],
-            ['label' => 'Hilang', 'value' => $statistik['hilang'], 'color' => 'text-rose-700'],
-            ['label' => 'Belum Diperiksa', 'value' => $statistik['belum_diperiksa'], 'color' => 'text-gray-600'],
+            ['label' => 'Jenis inventaris', 'value' => $statistik['total_jenis'], 'color' => 'text-slate-900'],
+            ['label' => 'Unit barang', 'value' => $statistik['total_unit'], 'color' => 'text-slate-900'],
+            ['label' => 'Inventaris aktif', 'value' => $statistik['aktif'], 'color' => 'text-emerald-700'],
         ];
     @endphp
 
-    <div class="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         @foreach($cards as $card)
             <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <p class="text-xs font-medium text-gray-500 sm:text-sm">
@@ -48,12 +44,22 @@
                 <p class="mt-2 text-2xl font-bold {{ $card['color'] }}">
                     {{ number_format($card['value']) }}
                 </p>
-                <p class="mt-1 text-[11px] text-gray-400">
-                    Seluruh database
-                </p>
+                <p class="mt-1 text-xs text-gray-500">Ringkasan seluruh data</p>
             </div>
         @endforeach
     </div>
+
+    <section aria-label="Ringkasan kondisi inventaris" class="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <h2 class="text-sm font-semibold text-slate-800">Kondisi pemeriksaan terakhir</h2>
+        <div class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-5">
+            @foreach ([['Baik', $statistik['baik'], 'text-emerald-700'], ['Perlu perbaikan', $statistik['perlu_perbaikan'], 'text-amber-700'], ['Rusak', $statistik['rusak'], 'text-red-700'], ['Hilang', $statistik['hilang'], 'text-rose-700'], ['Belum diperiksa', $statistik['belum_diperiksa'], 'text-slate-600']] as [$label, $value, $color])
+                <div class="border-l-2 border-slate-200 pl-3">
+                    <p class="text-xs text-slate-500">{{ $label }}</p>
+                    <p class="mt-1 text-lg font-semibold {{ $color }}">{{ number_format($value) }}</p>
+                </div>
+            @endforeach
+        </div>
+    </section>
 
     {{-- FILTER --}}
     @php
