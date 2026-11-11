@@ -94,18 +94,11 @@ function setManualCheck(button) {
     };
 
     const field = fieldMap[group];
-
     if (!field || !['yes', 'no'].includes(value)) return;
 
     const buttons = document.querySelectorAll(
         `.mini-check [data-group="${group}"]`
     );
-
-    const baseClasses = [
-        'border-slate-300',
-        'bg-white',
-        'text-slate-500'
-    ];
 
     buttons.forEach(item => {
         item.classList.remove(
@@ -113,14 +106,16 @@ function setManualCheck(button) {
             'border-red-300', 'bg-red-100', 'text-red-700'
         );
 
-        baseClasses.forEach(className => {
-            item.classList.add(className);
-        });
+        item.classList.add(
+            'border-slate-300', 'bg-slate-50', 'text-slate-500'
+        );
 
         item.setAttribute('aria-pressed', 'false');
     });
 
-    button.classList.remove(...baseClasses);
+    button.classList.remove(
+        'border-slate-300', 'bg-slate-50', 'text-slate-500'
+    );
 
     button.classList.add(
         value === 'yes' ? 'border-green-300' : 'border-red-300',
@@ -129,7 +124,6 @@ function setManualCheck(button) {
     );
 
     button.setAttribute('aria-pressed', 'true');
-
     manualCheck[field] = value;
 }
 
@@ -148,9 +142,7 @@ function resetManualChecks() {
         );
 
         button.classList.add(
-            'border-slate-300',
-            'bg-white',
-            'text-slate-500'
+            'border-slate-300', 'bg-slate-50', 'text-slate-500'
         );
 
         button.setAttribute('aria-pressed', 'false');
@@ -161,8 +153,6 @@ function resetFormManual() {
     [
         'manualNomor',
         'manualNama',
-        'manualHulu',
-        'manualHilir',
         'manualRelasi',
         'manualAktual',
         'manualKeterangan'
@@ -186,8 +176,6 @@ function ambilNilaiInput(id) {
 function tambahKAManual() {
     const nomor = ambilNilaiInput('manualNomor');
     const nama = ambilNilaiInput('manualNama');
-    const hulu = ambilNilaiInput('manualHulu');
-    const hilir = ambilNilaiInput('manualHilir');
     const relasi = ambilNilaiInput('manualRelasi');
     const keterangan = ambilNilaiInput('manualKeterangan');
     const aktual = ambilNilaiInput('manualAktual') || getNowHHMM();
@@ -208,8 +196,6 @@ function tambahKAManual() {
         no: dataKA.length + 1,
         nomor,
         nama,
-        hulu,
-        hilir,
         relasi,
         arah: '',
         jadwal: '-',
@@ -235,7 +221,7 @@ function tambahKAManual() {
     renderTable();
     toggleFormTambahKA(false);
 
-    tandaiBerubah(JEDA_SIMPAN_STATUS, indexBaru);
+    tandaiBerubah(indexBaru);
 }
 
 document.addEventListener('keydown', event => {

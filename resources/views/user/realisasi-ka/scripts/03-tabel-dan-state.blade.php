@@ -78,9 +78,7 @@ function simpanBaris(index) {
 
     refreshRowButtons();
 
-    simpanRealisasi({
-        index
-    });
+    simpanRealisasi();
 }
 
 /* =====================================================
@@ -179,20 +177,20 @@ function createStatus(ka, index) {
             <button
                 type="button"
                 data-print-status="jalan"
-                style="${jalanStyle}"
+                style="${jalanStyle}font-size:18px;"
                 onclick="setStatus(${index}, 'JALAN')"
-                aria-pressed="${jalanActive}">
-                JALAN
-            </button>
+                aria-label="Tandai KA jalan"
+                title="Jalan"
+                aria-pressed="${jalanActive}">✓</button>
 
             <button
                 type="button"
                 data-print-status="batal"
-                style="${batalStyle}"
+                style="${batalStyle}font-size:18px;"
                 onclick="setStatus(${index}, 'BATAL')"
-                aria-pressed="${batalActive}">
-                BATAL
-            </button>
+                aria-label="Tandai KA batal"
+                title="Batal"
+                aria-pressed="${batalActive}">×</button>
         </div>
 
         ${note
@@ -279,72 +277,64 @@ function renderTable(forPrint = false) {
         }
 
         row.innerHTML = `
-            <td class="whitespace-nowrap px-3 py-3 text-center text-sm text-gray-600">
+            <td class="break-words px-1 py-2 text-center text-xs text-gray-600">
                 ${visibleIndex + 1}
             </td>
 
-            <td class="whitespace-nowrap px-3 py-3 text-sm font-semibold text-gray-800">
+            <td class="break-words px-1 py-2 text-xs font-semibold text-gray-800">
                 ${escapeHtml(ka.nomor)}
                 ${ka.is_manual
                     ? '<div class="mt-1 text-xs font-medium text-amber-600">MANUAL</div>'
                     : ''}
             </td>
 
-            <td class="min-w-36 px-3 py-3 text-sm text-gray-800">
+            <td class="break-words px-1 py-2 text-xs text-gray-800">
                 ${escapeHtml(ka.nama)}
                 ${awasInfo.indexSet.has(index)
                     ? '<div class="awas-badge">⚠ AWAS 2 ARAH</div>'
                     : ''}
             </td>
 
-            <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">
-                ${escapeHtml(ka.hulu || '-')}
-            </td>
-
-            <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">
-                ${escapeHtml(ka.hilir || '-')}
-            </td>
-
-            <td class="min-w-28 px-3 py-3 text-sm text-gray-600">
+            <td class="break-words px-1 py-2 text-xs text-gray-600">
                 ${escapeHtml(ka.relasi || '-')}
             </td>
 
-            <td class="whitespace-nowrap px-3 py-3 text-center text-sm font-medium text-gray-700">
+            <td class="whitespace-nowrap px-1 py-2 text-center text-xs font-medium text-gray-700">
                 ${escapeHtml(ka.jadwal)}
             </td>
 
-            <td class="min-w-32 px-3 py-3">
+            <td class="px-1 py-2">
                 <input
                     type="time"
-                    class="actual-time w-full min-w-24 rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    class="actual-time w-full min-w-0 rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     value="${escapeHtml(ka.aktual)}"
                     onchange="updateActualTime(${index}, this.value)">
             </td>
 
-            <td class="min-w-28 px-3 py-3 text-center">
+            <td class="px-1 py-2 text-center">
                 ${createStatus(ka, index)}
             </td>
 
-            <td class="min-w-28 px-3 py-3 text-center">
+            <td class="px-1 py-2 text-center">
                 ${createCheckGroup(ka.semboyan21, index, 'semboyan21')}
             </td>
 
-            <td class="min-w-24 px-3 py-3 text-center">
+            <td class="px-1 py-2 text-center">
                 ${createCheckGroup(ka.genta, index, 'genta')}
             </td>
 
-            <td class="min-w-36 px-3 py-3 text-center">
+            <td class="px-1 py-2 text-center">
                 ${createCheckGroup(ka.pintu, index, 'pintu')}
             </td>
 
-            <td class="min-w-28 px-3 py-3 text-center">
+            <td class="px-1 py-2 text-center">
                 ${createCheckGroup(ka.semboyan35, index, 'semboyan35')}
             </td>
 
-            <td class="min-w-44 px-3 py-3">
+            <td class="px-1 py-2">
                 <input
                     type="text"
-                    class="note-input w-full min-w-36 rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    class="note-input w-full min-w-0 rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     value="${escapeHtml(ka.keterangan)}"
                     placeholder="Keterangan"
                     oninput="updateKeterangan(${index}, this.value)">

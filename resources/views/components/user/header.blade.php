@@ -75,7 +75,7 @@
 <header
     class="user-header fixed inset-x-0 top-0 z-30 flex h-[76px] items-center justify-between border-b border-slate-200 bg-white px-4 transition-[margin,width] duration-300 ease-in-out sm:px-6"
     :class="sidebarOpen
-        ? 'ml-[230px] w-[calc(100%-230px)]'
+        ? 'lg:ml-[260px] lg:w-[calc(100%-260px)]'
         : 'ml-0 w-full'"
 >
 
@@ -154,7 +154,8 @@
          BAGIAN KANAN: IDENTITAS DINAS
     ====================================================== --}}
 
-    <div class="ml-3 min-w-0 text-right">
+    <div class="ml-3 flex min-w-0 items-center justify-end gap-3">
+        <div class="min-w-0 text-right">
 
         {{-- NOMOR DAN LOKASI PJL --}}
         <div class="truncate text-sm font-bold text-[#1d2d50]">
@@ -200,6 +201,21 @@
             @endif
         </div>
 
+
+        </div>
+
+        {{-- FOTO PROFIL PENGGUNA --}}
+        <a
+            href="{{ route('user.profile.show') }}"
+            class="shrink-0 rounded-full transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-[#1d2d50]/30"
+            aria-label="Buka profil pengguna"
+            title="Profil Saya"
+        >
+            <x-user-operasional.user-avatar
+                :user="auth()->user()"
+                size="h-10 w-10"
+            />
+        </a>
     </div>
 
 </header>

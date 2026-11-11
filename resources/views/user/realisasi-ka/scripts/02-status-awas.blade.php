@@ -81,7 +81,7 @@ function getStatusNote(ka, color) {
     const selisih = getSelisihMenit(ka);
 
     if (color === 'belum') {
-        return 'Menunggu konfirmasi';
+        return '';
     }
 
     if (selisih === null) {

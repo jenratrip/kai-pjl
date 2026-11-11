@@ -19,7 +19,7 @@ class CatatanDinasController extends Controller
         return Dinas::with([
             'user',
             'userDigantikan',
-            'jpl.resort.wilayah',
+            'jpl.resort',
             'shift',
         ])
             ->where('user_id', auth()->id())
@@ -49,7 +49,7 @@ class CatatanDinasController extends Controller
             'dinas.user',
             'dinas.userDigantikan',
             'dinas.shift',
-            'dinas.jpl.resort.wilayah',
+            'dinas.jpl.resort',
         ])
             ->where('user_id', $user->id)
             ->latest('waktu_catatan')
@@ -59,7 +59,7 @@ class CatatanDinasController extends Controller
         $daftarDinas = Dinas::with([
             'user',
             'userDigantikan',
-            'jpl.resort.wilayah',
+            'jpl.resort',
             'shift',
         ])
             ->where('user_id', $user->id)

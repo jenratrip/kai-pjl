@@ -9,7 +9,7 @@
 }
 
 @layer components {
-    body.superadmin-shell [x-cloak] {
+    [x-cloak] {
         display: none !important;
     }
 
