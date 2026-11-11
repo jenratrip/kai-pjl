@@ -18,7 +18,8 @@
 <body
     class="min-h-screen overflow-x-hidden bg-[#f5f6f8] text-[#1d2d50] antialiased"
     x-data="{
-        sidebarOpen: localStorage.getItem('pjl_sidebar_open') === 'true',
+        sidebarOpen: window.matchMedia('(min-width: 1024px)').matches
+            && localStorage.getItem('pjl_sidebar_open') === 'true',
 
         toggleSidebar() {
             this.sidebarOpen = !this.sidebarOpen;
@@ -73,7 +74,7 @@
     <main
         class="min-h-screen pt-[76px] transition-[margin,width] duration-300 ease-in-out"
         :class="sidebarOpen
-            ? 'ml-[230px] w-[calc(100%-230px)]'
+            ? 'lg:ml-[260px] lg:w-[calc(100%-260px)]'
             : 'ml-0 w-full'"
     >
         <div class="min-h-[calc(100vh-76px)]">

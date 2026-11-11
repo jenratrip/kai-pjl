@@ -71,8 +71,8 @@ function setStatus(index, status) {
     // Perbarui tampilan.
     renderTable();
 
-    // Simpan perubahan secara otomatis.
-    tandaiBerubah(JEDA_SIMPAN_STATUS, index);
+    // Perubahan hanya ditandai; server menyimpan setelah tombol Simpan ditekan.
+    tandaiBerubah(index);
 }
 
 
@@ -110,7 +110,7 @@ function updateActualTime(index, value) {
 
     renderTable();
 
-    tandaiBerubah(JEDA_SIMPAN_STATUS, index);
+    tandaiBerubah(index);
 }
 
 
@@ -150,7 +150,7 @@ function setCheck(button, index, field, value) {
 
     renderTable();
 
-    tandaiBerubah(JEDA_SIMPAN_CHECK, index);
+    tandaiBerubah(index);
 }
 
 
@@ -173,8 +173,8 @@ function updateKeterangan(index, value) {
 
     incrementRowVersion(index);
 
-    // Simpan otomatis dengan jeda pengetikan.
-    tandaiBerubah(JEDA_SIMPAN_KETIK, index);
+    // Perubahan keterangan menunggu tombol Simpan.
+    tandaiBerubah(index);
 }
 
 

@@ -1,40 +1,39 @@
 /* =====================================================
-PENYIMPANAN OTOMATIS
+PENYIMPANAN MANUAL
 ===================================================== */
 
 let isSaving = false;
 let isDirty = false;
 let saveQueued = false;
-let queuedManual = false;
 let saveGagal = false;
-
-let autoSaveTimer = null;
-let retryTimer = null;
 
 function setSaveStatus(state, text) {
     const box = document.getElementById('saveStatus');
     const label = document.getElementById('saveStatusText');
 
     if (box) {
-        box.className = `save-status ${state}`;
+        box.classList.remove('idle', 'pending', 'saving', 'saved', 'error',
+            'text-slate-600', 'text-amber-700', 'text-blue-700', 'text-green-700', 'text-rose-700');
+        box.classList.add('save-status', state);
+        const colorClass = {
+            idle: 'text-slate-600',
+            pending: 'text-amber-700',
+            saving: 'text-blue-700',
+            saved: 'text-green-700',
+            error: 'text-rose-700'
+        }[state] || 'text-slate-600';
+        box.classList.add(colorClass);
     }
-
-    if (label) {
-        label.textContent = text;
-    }
+    if (label) label.textContent = text;
 }
 
-function tandaiBerubah(delay = JEDA_SIMPAN_STATUS, index) {
+function tandaiBerubah(index) {
     isDirty = true;
 
-    if (index !== undefined && index !== null) {
-        dirtyRows.add(index);
-    }
+    if (index !== undefined && index !== null) dirtyRows.add(index);
 
-    setSaveStatus('pending', 'Perubahan belum disimpan…');
+    setSaveStatus('pending', 'Ada perubahan yang belum disimpan. Tekan Simpan Semua.');
     refreshRowButtons();
-
-    clearTimeout(autoSaveTimer);
 }
 
 function ambilCsrfToken() {
@@ -44,59 +43,38 @@ function ambilCsrfToken() {
 
 function formatJamStatusSimpan() {
     const now = getWIBTime();
-
-    return (
-        String(now.hour).padStart(2, '0') + ':' +
-        String(now.minute).padStart(2, '0')
-    );
+    return String(now.hour).padStart(2, '0') + ':' + String(now.minute).padStart(2, '0');
 }
 
-async function simpanRealisasi(options = {}) {
-    const otomatis = options.otomatis === true;
+async function simpanRealisasi() {
     const tombol = document.getElementById('simpanBtn');
 
     if (dataKA.length === 0) {
-        if (!otomatis) {
-            alert('Belum ada data KA untuk disimpan.');
-        }
-
+        alert('Belum ada data KA untuk disimpan.');
         return;
     }
 
     if (isSaving) {
         saveQueued = true;
-
-        if (!otomatis) {
-            queuedManual = true;
-        }
-
         return;
     }
 
-    clearTimeout(autoSaveTimer);
-    clearTimeout(retryTimer);
-
     isSaving = true;
-
     const versiDikirim = new Map();
     const barisDikirim = new Set(dirtyRows);
 
-    dataKA.forEach((_, index) => {
-        versiDikirim.set(index, getRowVersion(index));
-    });
-
+    dataKA.forEach((_, index) => versiDikirim.set(index, getRowVersion(index)));
     const snapshot = JSON.parse(JSON.stringify(dataKA));
 
     isDirty = false;
     savingRows = new Set(barisDikirim);
     dirtyRows = new Set();
-
     refreshRowButtons();
-    setSaveStatus('saving', 'Menyimpan…');
+    setSaveStatus('saving', 'Menyimpan data…');
 
-    if (!otomatis && tombol) {
+    if (tombol) {
         tombol.disabled = true;
-        tombol.textContent = 'Menyimpan...';
+        tombol.querySelector('[data-save-label]')?.replaceChildren('Menyimpan…');
     }
 
     try {
@@ -107,81 +85,43 @@ async function simpanRealisasi(options = {}) {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': ambilCsrfToken()
             },
-            body: JSON.stringify({
-                data: snapshot
-            })
+            body: JSON.stringify({ data: snapshot })
         });
 
         const contentType = response.headers.get('content-type') || '';
-
         if (!contentType.includes('application/json')) {
-            let error;
-
-            if (response.status === 419) {
-                error = new Error(
-                    'Sesi berakhir. Muat ulang halaman, lalu coba lagi.'
-                );
-                error.permanen = true;
-
-            } else if (
-                response.status === 401 ||
-                response.status === 403
-            ) {
-                error = new Error(
-                    'Akses ditolak. Silakan login kembali.'
-                );
-                error.permanen = true;
-
-            } else {
-                error = new Error(
-                    'Server tidak mengembalikan JSON. Periksa route dan log Laravel.'
-                );
-            }
-
+            let message = response.status === 419
+                ? 'Sesi berakhir. Muat ulang halaman, lalu coba lagi.'
+                : response.status === 401 || response.status === 403
+                    ? 'Akses ditolak. Silakan login kembali.'
+                    : 'Server tidak mengembalikan JSON. Periksa route dan log Laravel.';
+            const error = new Error(message);
+            error.permanen = [401, 403, 419].includes(response.status);
             throw error;
         }
 
         const result = await response.json();
-
         if (!response.ok) {
-            const pesanValidasi = result.errors ?
-                Object.values(result.errors).flat().join('\n') :
-                result.message;
-
-            const error = new Error(
-                pesanValidasi || 'Gagal menyimpan realisasi KA.'
-            );
-
+            const validation = result.errors ? Object.values(result.errors).flat().join('\n') : result.message;
+            const error = new Error(validation || 'Gagal menyimpan realisasi KA.');
             error.permanen = response.status === 422;
-
             throw error;
         }
 
         if (Array.isArray(result.data)) {
             result.data.forEach(item => {
                 const index = Number(item.index);
-
-                if (
-                    Number.isInteger(index) &&
-                    index >= 0 &&
-                    dataKA[index] &&
-                    item.realisasi_ka_id !== undefined &&
-                    item.realisasi_ka_id !== null
-                ) {
-                    dataKA[index].realisasi_ka_id =
-                        item.realisasi_ka_id;
+                if (Number.isInteger(index) && index >= 0 && dataKA[index] && item.realisasi_ka_id != null) {
+                    dataKA[index].realisasi_ka_id = item.realisasi_ka_id;
                 }
             });
         }
 
         barisDikirim.forEach(index => {
-            if (
-                getRowVersion(index) === versiDikirim.get(index)
-            ) {
+            if (getRowVersion(index) === versiDikirim.get(index)) {
                 savedRows.add(index);
                 savedStatuses.set(index, dataKA[index].status);
                 dirtyRows.delete(index);
-
             } else {
                 dirtyRows.add(index);
             }
@@ -189,99 +129,52 @@ async function simpanRealisasi(options = {}) {
 
         savingRows = new Set();
         saveGagal = false;
-
         renderTable();
 
         if (dirtyRows.size > 0 || isDirty) {
             isDirty = true;
-
-            setSaveStatus(
-                'pending',
-                'Ada perubahan baru yang belum disimpan…'
-            );
-
+            setSaveStatus('pending', 'Ada perubahan baru yang belum disimpan. Tekan Simpan Semua.');
         } else {
-            isDirty = false;
-
             const jam = formatJamStatusSimpan();
-
-            if (result.serah_terima_sinkron === false) {
-                setSaveStatus(
-                    'saved',
-                    `Tersimpan pukul ${jam} (sinkron ke Serah Terima gagal)`
-                );
-
-            } else {
-                setSaveStatus(
-                    'saved',
-                    otomatis ?
-                    `Tersimpan otomatis pukul ${jam}` :
-                    `Tersimpan pukul ${jam}`
-                );
-            }
+            setSaveStatus(
+                'saved',
+                result.serah_terima_sinkron === false
+                    ? `Tersimpan pukul ${jam} (sinkron ke Serah Terima gagal)`
+                    : `Tersimpan pukul ${jam}`
+            );
         }
 
-        if (!otomatis) {
-            alert('Berhasil disimpan!');
-        }
-
+        alert('Berhasil disimpan!');
     } catch (error) {
         console.error('Gagal menyimpan realisasi:', error);
-
         saveGagal = true;
         isDirty = true;
-
         barisDikirim.forEach(index => dirtyRows.add(index));
         savingRows = new Set();
-
-        if (error.permanen) {
-            setSaveStatus(
-                'error',
-                `Gagal menyimpan: ${error.message}`
-            );
-
-        } else {
-            setSaveStatus(
-                'error',
-                'Gagal menyimpan. Silakan klik Simpan untuk mencoba lagi.'
-            );
-        }
-
-        if (!otomatis) {
-            alert(
-                'Realisasi belum berhasil disimpan.\n\n' +
-                error.message
-            );
-        }
-
+        setSaveStatus('error', error.permanen
+            ? `Gagal menyimpan: ${error.message}`
+            : 'Gagal menyimpan. Periksa koneksi, lalu klik Simpan Semua untuk mencoba lagi.');
+        alert('Realisasi belum berhasil disimpan.\n\n' + error.message);
     } finally {
         isSaving = false;
-
         refreshRowButtons();
-
         if (tombol) {
             tombol.disabled = false;
-            tombol.textContent = '▣  Simpan Semua';
+            const label = tombol.querySelector('[data-save-label]');
+            if (label) label.textContent = 'Simpan Semua';
         }
 
+        // Jika user menekan Simpan lagi ketika request pertama berjalan,
+        // kirim satu request lanjutan hanya karena ada klik manual kedua.
         if (saveQueued) {
-            const manual = queuedManual;
-
             saveQueued = false;
-            queuedManual = false;
-
-            if (manual && (isDirty || dirtyRows.size > 0)) {
-                simpanRealisasi();
-            }
+            if (isDirty || dirtyRows.size > 0) simpanRealisasi();
         }
     }
 }
 
 async function tungguSimpanSelesai() {
-    while (isSaving) {
-        await sleep(150);
-    }
-
+    while (isSaving) await sleep(150);
     return !isDirty && !saveGagal;
 }
 
@@ -293,8 +186,5 @@ window.addEventListener('beforeunload', event => {
 });
 
 window.addEventListener('offline', () => {
-    setSaveStatus(
-        'error',
-        'Tidak ada koneksi internet.'
-    );
+    setSaveStatus('error', 'Tidak ada koneksi internet. Perubahan belum disimpan.');
 });

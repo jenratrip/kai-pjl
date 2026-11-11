@@ -95,10 +95,6 @@ const WARNING_PENUTUPAN_PALANG_AKTIF =
 // JEDA PENYIMPANAN
 // -----------------------------------------------------
 
-const JEDA_SIMPAN_STATUS = 300;
-const JEDA_SIMPAN_CHECK = 600;
-const JEDA_SIMPAN_KETIK = 800;
-const JEDA_COBA_ULANG = 10000;
 
 // -----------------------------------------------------
 // BATAS TAMPILAN
@@ -106,7 +102,7 @@ const JEDA_COBA_ULANG = 10000;
 
 const BATAS_TAMPIL_JADWAL_MENIT = 60;
 
-const JUMLAH_KOLOM_TABEL = 15;
+const JUMLAH_KOLOM_TABEL = 13;
 const BATAS_KARAKTER_CATATAN = 5000;
 
 
@@ -118,8 +114,6 @@ let dataKA = CONFIG.data.map((ka, index) => ({
     no: ka.no ?? index + 1,
     nomor: ka.nomor ?? '',
     nama: ka.nama ?? '',
-    hulu: ka.hulu ?? '',
-    hilir: ka.hilir ?? '',
     relasi: ka.relasi ?? '',
     arah: String(ka.arah ?? '').trim().toUpperCase(),
     jadwal: ka.jadwal ?? '-',

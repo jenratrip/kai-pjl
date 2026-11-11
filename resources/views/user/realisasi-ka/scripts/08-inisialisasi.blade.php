@@ -30,7 +30,7 @@ function initRealisasiKA() {
 
     updateWindowRange();
 
-    setSaveStatus('idle', 'Penyimpanan otomatis aktif');
+    setSaveStatus('idle', 'Perubahan hanya tersimpan setelah tombol Simpan Semua ditekan.');
 
     initCatatanModal();
 
