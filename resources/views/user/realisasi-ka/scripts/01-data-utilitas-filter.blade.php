@@ -150,6 +150,66 @@ let manualCheck = {
 
 
 /* =====================================================
+   BASELINE DATA UNTUK DETEKSI PERUBAHAN
+===================================================== */
+
+/**
+ * Snapshot data original dari backend.
+ * Digunakan untuk mendeteksi apakah ada perubahan pada setiap baris.
+ * Diperbarui setelah penyimpanan backend berhasil.
+ */
+let originalData = JSON.parse(JSON.stringify(dataKA));
+
+/**
+ * Field yang dapat diedit dan perlu dibandingkan untuk deteksi perubahan.
+ */
+const EDITABLE_FIELDS = [
+    'status',
+    'aktual',
+    'semboyan21',
+    'genta',
+    'pintu',
+    'semboyan35',
+    'keterangan'
+];
+
+/**
+ * Periksa apakah baris mengalami perubahan dari baseline.
+ * Membandingkan hanya field yang dapat diedit.
+ * 
+ * @param {number} index - Index baris
+ * @returns {boolean} true jika ada perubahan, false jika sama dengan baseline
+ */
+function isRowChanged(index) {
+    if (!originalData[index] || !dataKA[index]) {
+        return false;
+    }
+
+    return EDITABLE_FIELDS.some(field => {
+        const originalValue = originalData[index][field];
+        const currentValue = dataKA[index][field];
+
+        // Normalisasi nilai kosong
+        const orig = (originalValue === null || originalValue === undefined) ? '' : String(originalValue);
+        const curr = (currentValue === null || currentValue === undefined) ? '' : String(currentValue);
+
+        return orig !== curr;
+    });
+}
+
+/**
+ * Perbarui baseline data setelah penyimpanan berhasil.
+ * 
+ * @param {number} index - Index baris yang disimpan
+ */
+function updateBaseline(index) {
+    if (dataKA[index]) {
+        originalData[index] = JSON.parse(JSON.stringify(dataKA[index]));
+    }
+}
+
+
+/* =====================================================
    UTILITAS HTML
 ===================================================== */
 

@@ -1,5 +1,5 @@
 /* =====================================================
-STATUS PENYIMPANAN PER BARIS
+   STATUS PENYIMPANAN PER BARIS
 ===================================================== */
 
 let dirtyRows = new Set();
@@ -24,20 +24,33 @@ function stateBaris(index) {
         return 'dirty';
     }
 
-    if (
-        savedRows.has(index) ||
-        (dataKA[index] && dataKA[index].realisasi_ka_id)
-    ) {
+    if (savedRows.has(index)) {
         return 'saved';
     }
 
-    return 'dirty';
+    // Jika belum ada realisasi_ka_id, berarti belum pernah disimpan
+    if (!dataKA[index] || !dataKA[index].realisasi_ka_id) {
+        // Check apakah ada perubahan dari baseline
+        return isRowChanged(index) ? 'dirty' : 'clean';
+    }
+
+    // Sudah pernah disimpan (punya realisasi_ka_id)
+    // Check apakah ada perubahan dari baseline
+    return isRowChanged(index) ? 'dirty' : 'clean';
 }
 
 function refreshRowButtons() {
     document.querySelectorAll('[data-save-row]').forEach(button => {
         const index = Number(button.dataset.saveRow);
         const state = stateBaris(index);
+
+        // Sembunyikan tombol jika baris bersih (tidak ada perubahan)
+        if (state === 'clean') {
+            button.style.display = 'none';
+            return;
+        }
+
+        button.style.display = '';  // Tampilkan kembali jika ada perubahan
 
         const labels = {
             dirty: 'Simpan',
@@ -61,6 +74,7 @@ function refreshRowButtons() {
             font-weight:600;
             white-space:nowrap;
             cursor:pointer;
+            display:;
         `;
 
         button.textContent = labels[state] || 'Simpan';
@@ -81,46 +95,259 @@ function simpanBaris(index) {
     simpanRealisasi();
 }
 
+
 /* =====================================================
-KOMPONEN TABEL
+   KOMPONEN TABEL
 ===================================================== */
 
+/*
+ * Satu tombol dengan siklus:
+ * kosong -> yes -> no -> yes -> no ...
+ */
 function createCheckGroup(value, index, field) {
-    const yesClass = value === 'yes' ?
-        'bg-green-100 text-green-700 border-green-300' :
-        'bg-white text-slate-500 border-slate-300 hover:bg-green-50 hover:text-green-700';
+    const isYes = value === 'yes';
+    const isNo = value === 'no';
 
-    const noClass = value === 'no' ?
-        'bg-red-100 text-red-700 border-red-300' :
-        'bg-white text-slate-500 border-slate-300 hover:bg-red-50 hover:text-red-700';
+    let label = '—';
+    let style = `
+        background:#fff;
+        color:#64748b;
+        border:1px solid #cbd5e1;
+    `;
+
+    let title = 'Belum diperiksa';
+
+    if (isYes) {
+        label = '✓';
+        title = 'YA';
+        style = `
+            background:#dcfce7;
+            color:#15803d;
+            border:1px solid #86efac;
+        `;
+    } else if (isNo) {
+        label = '×';
+        title = 'TIDAK';
+        style = `
+            background:#fee2e2;
+            color:#b91c1c;
+            border:1px solid #fca5a5;
+        `;
+    }
 
     const buttonBase = [
         'inline-flex items-center justify-center',
-        'h-8 w-8 rounded-md border',
-        'text-sm font-semibold transition-colors',
+        'h-8 w-8 rounded-md',
+        'text-sm font-bold transition-colors',
         'focus:outline-none focus:ring-2 focus:ring-offset-1'
     ].join(' ');
 
     return `
-        <div class="check-group flex items-center justify-center gap-1">
+        <div class="check-group flex items-center justify-center">
             <button
                 type="button"
-                class="check ${buttonBase} ${yesClass}"
-                onclick="setCheck(this, ${index}, '${field}', 'yes')"
-                aria-label="Ya"
-                title="Ya"
-            >✓</button>
-
-            <button
-                type="button"
-                class="check ${buttonBase} ${noClass}"
-                onclick="setCheck(this, ${index}, '${field}', 'no')"
-                aria-label="Tidak"
-                title="Tidak"
-            >×</button>
+                class="check ${buttonBase}"
+                style="${style}"
+                onclick="setCheck(this, ${index}, '${field}')"
+                aria-label="${title}"
+                aria-pressed="${isYes || isNo}"
+                title="${title}"
+            >${label}</button>
         </div>
     `;
 }
+
+
+/* =====================================================
+   PERGANTIAN STATUS PEMERIKSAAN
+===================================================== */
+
+function setCheck(button, index, field) {
+    if (!dataKA[index]) {
+        return;
+    }
+
+    const currentValue = dataKA[index][field];
+
+    // Kosong -> YA -> TIDAK -> YA
+    const nextValue = currentValue === 'yes'
+        ? 'no'
+        : 'yes';
+
+    // Simpan perubahan pada data lokal.
+    dataKA[index][field] = nextValue;
+
+    incrementRowVersion(index);
+
+    // ✓ PERBAIKAN: Deteksi apakah berubah dari baseline
+    if (isRowChanged(index)) {
+        dirtyRows.add(index);
+        savedRows.delete(index);
+    } else {
+        // Nilai kembali ke baseline
+        dirtyRows.delete(index);
+    }
+
+    // Perbarui tombol tanpa merender seluruh tabel.
+    const group = button.closest('.check-group');
+
+    if (group) {
+        group.outerHTML = createCheckGroup(
+            nextValue,
+            index,
+            field
+        );
+    }
+
+    // Tandai perubahan untuk disimpan nanti.
+    tandaiBerubah(index);
+}
+
+
+/* =====================================================
+   TAMPILAN JAM AKTUAL
+===================================================== */
+
+function createActualTimeDisplay(ka, index) {
+    // Jika belum ada jam aktual, tampilkan hanya ikon jam
+    if (!ka.aktual) {
+        return `
+            <div class="actual-time-wrapper flex items-center justify-center gap-2">
+                <button
+                    type="button"
+                    class="time-icon-btn inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+                    onclick="openActualTimeInput(${index})"
+                    title="Klik untuk mengisi jam aktual">
+                    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 6v6l4 2" />
+                    </svg>
+                </button>
+            </div>
+        `;
+    }
+
+    // Jika ada jam aktual, tampilkan waktu dengan ikon jam yang bisa diklik
+    return `
+        <div class="actual-time-wrapper flex items-center justify-center gap-2">
+            <button
+                type="button"
+                class="time-value-btn inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 transition-colors"
+                onclick="openActualTimeInput(${index})"
+                title="Klik untuk mengubah jam">
+                <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" class="h-3 w-3 mr-1 fill-none stroke-current stroke-2">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 6v6l4 2" />
+                </svg>
+                <span>${escapeHtml(ka.aktual)}</span>
+            </button>
+        </div>
+    `;
+}
+
+function openActualTimeInput(index) {
+    const ka = dataKA[index];
+    
+    if (!ka) {
+        return;
+    }
+
+    // Cari wrapper jam aktual
+    const row = document.querySelector(`tr[data-index="${index}"]`);
+    
+    if (!row) {
+        return;
+    }
+
+    const wrapper = row.querySelector('.actual-time-wrapper');
+    
+    if (!wrapper) {
+        return;
+    }
+
+    // Tampilkan input time
+    wrapper.innerHTML = `
+        <input
+            type="time"
+            class="actual-time-input w-full min-w-0 rounded-md border border-blue-500 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value="${escapeHtml(ka.aktual)}"
+            onchange="updateActualTimeFromInput(${index}, this.value)"
+            onblur="closeActualTimeInput(${index})"
+            autofocus>
+    `;
+
+    // Focus input
+    const input = wrapper.querySelector('input[type="time"]');
+    if (input) {
+        input.focus();
+        input.select?.();
+    }
+}
+
+function updateActualTimeFromInput(index, value) {
+    const ka = dataKA[index];
+
+    if (!ka) {
+        return;
+    }
+
+    const jamAktual = String(value ?? '').trim();
+
+    // Validasi format jam HH:mm
+    if (
+        jamAktual !== '' &&
+        !/^([01]\d|2[0-3]):[0-5]\d$/.test(jamAktual)
+    ) {
+        return;
+    }
+
+    ka.aktual = jamAktual;
+
+    incrementRowVersion(index);
+
+    // ✓ PERBAIKAN: Deteksi apakah berubah dari baseline
+    if (isRowChanged(index)) {
+        dirtyRows.add(index);
+        savedRows.delete(index);
+    } else {
+        // Nilai kembali ke baseline
+        dirtyRows.delete(index);
+    }
+
+    // Tandai perubahan
+    tandaiBerubah(index);
+
+    // Render ulang untuk memperbarui tampilan
+    renderTable();
+}
+
+function closeActualTimeInput(index) {
+    const ka = dataKA[index];
+    
+    if (!ka) {
+        return;
+    }
+
+    const row = document.querySelector(`tr[data-index="${index}"]`);
+    
+    if (!row) {
+        return;
+    }
+
+    const wrapper = row.querySelector('.actual-time-wrapper');
+    
+    if (!wrapper) {
+        return;
+    }
+
+    // Tampilkan kembali display jam aktual
+    wrapper.innerHTML = createActualTimeDisplay(ka, index);
+}
+
+
+/* =====================================================
+   STATUS PERJALANAN KA
+===================================================== */
 
 function createStatus(ka, index) {
     const color = getStatusColor(ka);
@@ -152,21 +379,20 @@ function createStatus(ka, index) {
         'display:flex;align-items:center;justify-content:center;';
 
     const jalanStyle = buttonBaseStyle + (
-        jalanActive ?
-        'background:#f0fdf4;color:#15803d;border-color:#bbf7d0;' :
-        'background:#f8fafc;color:#64748b;'
+        jalanActive
+            ? 'background:#f0fdf4;color:#15803d;border-color:#bbf7d0;'
+            : 'background:#f8fafc;color:#64748b;'
     );
 
     const batalStyle = buttonBaseStyle + (
-        batalActive ?
-        'background:#fef2f2;color:#b91c1c;border-color:#fecaca;' :
-        'background:#f8fafc;color:#64748b;'
+        batalActive
+            ? 'background:#fef2f2;color:#b91c1c;border-color:#fecaca;'
+            : 'background:#f8fafc;color:#64748b;'
     );
 
     const note = getStatusNote(ka, color);
 
     return `
-
         <div style="
             display:flex;
             width:100%;
@@ -199,8 +425,18 @@ function createStatus(ka, index) {
     `;
 }
 
+
+/* =====================================================
+   TOMBOL SIMPAN PER BARIS
+===================================================== */
+
 function createRowAction(index) {
     const state = stateBaris(index);
+
+    // Jika baris bersih, jangan render tombol
+    if (state === 'clean') {
+        return '';
+    }
 
     const styles = {
         dirty: 'background:#2563eb;color:#fff;border:1px solid #2563eb;',
@@ -228,6 +464,11 @@ function createRowAction(index) {
     `;
 }
 
+
+/* =====================================================
+   RENDER TABEL REALISASI KA
+===================================================== */
+
 function renderTable(forPrint = false) {
     const tbody = document.getElementById('kaTableBody');
 
@@ -243,9 +484,9 @@ function renderTable(forPrint = false) {
     tbody.innerHTML = '';
 
     if (!visibleKA.length) {
-        const message = dataKA.length === 0 ?
-            'Belum ada jadwal KA untuk dinas aktif ini.' :
-            'Tidak ada KA dalam rentang jam ini.';
+        const message = dataKA.length === 0
+            ? 'Belum ada jadwal KA untuk dinas aktif ini.'
+            : 'Tidak ada KA dalam rentang jam ini.';
 
         tbody.innerHTML = `
             <tr>
@@ -303,12 +544,8 @@ function renderTable(forPrint = false) {
                 ${escapeHtml(ka.jadwal)}
             </td>
 
-            <td class="px-1 py-2">
-                <input
-                    type="time"
-                    class="actual-time w-full min-w-0 rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    value="${escapeHtml(ka.aktual)}"
-                    onchange="updateActualTime(${index}, this.value)">
+            <td class="px-1 py-2 text-center">
+                ${createActualTimeDisplay(ka, index)}
             </td>
 
             <td class="px-1 py-2 text-center">

@@ -121,6 +121,8 @@ async function simpanRealisasi() {
             if (getRowVersion(index) === versiDikirim.get(index)) {
                 savedRows.add(index);
                 savedStatuses.set(index, dataKA[index].status);
+                // ✓ UPDATE BASELINE SETELAH SUKSES PENYIMPANAN
+                updateBaseline(index);
                 dirtyRows.delete(index);
             } else {
                 dirtyRows.add(index);

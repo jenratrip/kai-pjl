@@ -353,6 +353,42 @@
             return (string) $tanggal;
         }
     };
+
+    /*
+    |--------------------------------------------------------------------------
+    | HELPER HASIL PEMERIKSAAN YA/TIDAK
+    |--------------------------------------------------------------------------
+    */
+
+    $formatPemeriksaan = function ($nilai) {
+        // Normalisasi nilai: lowercase, trim whitespace
+        $nilai = strtolower(trim((string) $nilai));
+
+        // Nilai yang dianggap YA (POSITIF)
+        if (in_array($nilai, ['yes', 'ya', '1', 'true'], true)) {
+            return [
+                'label' => '✓',
+                'class' => 'bg-green-100 text-green-700 border-green-300',
+                'title' => 'YA',
+            ];
+        }
+
+        // Nilai yang dianggap TIDAK (NEGATIF)
+        if (in_array($nilai, ['no', 'tidak', '0', 'false'], true)) {
+            return [
+                'label' => '✕',
+                'class' => 'bg-red-100 text-red-700 border-red-300',
+                'title' => 'TIDAK',
+            ];
+        }
+
+        // Nilai kosong atau tidak dikenal (NETRAL)
+        return [
+            'label' => '—',
+            'class' => 'bg-slate-100 text-slate-500 border-slate-300',
+            'title' => 'Belum diisi',
+        ];
+    };
 @endphp
 
 <div class="mx-auto max-w-7xl px-5 py-8 sm:px-8">
@@ -789,20 +825,44 @@
                                                 </span>
                                             </td>
 
-                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
-                                                {{ $formatNilai($semboyan21) }}
+                                            <td class="whitespace-nowrap px-4 py-3 text-center">
+                                                @php($hasil = $formatPemeriksaan($semboyan21))
+                                                <span 
+                                                    class="inline-flex h-7 w-7 items-center justify-center rounded-full border font-bold {{ $hasil['class'] }}"
+                                                    title="{{ $hasil['title'] }}"
+                                                >
+                                                    {{ $hasil['label'] }}
+                                                </span>
                                             </td>
 
-                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
-                                                {{ $formatNilai($genta) }}
+                                            <td class="whitespace-nowrap px-4 py-3 text-center">
+                                                @php($hasil = $formatPemeriksaan($genta))
+                                                <span 
+                                                    class="inline-flex h-7 w-7 items-center justify-center rounded-full border font-bold {{ $hasil['class'] }}"
+                                                    title="{{ $hasil['title'] }}"
+                                                >
+                                                    {{ $hasil['label'] }}
+                                                </span>
                                             </td>
 
-                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
-                                                {{ $formatNilai($pintu) }}
+                                            <td class="whitespace-nowrap px-4 py-3 text-center">
+                                                @php($hasil = $formatPemeriksaan($pintu))
+                                                <span 
+                                                    class="inline-flex h-7 w-7 items-center justify-center rounded-full border font-bold {{ $hasil['class'] }}"
+                                                    title="{{ $hasil['title'] }}"
+                                                >
+                                                    {{ $hasil['label'] }}
+                                                </span>
                                             </td>
 
-                                            <td class="whitespace-nowrap px-4 py-3 text-slate-700">
-                                                {{ $formatNilai($semboyan35) }}
+                                            <td class="whitespace-nowrap px-4 py-3 text-center">
+                                                @php($hasil = $formatPemeriksaan($semboyan35))
+                                                <span 
+                                                    class="inline-flex h-7 w-7 items-center justify-center rounded-full border font-bold {{ $hasil['class'] }}"
+                                                    title="{{ $hasil['title'] }}"
+                                                >
+                                                    {{ $hasil['label'] }}
+                                                </span>
                                             </td>
 
                                             <td class="px-4 py-3 text-slate-600">

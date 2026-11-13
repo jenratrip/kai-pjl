@@ -68,6 +68,15 @@ function setStatus(index, status) {
     // Tandai perubahan data.
     incrementRowVersion(index);
 
+    // ✓ PERBAIKAN: Deteksi apakah berubah dari baseline
+    if (isRowChanged(index)) {
+        dirtyRows.add(index);
+        savedRows.delete(index);
+    } else {
+        // Nilai kembali ke baseline
+        dirtyRows.delete(index);
+    }
+
     // Perbarui tampilan.
     renderTable();
 
@@ -77,81 +86,10 @@ function setStatus(index, status) {
 
 
 /**
- * Memperbarui jam aktual secara manual.
- *
- * Format yang diperbolehkan:
- * HH:mm
- *
- * Contoh:
- * 08:15
- * 13:45
- * 23:59
+ * CATATAN: Fungsi setCheck() sudah didefinisikan di 03-tabel-dan-state.blade.php
+ * dengan siklus otomatis (kosong → yes → no → yes).
+ * Jangan mendefinisikan ulang di sini untuk menghindari konflik.
  */
-function updateActualTime(index, value) {
-    const ka = dataKA[index];
-
-    if (!ka) {
-        return;
-    }
-
-    const jamAktual = String(value ?? '').trim();
-
-    // Validasi format jam HH:mm.
-    if (
-        jamAktual !== '' &&
-        !/^([01]\d|2[0-3]):[0-5]\d$/.test(jamAktual)
-    ) {
-        return;
-    }
-
-    ka.aktual = jamAktual;
-
-    incrementRowVersion(index);
-
-    renderTable();
-
-    tandaiBerubah(index);
-}
-
-
-/**
- * Mengubah pemeriksaan semboyan atau perangkat.
- *
- * Field yang diperbolehkan:
- * - semboyan21
- * - genta
- * - pintu
- * - semboyan35
- */
-function setCheck(button, index, field, value) {
-    const ka = dataKA[index];
-
-    if (
-        !ka ||
-        !FIELD_PEMERIKSAAN_KA.includes(field)
-    ) {
-        return;
-    }
-
-    // Nilai pemeriksaan yang diperbolehkan.
-    const allowedValues = [
-        'yes',
-        'no',
-        ''
-    ];
-
-    if (!allowedValues.includes(value)) {
-        return;
-    }
-
-    ka[field] = value;
-
-    incrementRowVersion(index);
-
-    renderTable();
-
-    tandaiBerubah(index);
-}
 
 
 /**
@@ -172,6 +110,15 @@ function updateKeterangan(index, value) {
         .slice(0, BATAS_KARAKTER_CATATAN);
 
     incrementRowVersion(index);
+
+    // ✓ PERBAIKAN: Deteksi apakah berubah dari baseline
+    if (isRowChanged(index)) {
+        dirtyRows.add(index);
+        savedRows.delete(index);
+    } else {
+        // Nilai kembali ke baseline
+        dirtyRows.delete(index);
+    }
 
     // Perubahan keterangan menunggu tombol Simpan.
     tandaiBerubah(index);
