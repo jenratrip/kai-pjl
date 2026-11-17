@@ -54,6 +54,7 @@ class DinasRosterImportController extends Controller
         }
 
         $shiftConfiguration = $this->shiftConfiguration();
+
         $jpls = Jpl::query()
             ->orderBy('kode_jpl')
             ->get(['id', 'kode_jpl', 'nama_jpl', 'is_active']);
@@ -67,11 +68,16 @@ class DinasRosterImportController extends Controller
             ->map(fn (array $staff): string => $this->normalizeNip($staff['nipkwt']))
             ->filter()
             ->countBy();
+
         $allValidationErrors = [];
 
         foreach ($preview['staff'] as &$staff) {
             $normalizedNip = $this->normalizeNip($staff['nipkwt']);
-            $matches = $normalizedNip === '' ? collect() : $accountsByNip->get($normalizedNip, collect());
+
+            $matches = $normalizedNip === ''
+                ? collect()
+                : $accountsByNip->get($normalizedNip, collect());
+
             $staffValidationErrors = $staff['errors'];
 
             if ($matches->count() > 1) {
@@ -95,7 +101,10 @@ class DinasRosterImportController extends Controller
             } else {
                 /** @var User $account */
                 $account = $matches->first();
-                $isEligible = $account->is_active && $account->role?->name === 'pjl';
+
+                $isEligible = $account->is_active
+                    && $account->role?->name === 'pjl';
+
                 $staff['account'] = [
                     'status' => $isEligible ? 'cocok' : 'tidak_cocok',
                     'label' => $isEligible ? 'Cocok' : 'Tidak cocok',
@@ -116,7 +125,10 @@ class DinasRosterImportController extends Controller
                 $staffValidationErrors[] = "Baris {$staff['workbook_row']}: NIPKWT duplikat pada workbook; setiap petugas hanya boleh muncul satu kali.";
             }
 
-            $staff['assignment'] = $this->resolveAssignment($staff['job_title'], $jpls);
+            $staff['assignment'] = $this->resolveAssignment(
+                $staff['job_title'] ?? null,
+                $jpls
+            );
 
             if ($staff['assignment']['status'] !== 'cocok') {
                 $staffValidationErrors[] = "Baris {$staff['workbook_row']}: {$staff['assignment']['detail']}";
@@ -131,17 +143,22 @@ class DinasRosterImportController extends Controller
                     $staffValidationErrors[] = "Baris {$staff['workbook_row']}, tanggal {$day['day']}: master shift {$day['code']} belum sesuai dengan jam roster.";
                 }
             }
+
             unset($day);
 
             $staff['validation_errors'] = array_values(array_unique($staffValidationErrors));
+
             array_push($allValidationErrors, ...$staff['validation_errors']);
         }
+
         unset($staff);
 
         $allValidationErrors = array_values(array_unique($allValidationErrors));
+
         $invalidStaffCount = collect($preview['staff'])
             ->filter(fn (array $staff): bool => $staff['validation_errors'] !== [])
             ->count();
+
         $storageBlockers = $allValidationErrors === []
             ? $this->storageBlockers($preview)
             : [];
@@ -162,10 +179,15 @@ class DinasRosterImportController extends Controller
     }
 
     /**
-     * @param  Collection<int, Jpl>  $jpls
-     * @return array{status: string, label: string, detail: string, jpl: ?array{id: int, code: string, name: string}}
+     * @param Collection<int, Jpl> $jpls
+     * @return array{
+     *     status: string,
+     *     label: string,
+     *     detail: string,
+     *     jpl: ?array{id: int, code: string, name: string}
+     * }
      */
-    private function resolveAssignment(string $jobTitle, EloquentCollection $jpls): array
+    private function resolveAssignment(?string $jobTitle, EloquentCollection $jpls): array
     {
         $number = $this->jplNumber($jobTitle);
 
@@ -173,14 +195,16 @@ class DinasRosterImportController extends Controller
             return [
                 'status' => 'tidak_cocok',
                 'label' => 'Jabatan tidak dikenali',
-                'detail' => trim($jobTitle) === ''
+                'detail' => $jobTitle === null || trim($jobTitle) === ''
                     ? 'Kolom Jabatan kosong.'
                     : 'Jabatan harus mencantumkan kode JPL yang dikenali, misalnya JPL 351.',
                 'jpl' => null,
             ];
         }
 
-        $matches = $jpls->filter(fn (Jpl $jpl): bool => $this->jplNumber($jpl->kode_jpl) === $number);
+        $matches = $jpls->filter(
+            fn (Jpl $jpl): bool => $this->jplNumber($jpl->kode_jpl) === $number
+        );
 
         if ($matches->count() > 1) {
             return [
@@ -224,8 +248,12 @@ class DinasRosterImportController extends Controller
         ];
     }
 
-    private function jplNumber(string $value): ?string
+    private function jplNumber(?string $value): ?string
     {
+        if ($value === null || trim($value) === '') {
+            return null;
+        }
+
         if (preg_match('/^\s*(?:JPL[\s-]*)?(\d+)\s*$/i', $value, $matches) !== 1) {
             return null;
         }
@@ -234,16 +262,36 @@ class DinasRosterImportController extends Controller
     }
 
     /**
-     * @return array<string, array{name: string, start: string, end: string, status: string, actual_start: ?string, actual_end: ?string}>
+     * @return array<string, array{
+     *     name: string,
+     *     start: string,
+     *     end: string,
+     *     status: string,
+     *     actual_start: ?string,
+     *     actual_end: ?string
+     * }>
      */
     private function shiftConfiguration(): array
     {
-        $shifts = Shift::query()->get(['id', 'nama_shift', 'jam_mulai', 'jam_selesai']);
+        $shifts = Shift::query()->get([
+            'id',
+            'nama_shift',
+            'jam_mulai',
+            'jam_selesai',
+        ]);
+
         $configuration = [];
 
         foreach (self::SHIFT_CODES as $code => $expected) {
-            $matches = $shifts->filter(fn (Shift $shift): bool => mb_strtolower(trim($shift->nama_shift)) === mb_strtolower($expected['name']));
-            $match = $matches->count() === 1 ? $matches->first() : null;
+            $matches = $shifts->filter(
+                fn (Shift $shift): bool =>
+                    mb_strtolower(trim($shift->nama_shift)) === mb_strtolower($expected['name'])
+            );
+
+            $match = $matches->count() === 1
+                ? $matches->first()
+                : null;
+
             $timesMatch = $match !== null
                 && substr((string) $match->jam_mulai, 0, 8) === $expected['start']
                 && substr((string) $match->jam_selesai, 0, 8) === $expected['end'];
@@ -254,8 +302,12 @@ class DinasRosterImportController extends Controller
                 'status' => $matches->count() > 1
                     ? 'ambigu'
                     : ($match === null ? 'tidak_ditemukan' : ($timesMatch ? 'cocok' : 'jam_tidak_cocok')),
-                'actual_start' => $match?->jam_mulai === null ? null : substr((string) $match->jam_mulai, 0, 8),
-                'actual_end' => $match?->jam_selesai === null ? null : substr((string) $match->jam_selesai, 0, 8),
+                'actual_start' => $match?->jam_mulai === null
+                    ? null
+                    : substr((string) $match->jam_mulai, 0, 8),
+                'actual_end' => $match?->jam_selesai === null
+                    ? null
+                    : substr((string) $match->jam_selesai, 0, 8),
             ];
         }
 
@@ -290,6 +342,7 @@ class DinasRosterImportController extends Controller
         }
 
         $preview = $previewData['preview'];
+
         $holidayRows = [];
         $scheduleRows = [];
 
@@ -306,6 +359,7 @@ class DinasRosterImportController extends Controller
                 }
 
                 $shift = $previewData['shiftConfiguration'][$day['code']];
+
                 $scheduleRows[] = [
                     'user_id' => $staff['account']['id'],
                     'nipkwt' => $staff['nipkwt'],
@@ -317,18 +371,35 @@ class DinasRosterImportController extends Controller
                     'tanggal_dinas' => $day['date'],
                     'workbook_row' => $staff['workbook_row'],
                 ];
-
             }
         }
 
-        $startDate = CarbonImmutable::createSafe($preview['year'], $preview['month'], 1)->toDateString();
-        $endDate = CarbonImmutable::createSafe($preview['year'], $preview['month'], $preview['days_in_month'])->toDateString();
-        $userIds = collect($preview['staff'])->pluck('account.id')->unique()->sort()->values();
-        $jplIds = collect($preview['staff'])->pluck('assignment.jpl.id')->unique()->sort()->values();
-        $importedScheduleCount = count($scheduleRows);
+        $startDate = CarbonImmutable::createSafe(
+            $preview['year'],
+            $preview['month'],
+            1
+        )->toDateString();
+
+        $endDate = CarbonImmutable::createSafe(
+            $preview['year'],
+            $preview['month'],
+            $preview['days_in_month']
+        )->toDateString();
+
+        $userIds = collect($preview['staff'])
+            ->pluck('account.id')
+            ->unique()
+            ->sort()
+            ->values();
+
+        $jplIds = collect($preview['staff'])
+            ->pluck('assignment.jpl.id')
+            ->unique()
+            ->sort()
+            ->values();
 
         try {
-            DB::transaction(function () use (
+            $importResult = DB::transaction(function () use (
                 $startDate,
                 $endDate,
                 $userIds,
@@ -337,15 +408,55 @@ class DinasRosterImportController extends Controller
                 $holidayRows,
                 $preview,
                 $snapshotService,
-                $activityLogService,
-                $importedScheduleCount
-            ): void {
-                foreach (collect($scheduleRows)->unique(fn (array $row): string => $row['jpl_id'].'|'.$row['tanggal_dinas']) as $row) {
-                    if (CarbonImmutable::parse($row['tanggal_dinas'])->isBefore(today())
-                        && ! $this->hasHistoricalScheduleSource((int) $row['jpl_id'], $row['tanggal_dinas'])) {
-                        throw new InvalidArgumentException("Sumber Jadwal KA historis untuk JPL {$row['jpl_id']} pada {$row['tanggal_dinas']} sudah tidak tersedia. Seluruh impor dibatalkan.");
+                $activityLogService
+            ): array {
+                /*
+                 * FILTER SUMBER JADWAL KA
+                 *
+                 * Jadwal sebelum hari ini hanya disimpan jika
+                 * sumber Jadwal KA historisnya tersedia.
+                 *
+                 * Jika tidak tersedia, penugasan pada tanggal
+                 * tersebut dilewati, bukan membatalkan impor.
+                 */
+                $availableScheduleRows = [];
+                $skippedScheduleCount = 0;
+                $sourceCache = [];
+
+                foreach ($scheduleRows as $row) {
+                    $date = $row['tanggal_dinas'];
+
+                    $isHistorical = CarbonImmutable::parse($date)
+                        ->isBefore(today());
+
+                    if (! $isHistorical) {
+                        $availableScheduleRows[] = $row;
+                        continue;
                     }
+
+                    $sourceKey = $row['jpl_id'].'|'.$date;
+
+                    if (! array_key_exists($sourceKey, $sourceCache)) {
+                        $sourceCache[$sourceKey] = $this->hasHistoricalScheduleSource(
+                            (int) $row['jpl_id'],
+                            $date
+                        );
+                    }
+
+                    if (! $sourceCache[$sourceKey]) {
+                        $skippedScheduleCount++;
+                        continue;
+                    }
+
+                    $availableScheduleRows[] = $row;
                 }
+
+                /*
+                 * Hanya jadwal yang memiliki sumber valid
+                 * yang diteruskan ke proses penyimpanan.
+                 */
+                $scheduleRows = $availableScheduleRows;
+                $importedScheduleCount = count($scheduleRows);
 
                 $lockedUsers = User::query()
                     ->whereIn('id', $userIds)
@@ -362,14 +473,24 @@ class DinasRosterImportController extends Controller
                     ->lockForUpdate()
                     ->get();
 
+                $requiredShiftIds = collect($scheduleRows)
+                    ->pluck('shift_id')
+                    ->filter()
+                    ->unique();
+
                 $lockedShifts = Shift::query()
-                    ->whereIn('id', collect($scheduleRows)->pluck('shift_id')->unique())
+                    ->whereIn('id', $requiredShiftIds)
                     ->orderBy('id')
                     ->lockForUpdate()
                     ->get();
 
-                if ($lockedUsers->count() !== $userIds->count() || $lockedJpls->count() !== $jplIds->count()) {
-                    throw new InvalidArgumentException('Identitas petugas atau JPL berubah setelah preview. Unggah ulang workbook.');
+                if (
+                    $lockedUsers->count() !== $userIds->count()
+                    || $lockedJpls->count() !== $jplIds->count()
+                ) {
+                    throw new InvalidArgumentException(
+                        'Identitas petugas atau JPL berubah setelah preview. Unggah ulang workbook.'
+                    );
                 }
 
                 $allLockedJpls = Jpl::query()
@@ -378,34 +499,68 @@ class DinasRosterImportController extends Controller
                     ->get(['id', 'kode_jpl', 'nama_jpl', 'is_active']);
 
                 foreach ($preview['staff'] as $staff) {
-                    $number = $this->jplNumber($staff['job_title']);
+                    $number = $this->jplNumber($staff['job_title'] ?? null);
+
                     $candidates = $number === null
                         ? collect()
-                        : $allLockedJpls->filter(fn (Jpl $jpl): bool => $this->jplNumber($jpl->kode_jpl) === $number);
+                        : $allLockedJpls->filter(
+                            fn (Jpl $jpl): bool =>
+                                $this->jplNumber($jpl->kode_jpl) === $number
+                        );
+
                     $assignment = $staff['assignment']['jpl'];
-                    if ($candidates->count() !== 1
+
+                    if (
+                        $candidates->count() !== 1
                         || ! $candidates->first()?->is_active
-                        || (int) $candidates->first()->id !== (int) $assignment['id']) {
-                        throw new InvalidArgumentException("Baris {$staff['workbook_row']}: pemetaan JPL berubah atau menjadi ambigu setelah preview. Seluruh impor dibatalkan.");
+                        || (int) $candidates->first()->id !== (int) $assignment['id']
+                    ) {
+                        throw new InvalidArgumentException(
+                            "Baris {$staff['workbook_row']}: pemetaan JPL berubah atau menjadi ambigu setelah preview. Seluruh impor dibatalkan."
+                        );
                     }
 
-                    $account = $lockedUsers->firstWhere('id', $staff['account']['id']);
-                    if (! $account || $this->normalizeNip((string) $account->nip) !== $this->normalizeNip($staff['nipkwt'])) {
-                        throw new InvalidArgumentException("Baris {$staff['workbook_row']}: akun tidak lagi cocok dengan NIPKWT workbook. Seluruh impor dibatalkan.");
+                    $account = $lockedUsers->firstWhere(
+                        'id',
+                        $staff['account']['id']
+                    );
+
+                    if (
+                        ! $account
+                        || $this->normalizeNip((string) $account->nip)
+                            !== $this->normalizeNip($staff['nipkwt'])
+                    ) {
+                        throw new InvalidArgumentException(
+                            "Baris {$staff['workbook_row']}: akun tidak lagi cocok dengan NIPKWT workbook. Seluruh impor dibatalkan."
+                        );
                     }
                 }
 
-                if ($lockedShifts->count() !== collect($scheduleRows)->pluck('shift_id')->unique()->count()) {
-                    throw new InvalidArgumentException('Master shift berubah setelah preview. Unggah ulang workbook.');
+                if (
+                    $lockedShifts->count() !== $requiredShiftIds->count()
+                ) {
+                    throw new InvalidArgumentException(
+                        'Master shift berubah setelah preview. Unggah ulang workbook.'
+                    );
                 }
 
                 foreach ($scheduleRows as $row) {
                     $expectedShift = self::SHIFT_CODES[$row['shift_code']];
+
                     $shift = $lockedShifts->firstWhere('id', $row['shift_id']);
-                    if (mb_strtolower(trim($shift->nama_shift)) !== mb_strtolower($expectedShift['name'])
-                        || substr((string) $shift->jam_mulai, 0, 8) !== $expectedShift['start']
-                        || substr((string) $shift->jam_selesai, 0, 8) !== $expectedShift['end']) {
-                        throw new InvalidArgumentException("Baris {$row['workbook_row']}: jam master shift berubah setelah preview. Seluruh impor dibatalkan.");
+
+                    if (
+                        ! $shift
+                        || mb_strtolower(trim($shift->nama_shift))
+                            !== mb_strtolower($expectedShift['name'])
+                        || substr((string) $shift->jam_mulai, 0, 8)
+                            !== $expectedShift['start']
+                        || substr((string) $shift->jam_selesai, 0, 8)
+                            !== $expectedShift['end']
+                    ) {
+                        throw new InvalidArgumentException(
+                            "Baris {$row['workbook_row']}: jam master shift berubah setelah preview. Seluruh impor dibatalkan."
+                        );
                     }
                 }
 
@@ -414,6 +569,7 @@ class DinasRosterImportController extends Controller
                     ->whereBetween('tanggal_dinas', [$startDate, $endDate])
                     ->lockForUpdate()
                     ->exists();
+
                 $hasExistingHoliday = DB::table('jadwal_dinas_libur')
                     ->whereIn('user_id', $userIds)
                     ->whereBetween('tanggal_dinas', [$startDate, $endDate])
@@ -421,14 +577,24 @@ class DinasRosterImportController extends Controller
                     ->exists();
 
                 if ($hasExistingDinas || $hasExistingHoliday) {
-                    throw new InvalidArgumentException('Periode tujuan sudah memiliki jadwal atau hari libur. Impor dibatalkan tanpa menimpa data.');
+                    throw new InvalidArgumentException(
+                        'Periode tujuan sudah memiliki jadwal atau hari libur. Impor dibatalkan tanpa menimpa data.'
+                    );
                 }
 
                 $intervals = [];
+
                 foreach ($scheduleRows as $row) {
                     $shift = $lockedShifts->firstWhere('id', $row['shift_id']);
-                    $start = CarbonImmutable::parse($row['tanggal_dinas'].' '.$shift->jam_mulai);
-                    $end = CarbonImmutable::parse($row['tanggal_dinas'].' '.$shift->jam_selesai);
+
+                    $start = CarbonImmutable::parse(
+                        $row['tanggal_dinas'].' '.$shift->jam_mulai
+                    );
+
+                    $end = CarbonImmutable::parse(
+                        $row['tanggal_dinas'].' '.$shift->jam_selesai
+                    );
+
                     if ($end->lessThanOrEqualTo($start)) {
                         $end = $end->addDay();
                     }
@@ -440,19 +606,28 @@ class DinasRosterImportController extends Controller
                         ->exists();
 
                     foreach ($intervals as $interval) {
-                        if ($interval['user_id'] === $row['user_id']
+                        if (
+                            $interval['user_id'] === $row['user_id']
                             && $interval['start']->lessThan($end)
-                            && $interval['end']->greaterThan($start)) {
+                            && $interval['end']->greaterThan($start)
+                        ) {
                             $conflict = true;
                             break;
                         }
                     }
 
                     if ($conflict) {
-                        throw new InvalidArgumentException("Jadwal petugas pada {$row['tanggal_dinas']} berbenturan dengan Dinas yang sudah ada.");
+                        throw new InvalidArgumentException(
+                            "Jadwal petugas pada {$row['tanggal_dinas']} berbenturan dengan Dinas yang sudah ada."
+                        );
                     }
 
-                    $intervals[] = ['user_id' => $row['user_id'], 'start' => $start, 'end' => $end];
+                    $intervals[] = [
+                        'user_id' => $row['user_id'],
+                        'start' => $start,
+                        'end' => $end,
+                    ];
+
                     $dinas = Dinas::query()->create([
                         'user_id' => $row['user_id'],
                         'jpl_id' => $row['jpl_id'],
@@ -469,10 +644,17 @@ class DinasRosterImportController extends Controller
 
                 if ($holidayRows !== []) {
                     $now = now();
-                    DB::table('jadwal_dinas_libur')->insert(array_map(
-                        fn (array $row): array => [...$row, 'created_at' => $now, 'updated_at' => $now],
-                        $holidayRows
-                    ));
+
+                    DB::table('jadwal_dinas_libur')->insert(
+                        array_map(
+                            fn (array $row): array => [
+                                ...$row,
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ],
+                            $holidayRows
+                        )
+                    );
                 }
 
                 $activityLogService->log(
@@ -485,9 +667,16 @@ class DinasRosterImportController extends Controller
                         'period_start' => $startDate,
                         'period_end' => $endDate,
                         'schedule_count' => $importedScheduleCount,
+                        'skipped_schedule_count' => $skippedScheduleCount,
                         'holiday_count' => count($holidayRows),
                     ],
                 );
+
+                return [
+                    'imported_count' => $importedScheduleCount,
+                    'skipped_count' => $skippedScheduleCount,
+                    'holiday_count' => count($holidayRows),
+                ];
             }, 3);
         } catch (InvalidArgumentException $exception) {
             return response()->json([
@@ -502,13 +691,24 @@ class DinasRosterImportController extends Controller
             ], 500);
         }
 
+        $message = "{$importResult['imported_count']} jadwal dan {$importResult['holiday_count']} hari libur berhasil disimpan.";
+
+        if ($importResult['skipped_count'] > 0) {
+            $message .= " {$importResult['skipped_count']} jadwal dilewati karena sumber Jadwal KA historis tidak tersedia.";
+        }
+
         return response()->json([
-            'message' => "{$importedScheduleCount} jadwal dan ".count($holidayRows).' hari libur berhasil disimpan.',
-            'imported_count' => $importedScheduleCount,
-            'holiday_count' => count($holidayRows),
+            'message' => $message,
+            'imported_count' => $importResult['imported_count'],
+            'skipped_count' => $importResult['skipped_count'],
+            'holiday_count' => $importResult['holiday_count'],
         ]);
     }
 
+    /**
+     * Memeriksa apakah JPL memiliki sumber Jadwal KA
+     * yang berlaku pada tanggal tertentu.
+     */
     private function hasHistoricalScheduleSource(int $jplId, string $date): bool
     {
         return JadwalKaBatch::query()
@@ -518,16 +718,34 @@ class DinasRosterImportController extends Controller
                 $query->where('jpl.id', $jplId)
                     ->where(function ($pivot) use ($date): void {
                         $pivot->whereNull('jadwal_ka_batch_jpl.tanggal_akhir_berlaku')
-                            ->orWhereDate('jadwal_ka_batch_jpl.tanggal_akhir_berlaku', '>=', $date);
+                            ->orWhereDate(
+                                'jadwal_ka_batch_jpl.tanggal_akhir_berlaku',
+                                '>=',
+                                $date
+                            );
                     });
             })
-            ->whereHas('jadwalKa', fn ($query) => $query->where('jpl_id', $jplId))
+            ->whereHas(
+                'jadwalKa',
+                fn ($query) => $query->where('jpl_id', $jplId)
+            )
             ->lockForUpdate()
             ->exists();
     }
 
     /**
-     * @param  array{month: int, year: int, days_in_month: int, staff: list<array<string, mixed>>}  $preview
+     * Memeriksa persyaratan penyimpanan selain ketersediaan
+     * sumber Jadwal KA historis per tanggal.
+     *
+     * Kekurangan sumber Jadwal KA ditangani dengan melewati
+     * penugasan tanggal tersebut di dalam confirm().
+     *
+     * @param array{
+     *     month: int,
+     *     year: int,
+     *     days_in_month: int,
+     *     staff: list<array<string, mixed>>
+     * } $preview
      * @return list<string>
      */
     private function storageBlockers(array $preview): array
@@ -539,35 +757,42 @@ class DinasRosterImportController extends Controller
         }
 
         $userIds = [];
-        $historicalSources = [];
+
         foreach ($preview['staff'] as $staff) {
             $userIds[] = $staff['account']['id'] ?? null;
-            foreach ($staff['days'] as $day) {
-                if ($day['code'] === 'L') {
-                    continue;
-                }
-
-                $jplId = (int) ($staff['assignment']['jpl']['id'] ?? 0);
-                $sourceKey = $jplId.'|'.$day['date'];
-                if (CarbonImmutable::parse($day['date'])->isBefore(today()) && ! array_key_exists($sourceKey, $historicalSources)) {
-                    $historicalSources[$sourceKey] = $this->hasHistoricalScheduleSource($jplId, $day['date']);
-                    if (! $historicalSources[$sourceKey]) {
-                        $blockers[] = "Baris {$staff['workbook_row']}, tanggal {$day['day']}: sumber Jadwal KA historis tidak tersedia untuk JPL {$staff['assignment']['jpl']['code']} pada {$day['date']}.";
-                    }
-                }
-            }
         }
 
         $userIds = array_values(array_unique(array_filter($userIds)));
+
         if ($userIds !== []) {
-            $startDate = CarbonImmutable::createSafe($preview['year'], $preview['month'], 1)->toDateString();
-            $endDate = CarbonImmutable::createSafe($preview['year'], $preview['month'], $preview['days_in_month'])->toDateString();
-            if (Dinas::query()->whereIn('user_id', $userIds)->whereBetween('tanggal_dinas', [$startDate, $endDate])->exists()) {
+            $startDate = CarbonImmutable::createSafe(
+                $preview['year'],
+                $preview['month'],
+                1
+            )->toDateString();
+
+            $endDate = CarbonImmutable::createSafe(
+                $preview['year'],
+                $preview['month'],
+                $preview['days_in_month']
+            )->toDateString();
+
+            if (
+                Dinas::query()
+                    ->whereIn('user_id', $userIds)
+                    ->whereBetween('tanggal_dinas', [$startDate, $endDate])
+                    ->exists()
+            ) {
                 $blockers[] = 'Periode tujuan sudah memiliki jadwal Dinas untuk satu atau lebih petugas; sistem tidak akan menimpa data.';
             }
 
-            if (Schema::hasTable('jadwal_dinas_libur')
-                && DB::table('jadwal_dinas_libur')->whereIn('user_id', $userIds)->whereBetween('tanggal_dinas', [$startDate, $endDate])->exists()) {
+            if (
+                Schema::hasTable('jadwal_dinas_libur')
+                && DB::table('jadwal_dinas_libur')
+                    ->whereIn('user_id', $userIds)
+                    ->whereBetween('tanggal_dinas', [$startDate, $endDate])
+                    ->exists()
+            ) {
                 $blockers[] = 'Periode tujuan sudah memiliki data libur untuk satu atau lebih petugas; sistem tidak akan menimpa data.';
             }
         }
@@ -575,17 +800,25 @@ class DinasRosterImportController extends Controller
         return array_values(array_unique($blockers));
     }
 
-    private function initialStatus(CarbonImmutable $start, CarbonImmutable $end): string
-    {
+    private function initialStatus(
+        CarbonImmutable $start,
+        CarbonImmutable $end
+    ): string {
         if ($end->lessThanOrEqualTo(now())) {
             return 'selesai';
         }
 
-        return $start->lessThanOrEqualTo(now()) ? 'berlangsung' : 'dijadwalkan';
+        return $start->lessThanOrEqualTo(now())
+            ? 'berlangsung'
+            : 'dijadwalkan';
     }
 
     private function normalizeNip(string $nip): string
     {
-        return preg_replace('/[^A-Z0-9]/', '', mb_strtoupper(trim($nip))) ?? '';
+        return preg_replace(
+            '/[^A-Z0-9]/',
+            '',
+            mb_strtoupper(trim($nip))
+        ) ?? '';
     }
 }

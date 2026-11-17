@@ -14,9 +14,8 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
-        // 1. Data master wilayah, role, dan shift
+        // 1. Data master role dan shift
         $this->call([
-            WilayahSeeder::class,
             RoleSeeder::class,
             ShiftSeeder::class,
         ]);

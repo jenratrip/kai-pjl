@@ -3,8 +3,7 @@
 @section('title', 'Manajemen Dinas')
 
 @section('content')
-<div class="min-h-screen bg-slate-50 p-4 md:p-6"
-     x-data="dinasPage()">
+<div class="min-h-screen bg-slate-50 p-4 md:p-6" x-data="dinasPage()">
 
     {{-- HEADER --}}
     <div class="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
@@ -34,25 +33,33 @@
                 ⇩ Ekspor CSV
             </a>
 
-            <button type="button" disabled title="Penyalinan menunggu tersedianya sumber penempatan JPL petugas yang tepercaya."
+            <button type="button"
+                    disabled
+                    title="Penyalinan menunggu tersedianya sumber penempatan JPL petugas yang tepercaya."
                     class="cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-500">
                 Gunakan Jadwal Bulan Sebelumnya
             </button>
 
             <button type="button"
                     @click="openCreate = true"
-                    class="rounded-lg bg-[#1d2d50] px-4 py-2.5 text-sm font-bold text-[#ffff]">
+                    class="rounded-lg bg-[#1d2d50] px-4 py-2.5 text-sm font-bold text-white">
                 + Tambah Dinas
             </button>
         </div>
     </div>
 
+    {{-- IMPOR JADWAL --}}
     <section class="mb-6 flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
         <div>
             <h2 class="font-bold text-[#1d2d50]">Impor Jadwal Dinas</h2>
-            <p class="mt-1 text-sm text-slate-600">Pilih satu file Excel (.xlsx), CSV (.csv), atau TXT (.txt). Sistem mendeteksi formatnya otomatis dan memvalidasi seluruh data sebelum penyimpanan.</p>
+            <p class="mt-1 text-sm text-slate-600">
+                Pilih satu file Excel (.xlsx), CSV (.csv), atau TXT (.txt).
+                Sistem mendeteksi formatnya otomatis dan memvalidasi seluruh data sebelum penyimpanan.
+            </p>
         </div>
-        <button type="button" @click="$refs.upload.click()"
+
+        <button type="button"
+                @click="$refs.upload.click()"
                 class="shrink-0 rounded-lg bg-[#1d2d50] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#293e68]">
             Impor Jadwal Dinas
         </button>
@@ -127,66 +134,288 @@
         </div>
     </div>
 
-    {{-- FILTER --}}
-    <div class="mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <form method="GET" action="{{ route('admin.dinas.index') }}"
-              class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-7">
-
+    {{-- MONITORING TUKAR JADWAL --}}
+    <section class="mb-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div class="flex flex-col justify-between gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center">
             <div>
-                <label for="filter-month" class="mb-1.5 block text-sm font-semibold text-slate-700">Bulan</label>
-                <select id="filter-month" name="month" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="font-bold text-[#1d2d50]">Monitoring Tukar Jadwal Dinas</h2>
+
+                    <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                        <span x-text="tukarJadwal.totalMenunggu"></span> Menunggu
+                    </span>
+                </div>
+
+                <p class="mt-1 text-sm text-slate-500">
+                    Pemantauan permintaan pertukaran jadwal antarpetugas PJL.
+                    Admin hanya memiliki akses pemantauan.
+                </p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <span class="text-xs text-slate-400"
+                      x-show="tukarJadwal.lastUpdated"
+                      x-text="'Diperbarui ' + tukarJadwal.lastUpdated">
+                </span>
+
+                <button type="button"
+                        @click="loadTukarJadwal()"
+                        :disabled="tukarJadwal.loading"
+                        class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-[#1d2d50] hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50">
+                    <span x-show="!tukarJadwal.loading">↻ Muat Ulang</span>
+                    <span x-show="tukarJadwal.loading" x-cloak>Memuat...</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="p-5">
+            {{-- ERROR --}}
+            <div x-show="tukarJadwal.error"
+                 x-cloak
+                 class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                 role="alert">
+                <p x-text="tukarJadwal.error"></p>
+                <button type="button"
+                        @click="loadTukarJadwal()"
+                        class="mt-2 font-semibold underline">
+                    Coba lagi
+                </button>
+            </div>
+
+            {{-- LOADING --}}
+            <div x-show="tukarJadwal.loading && tukarJadwal.items.length === 0"
+                 x-cloak
+                 class="py-8 text-center text-sm text-slate-500">
+                Memuat data permintaan tukar jadwal...
+            </div>
+
+            {{-- DATA --}}
+            <div x-show="!tukarJadwal.error && tukarJadwal.items.length > 0"
+                 x-cloak
+                 class="space-y-3">
+                <template x-for="item in tukarJadwal.items" :key="item.id">
+                    <div class="rounded-xl border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50">
+                        <div class="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
+                            <div class="min-w-0 flex-1">
+                                <div class="mb-3 flex flex-wrap items-center gap-2">
+                                    <span class="text-xs font-bold text-slate-400"
+                                          x-text="'#' + item.id">
+                                    </span>
+
+                                    <span class="rounded-full px-2.5 py-1 text-xs font-bold"
+                                          :class="tukarJadwalStatusClass(item.status)"
+                                          x-text="item.status_label">
+                                    </span>
+                                </div>
+
+                                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    {{-- PEMOHON --}}
+                                    <div class="rounded-lg bg-slate-50 p-3">
+                                        <p class="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+                                            Pemohon
+                                        </p>
+
+                                        <p class="font-semibold text-slate-800"
+                                           x-text="item.pemohon || '-'">
+                                        </p>
+
+                                        <p class="mt-1 text-xs text-slate-500"
+                                           x-text="'NIP ' + (item.nip_pemohon || '-')">
+                                        </p>
+
+                                        <p class="mt-2 text-sm font-semibold text-[#1d2d50]"
+                                           x-text="item.jpl_pemohon || 'JPL tidak tersedia'">
+                                        </p>
+                                    </div>
+
+                                    {{-- PENERIMA --}}
+                                    <div class="rounded-lg bg-slate-50 p-3">
+                                        <p class="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+                                            Penerima
+                                        </p>
+
+                                        <p class="font-semibold text-slate-800"
+                                           x-text="item.penerima || '-'">
+                                        </p>
+
+                                        <p class="mt-1 text-xs text-slate-500"
+                                           x-text="'NIP ' + (item.nip_penerima || '-')">
+                                        </p>
+
+                                        <p class="mt-2 text-sm font-semibold text-[#1d2d50]"
+                                           x-text="item.jpl_tujuan || 'JPL tidak tersedia'">
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
+                                    <span>
+                                        Diajukan:
+                                        <span class="font-medium text-slate-700"
+                                              x-text="item.diajukan_pada || '-'"></span>
+                                    </span>
+
+                                    <span x-show="item.dijawab_pada">
+                                        Dijawab:
+                                        <span class="font-medium text-slate-700"
+                                              x-text="item.dijawab_pada"></span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="flex shrink-0 items-center lg:pt-1">
+                                <a :href="item.detail_url"
+                                   class="inline-flex items-center gap-2 rounded-lg border border-[#1d2d50] px-3 py-2 text-sm font-semibold text-[#1d2d50] hover:bg-[#1d2d50] hover:text-white">
+                                    Lihat Detail
+                                    <span aria-hidden="true">→</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            {{-- EMPTY --}}
+            <div x-show="!tukarJadwal.loading && !tukarJadwal.error && tukarJadwal.items.length === 0"
+                 x-cloak
+                 class="py-8 text-center">
+                <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-xl">
+                    ⇄
+                </div>
+
+                <p class="font-semibold text-slate-700">Belum ada permintaan tukar jadwal</p>
+                <p class="mt-1 text-sm text-slate-500">
+                    Permintaan pertukaran jadwal dari petugas akan muncul di sini.
+                </p>
+            </div>
+
+            <div class="mt-4 flex flex-col justify-between gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center">
+                <p class="text-xs text-slate-500">
+                    Menampilkan maksimal 5 permintaan terbaru. Data diperbarui otomatis setiap 30 detik.
+                </p>
+
+                <a href="{{ route('admin.tukar-jadwal-dinas.index') }}"
+                   class="text-sm font-semibold text-[#1d2d50] hover:underline">
+                    Lihat halaman monitoring lengkap →
+                </a>
+            </div>
+        </div>
+    </section>
+
+    {{-- FILTER --}}
+    <div class="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+        <form method="GET"
+              action="{{ route('admin.dinas.index') }}"
+              class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-7">
+
+            {{-- BULAN --}}
+            <div class="min-w-0">
+                <label for="filter-month"
+                       class="mb-1.5 block text-sm font-semibold text-slate-700">
+                    Bulan
+                </label>
+
+                <select id="filter-month"
+                        name="month"
+                        class="block w-full min-w-0 max-w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-[#f5a400] focus:outline-none focus:ring-1 focus:ring-[#f5a400]">
                     <option value="">Semua bulan</option>
-                    @foreach ([1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April', 5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus', 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'] as $monthNumber => $monthName)
-                        <option value="{{ $monthNumber }}" @selected(request('month') == $monthNumber)>{{ $monthName }}</option>
+
+                    @foreach ([
+                        1 => 'Januari',
+                        2 => 'Februari',
+                        3 => 'Maret',
+                        4 => 'April',
+                        5 => 'Mei',
+                        6 => 'Juni',
+                        7 => 'Juli',
+                        8 => 'Agustus',
+                        9 => 'September',
+                        10 => 'Oktober',
+                        11 => 'November',
+                        12 => 'Desember'
+                    ] as $monthNumber => $monthName)
+                        <option value="{{ $monthNumber }}"
+                            @selected(request('month') == $monthNumber)>
+                            {{ $monthName }}
+                        </option>
                     @endforeach
                 </select>
             </div>
 
-            <div>
-                <label for="filter-year" class="mb-1.5 block text-sm font-semibold text-slate-700">Tahun</label>
-                <input id="filter-year" type="number" name="year" min="2000" max="2100" value="{{ request('year') }}"
-                       class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
+            {{-- TAHUN --}}
+            <div class="min-w-0">
+                <label for="filter-year"
+                       class="mb-1.5 block text-sm font-semibold text-slate-700">
+                    Tahun
+                </label>
+
+                <input id="filter-year"
+                       type="number"
+                       name="year"
+                       min="2000"
+                       max="2100"
+                       value="{{ request('year') }}"
+                       placeholder="Semua tahun"
+                       class="block w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-[#f5a400] focus:outline-none focus:ring-1 focus:ring-[#f5a400]">
             </div>
 
-            <div>
-                <label for="filter-user" class="mb-1.5 block text-sm font-semibold text-slate-700">
+            {{-- PETUGAS --}}
+            <div class="min-w-0">
+                <label for="filter-user"
+                       class="mb-1.5 block text-sm font-semibold text-slate-700">
                     Petugas
                 </label>
-                <select id="filter-user" name="user_id"
-                        class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-[#f5a400] focus:outline-none">
+
+                <select id="filter-user"
+                        name="user_id"
+                        class="block w-full min-w-0 max-w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-[#f5a400] focus:outline-none focus:ring-1 focus:ring-[#f5a400]">
                     <option value="">Semua petugas</option>
+
                     @foreach($petugas as $p)
-                        <option value="{{ $p->id }}" @selected(request('user_id') == $p->id)>
+                        <option value="{{ $p->id }}"
+                            @selected(request('user_id') == $p->id)>
                             {{ $p->name }}
                         </option>
                     @endforeach
                 </select>
             </div>
 
-            <div>
-                <label for="filter-jpl" class="mb-1.5 block text-sm font-semibold text-slate-700">
+            {{-- JPL --}}
+            <div class="min-w-0">
+                <label for="filter-jpl"
+                       class="mb-1.5 block text-sm font-semibold text-slate-700">
                     JPL
                 </label>
-                <select id="filter-jpl" name="jpl_id"
-                        class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-[#f5a400] focus:outline-none">
+
+                <select id="filter-jpl"
+                        name="jpl_id"
+                        class="block w-full min-w-0 max-w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-[#f5a400] focus:outline-none focus:ring-1 focus:ring-[#f5a400]">
                     <option value="">Semua JPL</option>
+
                     @foreach($jpl as $lokasi)
-                        <option value="{{ $lokasi->id }}" @selected(request('jpl_id') == $lokasi->id)>
+                        <option value="{{ $lokasi->id }}"
+                            @selected(request('jpl_id') == $lokasi->id)>
                             {{ $lokasi->kode_jpl }} - {{ $lokasi->nama_jpl }}
                         </option>
                     @endforeach
                 </select>
             </div>
 
-            <div>
-                <label for="filter-shift" class="mb-1.5 block text-sm font-semibold text-slate-700">
+            {{-- SHIFT --}}
+            <div class="min-w-0">
+                <label for="filter-shift"
+                       class="mb-1.5 block text-sm font-semibold text-slate-700">
                     Shift
                 </label>
-                <select id="filter-shift" name="shift_id"
-                        class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-[#f5a400] focus:outline-none">
+
+                <select id="filter-shift"
+                        name="shift_id"
+                        class="block w-full min-w-0 max-w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-[#f5a400] focus:outline-none focus:ring-1 focus:ring-[#f5a400]">
                     <option value="">Semua shift</option>
+
                     @foreach($shifts as $shift)
-                        <option value="{{ $shift->id }}" @selected(request('shift_id') == $shift->id)>
+                        <option value="{{ $shift->id }}"
+                            @selected(request('shift_id') == $shift->id)>
                             {{ $shift->nama_shift }}
                             ({{ substr($shift->jam_mulai, 0, 5) }}–{{ substr($shift->jam_selesai, 0, 5) }})
                         </option>
@@ -194,25 +423,33 @@
                 </select>
             </div>
 
-            <div>
-                <label for="filter-tanggal" class="mb-1.5 block text-sm font-semibold text-slate-700">
+            {{-- TANGGAL DINAS --}}
+            <div class="min-w-0">
+                <label for="filter-tanggal"
+                       class="mb-1.5 block text-sm font-semibold text-slate-700">
                     Tanggal Dinas
                 </label>
-                <input id="filter-tanggal" type="date" name="tanggal_dinas"
+
+                <input id="filter-tanggal"
+                       type="date"
+                       name="tanggal_dinas"
                        value="{{ request('tanggal_dinas') }}"
-                       class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-[#f5a400] focus:outline-none">
+                       class="block w-full min-w-0 max-w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-[#f5a400] focus:outline-none focus:ring-1 focus:ring-[#f5a400]">
             </div>
 
-            <div class="flex items-end gap-2">
+            {{-- TOMBOL --}}
+            <div class="flex min-w-0 items-end gap-2 sm:col-span-2 lg:col-span-3 2xl:col-span-1">
                 <button type="submit"
-                        class="flex-1 rounded-lg bg-[#1d2d50] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#293e68]">
+                        class="min-w-0 flex-1 rounded-lg bg-[#1d2d50] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#293e68]">
                     Terapkan
                 </button>
+
                 <a href="{{ route('admin.dinas.index') }}"
-                   class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                   class="min-w-0 rounded-lg border border-slate-300 px-3 py-2.5 text-center text-sm font-semibold text-slate-600 transition hover:bg-slate-100">
                     Reset
                 </a>
             </div>
+
         </form>
     </div>
 
@@ -225,6 +462,7 @@
                     Jadwal penugasan petugas di setiap JPL.
                 </p>
             </div>
+
             <span class="w-fit rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
                 {{ $dinas->total() }} data
             </span>
@@ -302,6 +540,7 @@
                                         default => 'bg-blue-100 text-blue-700',
                                     };
                                 @endphp
+
                                 <span class="whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold {{ $statusClass }}">
                                     {{ ucfirst($item->status ?? 'Tidak diketahui') }}
                                 </span>
@@ -345,6 +584,7 @@
                                           onsubmit="return confirm('Yakin ingin menghapus jadwal ini?')">
                                         @csrf
                                         @method('DELETE')
+
                                         <button type="submit"
                                                 title="Hapus jadwal"
                                                 aria-label="Hapus jadwal"
@@ -380,6 +620,7 @@
                 Menampilkan {{ $dinas->firstItem() ?? 0 }}–{{ $dinas->lastItem() ?? 0 }}
                 dari {{ $dinas->total() }} data
             </p>
+
             <div>{{ $dinas->withQueryString()->links() }}</div>
         </div>
     </div>
@@ -391,6 +632,7 @@
           enctype="multipart/form-data"
           class="hidden">
         @csrf
+
         <input x-ref="upload"
                type="file"
                name="file"
@@ -399,7 +641,8 @@
     </form>
 
     {{-- MODAL PREVIEW CSV --}}
-    <div x-cloak x-show="showPreview"
+    <div x-cloak
+         x-show="showPreview"
          x-transition.opacity
          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-3 sm:p-6"
          @keydown.escape.window="showPreview = false">
@@ -411,9 +654,10 @@
                 <div>
                     <h2 class="text-xl font-bold text-[#1d2d50]">Preview Impor Jadwal Dinas</h2>
                     <p class="mt-1 text-sm text-slate-500">
-                    Server memeriksa identitas, JPL, shift, bentrok, dan seluruh aturan sebelum konfirmasi.
+                        Server memeriksa identitas, JPL, shift, bentrok, dan seluruh aturan sebelum konfirmasi.
                     </p>
                 </div>
+
                 <button type="button"
                         @click="showPreview = false"
                         aria-label="Tutup preview"
@@ -430,10 +674,12 @@
                         <div class="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-2xl">
                             📄
                         </div>
+
                         <p class="break-all font-semibold text-slate-800" x-text="fileName"></p>
                         <p class="mt-1 text-xs text-slate-500">
                             <span x-text="rowCount"></span> baris data
                         </p>
+
                         <button type="button"
                                 @click="$refs.upload.click()"
                                 class="mt-4 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-[#1d2d50] hover:bg-slate-100">
@@ -454,17 +700,28 @@
                         </ul>
                     </div>
 
-                    <div x-show="readError" x-cloak
+                    <div x-show="readError"
+                         x-cloak
                          class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-                         x-text="readError"></div>
-                    <div x-show="validating" x-cloak class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800" role="status">
+                         x-text="readError">
+                    </div>
+
+                    <div x-show="validating"
+                         x-cloak
+                         class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800"
+                         role="status">
                         Memvalidasi seluruh baris pada server...
                     </div>
-                    <div x-show="serverValidationReady && serverErrors.length > 0" x-cloak
-                         class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
+
+                    <div x-show="serverValidationReady && serverErrors.length > 0"
+                         x-cloak
+                         class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+                         role="alert">
                         <p class="font-bold">Hasil validasi server</p>
                         <ul class="mt-2 max-h-48 list-inside list-disc space-y-1 overflow-y-auto">
-                            <template x-for="(error, index) in serverErrors" :key="`${index}-${error}`"><li x-text="error"></li></template>
+                            <template x-for="(error, index) in serverErrors" :key="`${index}-${error}`">
+                                <li x-text="error"></li>
+                            </template>
                         </ul>
                     </div>
                 </aside>
@@ -476,10 +733,12 @@
                             <p class="text-xs text-slate-500">Total Baris</p>
                             <p class="mt-1 text-2xl font-bold text-[#1d2d50]" x-text="rowCount"></p>
                         </div>
+
                         <div class="rounded-xl border border-green-200 bg-green-50 p-4">
                             <p class="text-xs text-green-700">Format Sesuai</p>
                             <p class="mt-1 text-2xl font-bold text-green-700" x-text="validCount"></p>
                         </div>
+
                         <div class="rounded-xl border border-red-200 bg-red-50 p-4">
                             <p class="text-xs text-red-700">Format Bermasalah</p>
                             <p class="mt-1 text-2xl font-bold text-red-700" x-text="errorCount"></p>
@@ -502,6 +761,7 @@
                                     <th class="px-3 py-3">Validasi</th>
                                 </tr>
                             </thead>
+
                             <tbody class="divide-y divide-slate-100">
                                 <template x-for="(row, i) in previewRows" :key="row.line">
                                     <tr class="hover:bg-slate-50">
@@ -512,15 +772,20 @@
                                         <td class="whitespace-nowrap px-3 py-3" x-text="row.tanggal || '-'"></td>
                                         <td class="px-3 py-3" x-text="row.jam_mulai || 'Otomatis'"></td>
                                         <td class="px-3 py-3" x-text="row.jam_selesai || 'Otomatis'"></td>
-                                        <td class="px-3 py-3" x-text="row.pengganti === '1' ? 'Ya' : (row.pengganti === '0' ? 'Tidak' : '-')"></td>
+                                        <td class="px-3 py-3"
+                                            x-text="row.pengganti === '1' ? 'Ya' : (row.pengganti === '0' ? 'Tidak' : '-')">
+                                        </td>
                                         <td class="px-3 py-3" x-text="row.nip_digantikan || '-'"></td>
                                         <td class="px-3 py-3">
                                             <span :class="row.error ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'"
                                                   class="rounded-full px-2 py-1 font-semibold"
-                                                  x-text="row.error ? 'Periksa' : 'Format OK'"></span>
+                                                  x-text="row.error ? 'Periksa' : 'Format OK'">
+                                            </span>
+
                                             <p x-show="row.error"
                                                class="mt-1 max-w-48 whitespace-normal text-red-600"
-                                               x-text="row.error"></p>
+                                               x-text="row.error">
+                                            </p>
                                         </td>
                                     </tr>
                                 </template>
@@ -535,7 +800,8 @@
                     </div>
 
                     <p class="mt-3 text-xs leading-5 text-slate-500">
-                        Pratinjau format awal dibantu browser, lalu seluruh validasi bisnis dilakukan server. Konfirmasi tetap memvalidasi ulang seluruh file.
+                        Pratinjau format awal dibantu browser, lalu seluruh validasi bisnis dilakukan server.
+                        Konfirmasi tetap memvalidasi ulang seluruh file.
                     </p>
 
                     <div class="mt-5 flex flex-col-reverse justify-end gap-3 sm:flex-row">
@@ -558,7 +824,8 @@
     </div>
 
     {{-- MODAL TAMBAH DINAS --}}
-    <div x-cloak x-show="openCreate"
+    <div x-cloak
+         x-show="openCreate"
          x-transition.opacity
          class="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4"
          @keydown.escape.window="openCreate = false">
@@ -573,6 +840,7 @@
                         Jam dinas mengikuti konfigurasi shift.
                     </p>
                 </div>
+
                 <button type="button"
                         @click="openCreate = false"
                         aria-label="Tutup formulir"
@@ -591,9 +859,13 @@
                         <label for="user_id" class="mb-1.5 block text-sm font-semibold text-slate-700">
                             Petugas PJL
                         </label>
-                        <select id="user_id" name="user_id" required
+
+                        <select id="user_id"
+                                name="user_id"
+                                required
                                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
                             <option value="">Pilih petugas</option>
+
                             @foreach($petugas as $p)
                                 <option value="{{ $p->id }}" @selected(old('user_id') == $p->id)>
                                     {{ $p->name }} ({{ $p->nip }})
@@ -606,9 +878,13 @@
                         <label for="jpl_id" class="mb-1.5 block text-sm font-semibold text-slate-700">
                             JPL
                         </label>
-                        <select id="jpl_id" name="jpl_id" required
+
+                        <select id="jpl_id"
+                                name="jpl_id"
+                                required
                                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
                             <option value="">Pilih JPL</option>
+
                             @foreach($jpl as $lokasi)
                                 <option value="{{ $lokasi->id }}" @selected(old('jpl_id') == $lokasi->id)>
                                     {{ $lokasi->kode_jpl }} - {{ $lokasi->nama_jpl }}
@@ -621,9 +897,13 @@
                         <label for="shift_id" class="mb-1.5 block text-sm font-semibold text-slate-700">
                             Shift
                         </label>
-                        <select id="shift_id" name="shift_id" required
+
+                        <select id="shift_id"
+                                name="shift_id"
+                                required
                                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
                             <option value="">Pilih shift</option>
+
                             @foreach($shifts as $shift)
                                 <option value="{{ $shift->id }}" @selected(old('shift_id') == $shift->id)>
                                     {{ $shift->nama_shift }}
@@ -637,6 +917,7 @@
                         <label for="tanggal_dinas" class="mb-1.5 block text-sm font-semibold text-slate-700">
                             Tanggal Dinas
                         </label>
+
                         <input id="tanggal_dinas"
                                type="date"
                                name="tanggal_dinas"
@@ -662,12 +943,14 @@
                                class="mb-1.5 block text-sm font-semibold text-slate-700">
                             Petugas yang Digantikan
                         </label>
+
                         <select id="user_digantikan_id"
                                 name="user_digantikan_id"
                                 :required="isReplacement"
                                 :disabled="!isReplacement"
                                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
                             <option value="">Pilih petugas yang digantikan</option>
+
                             @foreach($petugas as $p)
                                 <option value="{{ $p->id }}" @selected(old('user_digantikan_id') == $p->id)>
                                     {{ $p->name }} ({{ $p->nip }})
@@ -687,6 +970,7 @@
                             class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600">
                         Batal
                     </button>
+
                     <button type="submit"
                             class="rounded-lg bg-[#f5a400] px-5 py-2.5 text-sm font-bold text-[#1d2d50] hover:bg-amber-400">
                         Simpan Jadwal
@@ -707,6 +991,20 @@
 function dinasPage() {
     return {
         previewUrl: @js(route('admin.dinas.import.preview')),
+
+        // Endpoint monitoring tukar jadwal.
+        tukarJadwalUrl: @js(route('admin.tukar-jadwal-dinas.updates')),
+
+        tukarJadwal: {
+            items: [],
+            totalMenunggu: 0,
+            loading: false,
+            error: '',
+            lastUpdated: '',
+        },
+
+        tukarJadwalInterval: null,
+
         openCreate: {{ $errors->any() ? 'true' : 'false' }},
         isReplacement: {{ old('is_pengganti') ? 'true' : 'false' }},
         showPreview: false,
@@ -719,8 +1017,96 @@ function dinasPage() {
         serverValidationValid: false,
         validating: false,
 
+        // Inisialisasi monitoring dan polling berkala.
+        init() {
+            this.loadTukarJadwal();
+
+            this.tukarJadwalInterval = setInterval(() => {
+                this.loadTukarJadwal();
+            }, 30000);
+        },
+
+        // Hentikan polling ketika komponen Alpine dihancurkan.
+        destroy() {
+            if (this.tukarJadwalInterval) {
+                clearInterval(this.tukarJadwalInterval);
+                this.tukarJadwalInterval = null;
+            }
+        },
+
+        // Mengambil data monitoring dari endpoint admin.
+        async loadTukarJadwal() {
+            if (this.tukarJadwal.loading) {
+                return;
+            }
+
+            this.tukarJadwal.loading = true;
+            this.tukarJadwal.error = '';
+
+            try {
+                const response = await fetch(
+                    this.tukarJadwalUrl + '?status_filter=semua',
+                    {
+                        method: 'GET',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    }
+                );
+
+                if (!response.ok) {
+                    throw new Error('Gagal mengambil data monitoring tukar jadwal.');
+                }
+
+                const payload = await response.json();
+
+                if (
+                    payload.success !== true ||
+                    !Array.isArray(payload.items)
+                ) {
+                    throw new Error('Format respons monitoring tidak sesuai.');
+                }
+
+                // Endpoint mengirim maksimal 20 data; dashboard menampilkan 5.
+                this.tukarJadwal.items = payload.items.slice(0, 5);
+
+                this.tukarJadwal.totalMenunggu = Number(
+                    payload.total_menunggu ?? 0
+                );
+
+                this.tukarJadwal.lastUpdated = new Date().toLocaleTimeString(
+                    'id-ID',
+                    {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                    }
+                );
+            } catch (error) {
+                this.tukarJadwal.error =
+                    error.message || 'Terjadi kesalahan saat memuat monitoring.';
+            } finally {
+                this.tukarJadwal.loading = false;
+            }
+        },
+
+        // Warna badge berdasarkan status permintaan.
+        tukarJadwalStatusClass(status) {
+            const classes = {
+                menunggu: 'bg-amber-100 text-amber-800',
+                ditolak: 'bg-red-100 text-red-700',
+                dibatalkan: 'bg-slate-100 text-slate-600',
+                berhasil: 'bg-green-100 text-green-700',
+                gagal: 'bg-orange-100 text-orange-700',
+            };
+
+            return classes[status] || 'bg-slate-100 text-slate-600';
+        },
+
         handleImportFile(event) {
             const file = event.target.files?.[0];
+
             if (!file) return;
 
             if (/\.xlsx$/i.test(file.name)) {
@@ -765,9 +1151,13 @@ function dinasPage() {
 
         get errorCount() {
             return this.previewRows.filter(row => !!row.error).length
-                + (this.serverValidationReady && !this.serverValidationValid && this.previewRows.every(row => !row.error)
-                    ? 1
-                    : 0);
+                + (
+                    this.serverValidationReady &&
+                    !this.serverValidationValid &&
+                    this.previewRows.every(row => !row.error)
+                        ? 1
+                        : 0
+                );
         },
 
         // Hapus BOM asli (\uFEFF) maupun BOM yang salah decode (ï»¿).
@@ -809,7 +1199,7 @@ function dinasPage() {
             return result;
         },
 
-        // Menerima YYYY-MM-DD, DD/MM/YYYY, dan DD-MM-YYYY (sama seperti server).
+        // Menerima YYYY-MM-DD, DD/MM/YYYY, dan DD-MM-YYYY.
         isValidDate(value) {
             let y, m, d, match;
 
@@ -821,7 +1211,10 @@ function dinasPage() {
                 return false;
             }
 
-            y = Number(y); m = Number(m); d = Number(d);
+            y = Number(y);
+            m = Number(m);
+            d = Number(d);
+
             const date = new Date(Date.UTC(y, m - 1, d));
 
             return date.getUTCFullYear() === y
@@ -832,7 +1225,9 @@ function dinasPage() {
         // Jam boleh kosong (otomatis dari shift), atau HH:MM:SS.
         isValidTime(value) {
             if (value === '') return true;
+
             const match = value.match(/^(\d{2}):(\d{2}):(\d{2})$/);
+
             return !!match
                 && Number(match[1]) <= 23
                 && Number(match[2]) <= 59
@@ -841,6 +1236,7 @@ function dinasPage() {
 
         readCsv(event) {
             const file = event.target.files?.[0];
+
             if (!file) return;
 
             this.fileName = file.name;
@@ -872,6 +1268,7 @@ function dinasPage() {
             reader.onload = (e) => {
                 try {
                     const content = this.stripBom(e.target.result);
+
                     const lines = content
                         .split(/\r\n|\n|\r/)
                         .filter(line => line.trim() !== '');
@@ -911,8 +1308,14 @@ function dinasPage() {
                         }
 
                         const [
-                            nip, kodeJpl, idShift, tanggal,
-                            jamMulai, jamSelesai, pengganti, nipDigantikan
+                            nip,
+                            kodeJpl,
+                            idShift,
+                            tanggal,
+                            jamMulai,
+                            jamSelesai,
+                            pengganti,
+                            nipDigantikan
                         ] = cols;
 
                         if (!error && !nip) {
@@ -970,8 +1373,10 @@ function dinasPage() {
 
         async validateCsvOnServer(file) {
             this.validating = true;
+
             const formData = new FormData();
             formData.append('file', file);
+
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
             try {
@@ -984,6 +1389,7 @@ function dinasPage() {
                     },
                     body: formData,
                 });
+
                 const data = await response.json();
                 const rowErrors = data.row_errors ?? {};
 
@@ -991,6 +1397,7 @@ function dinasPage() {
                     ...row,
                     error: row.error || rowErrors[row.line] || '',
                 }));
+
                 this.serverValidationReady = true;
                 this.serverValidationValid = response.ok && data.valid === true;
                 this.serverErrors = data.errors ?? [];
@@ -1001,7 +1408,9 @@ function dinasPage() {
             } catch {
                 this.serverValidationReady = true;
                 this.serverValidationValid = false;
-                this.serverErrors = ['Validasi server gagal dijalankan. Periksa koneksi lalu coba lagi.'];
+                this.serverErrors = [
+                    'Validasi server gagal dijalankan. Periksa koneksi lalu coba lagi.'
+                ];
             } finally {
                 this.validating = false;
             }

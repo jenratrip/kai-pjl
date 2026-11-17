@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Dinas extends Model
 {
+    use HasFactory;
+
     protected $table = 'dinas';
 
     protected $fillable = [
@@ -118,5 +121,27 @@ class Dinas extends Model
     public function realisasiKa(): HasMany
     {
         return $this->hasMany(RealisasiKa::class, 'dinas_id');
+    }
+
+    /**
+     * Permintaan tukar jadwal di mana dinas ini adalah jadwal pemohon.
+     */
+    public function permintaanTukarAsalPemohon(): HasMany
+    {
+        return $this->hasMany(
+            PermintaanTukarJadwal::class,
+            'dinas_pemohon_id'
+        );
+    }
+
+    /**
+     * Permintaan tukar jadwal di mana dinas ini adalah jadwal tujuan.
+     */
+    public function permintaanTukarAsalTujuan(): HasMany
+    {
+        return $this->hasMany(
+            PermintaanTukarJadwal::class,
+            'dinas_tujuan_id'
+        );
     }
 }

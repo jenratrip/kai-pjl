@@ -4,6 +4,7 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\CoachingMessage;
+use App\Models\Dinas;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,8 +15,18 @@ class CoachingMessageController extends Controller
     public function index(Request $request): View
     {
         $user = $this->activePjl($request);
+        $dinasAktif = $this->dinasAktif($user);
+
         $messages = CoachingMessage::query()
-            ->select(['id', 'recipient_user_id', 'subject', 'body', 'received_at', 'expires_at', 'read_at'])
+            ->select([
+                'id',
+                'recipient_user_id',
+                'subject',
+                'body',
+                'received_at',
+                'expires_at',
+                'read_at',
+            ])
             ->where('recipient_user_id', $user->getKey())
             ->active()
             ->orderByDesc('received_at')
@@ -26,23 +37,30 @@ class CoachingMessageController extends Controller
         return view('user.coaching-messages.index', [
             'messages' => $messages,
             'unreadCount' => $this->unreadCountFor($user),
+            'dinasAktif' => $dinasAktif,
         ]);
     }
 
     public function show(Request $request, string $message): View
     {
         $user = $this->activePjl($request);
+        $dinasAktif = $this->dinasAktif($user);
+
         $coachingMessage = $this->activeMessageFor($message, $user);
 
         return view('user.coaching-messages.show', [
             'message' => $coachingMessage,
             'unreadCount' => $this->unreadCountFor($user),
+            'dinasAktif' => $dinasAktif,
         ]);
     }
 
-    public function markAsRead(Request $request, string $message): RedirectResponse
-    {
+    public function markAsRead(
+        Request $request,
+        string $message
+    ): RedirectResponse {
         $user = $this->activePjl($request);
+
         $coachingMessage = $this->activeMessageFor($message, $user);
 
         if ($coachingMessage->read_at === null) {
@@ -67,17 +85,44 @@ class CoachingMessageController extends Controller
         $user = $request->user();
 
         abort_unless(
-            $user instanceof User && $user->hasRole('pjl') && $user->is_active,
+            $user instanceof User
+                && $user->hasRole('pjl')
+                && $user->is_active,
             403,
         );
 
         return $user;
     }
 
-    private function activeMessageFor(string $messageId, User $user): CoachingMessage
+    private function dinasAktif(User $user): ?Dinas
     {
+        return Dinas::query()
+            ->with([
+                'jpl.resort',
+                'shift',
+                'user',
+                'userDigantikan',
+            ])
+            ->where('user_id', $user->getKey())
+            ->where('status', 'berlangsung')
+            ->latest('id')
+            ->first();
+    }
+
+    private function activeMessageFor(
+        string $messageId,
+        User $user
+    ): CoachingMessage {
         return CoachingMessage::query()
-            ->select(['id', 'recipient_user_id', 'subject', 'body', 'received_at', 'expires_at', 'read_at'])
+            ->select([
+                'id',
+                'recipient_user_id',
+                'subject',
+                'body',
+                'received_at',
+                'expires_at',
+                'read_at',
+            ])
             ->whereKey($messageId)
             ->where('recipient_user_id', $user->getKey())
             ->active()

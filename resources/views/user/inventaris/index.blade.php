@@ -48,7 +48,7 @@
         @endif
 
         {{-- TIDAK ADA DINAS AKTIF --}}
-        @if (!$dinas)
+        @if (!$dinasAktif)
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-3 h-10 w-10 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
@@ -61,28 +61,68 @@
         @else
 
             {{-- INFO DINAS --}}
-            <div class="mb-6 grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-3">
+            @php
+                $petugasAktif = $dinasAktif->user;
+                $petugasReguler = $dinasAktif->userDigantikan;
+            @endphp
+
+            <div class="mb-6 grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
+
+                {{-- JPL --}}
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">JPL</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        JPL
+                    </p>
                     <p class="mt-1 font-semibold text-slate-800">
-                        {{ $dinas->jpl?->kode_jpl ?? '-' }}
-                        <span class="font-normal text-slate-500">{{ $dinas->jpl?->nama_jpl ? '— ' . $dinas->jpl->nama_jpl : '' }}</span>
+                        {{ $dinasAktif->jpl?->kode_jpl ?? '-' }}
+                        <span class="font-normal text-slate-500">
+                            {{ $dinasAktif->jpl?->nama_jpl ? '— ' . $dinasAktif->jpl->nama_jpl : '' }}
+                        </span>
+                    </p>
+                    <p class="mt-1 text-xs text-slate-500">
+                        {{ $dinasAktif->jpl?->resort?->nama_resort ?? '' }}
                     </p>
                 </div>
+
+                {{-- PETUGAS --}}
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Tanggal Dinas</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Petugas
+                    </p>
                     <p class="mt-1 font-semibold text-slate-800">
-                        {{ \Carbon\Carbon::parse($dinas->tanggal_dinas)->locale('id')->translatedFormat('l, d F Y') }}
+                        {{ $petugasAktif?->name ?? auth()->user()?->name ?? '-' }}
+                    </p>
+
+                    @if ($dinasAktif->is_pengganti)
+                        <p class="mt-1 text-xs text-slate-500">
+                            Menggantikan: {{ $petugasReguler?->name ?? 'Belum ditentukan' }}
+                        </p>
+                    @endif
+                </div>
+
+                {{-- TANGGAL DINAS --}}
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Tanggal Dinas
+                    </p>
+                    <p class="mt-1 font-semibold text-slate-800">
+                        {{ \Carbon\Carbon::parse($dinasAktif->tanggal_dinas)->locale('id')->translatedFormat('l, d F Y') }}
                     </p>
                 </div>
+
+                {{-- SHIFT --}}
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Shift</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Shift
+                    </p>
                     <p class="mt-1 font-semibold text-slate-800">
-                        {{ $dinas->shift?->nama_shift ?? '-' }}
+                        {{ $dinasAktif->shift?->nama_shift ?? '-' }}
                     </p>
                 </div>
+
             </div>
 
+            {{-- SALIN PEMERIKSAAN TERAKHIR --}}
             <form
                 method="POST"
                 action="{{ route('user.inventaris.prepare') }}"
@@ -90,7 +130,8 @@
             >
                 @csrf
                 <p class="text-sm text-blue-900">
-                    Salin hasil pemeriksaan terakhir ke Dinas ini jika diperlukan. Rusak atau Hilang memerlukan konfirmasi bukti dan keterangan.
+                    Salin hasil pemeriksaan terakhir ke Dinas ini jika diperlukan.
+                    Rusak atau Hilang memerlukan konfirmasi bukti dan keterangan.
                 </p>
                 <button
                     type="submit"
@@ -102,9 +143,11 @@
 
             {{-- PROGRESS --}}
             @php
-                $totalItem     = $inventaris->count();
+                $totalItem = $inventaris->count();
                 $sudahDiperiksa = $realisasi->count();
-                $persen        = $totalItem > 0 ? round(($sudahDiperiksa / $totalItem) * 100) : 0;
+                $persen = $totalItem > 0
+                    ? round(($sudahDiperiksa / $totalItem) * 100)
+                    : 0;
             @endphp
 
             <div class="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -122,7 +165,9 @@
                         style="width: {{ $persen }}%"
                     ></div>
                 </div>
-                <p class="mt-1 text-right text-xs text-slate-400">{{ $persen }}%</p>
+                <p class="mt-1 text-right text-xs text-slate-400">
+                    {{ $persen }}%
+                </p>
             </div>
 
             {{-- DAFTAR INVENTARIS --}}
@@ -134,9 +179,9 @@
                 <div class="space-y-3">
                     @foreach ($inventaris as $item)
                         @php
-                            $hasil       = $realisasi->get($item->id);
-                            $sudahIsi    = $hasil !== null;
-                            $adaMasalah  = $sudahIsi && $hasil->status === 'silang';
+                            $hasil = $realisasi->get($item->id);
+                            $sudahIsi = $hasil !== null;
+                            $adaMasalah = $sudahIsi && $hasil->status === 'silang';
                         @endphp
 
                         <div
@@ -150,9 +195,9 @@
                             data-saved-note="{{ $hasil?->catatan ?? '' }}"
                             data-saved-photo-url="{{ $hasil?->bukti_foto_path ? route('user.inventaris.foto-bukti', $item) : '' }}"
                             class="overflow-hidden rounded-xl border shadow-sm transition
-                                {{ $adaMasalah  ? 'border-red-200 bg-red-50'
-                                  : ($sudahIsi  ? 'border-green-200 bg-green-50'
-                                               : 'border-slate-200 bg-white') }}"
+                                {{ $adaMasalah ? 'border-red-200 bg-red-50'
+                                    : ($sudahIsi ? 'border-green-200 bg-green-50'
+                                    : 'border-slate-200 bg-white') }}"
                         >
                             {{-- HEADER ITEM --}}
                             <button
@@ -162,7 +207,7 @@
                                 :aria-expanded="open"
                             >
                                 <div class="flex items-center gap-3">
-                                    {{-- Status icon --}}
+                                    {{-- STATUS ICON --}}
                                     @if ($adaMasalah)
                                         <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -184,8 +229,12 @@
                                     @endif
 
                                     <div>
-                                        <p class="font-semibold text-slate-800">{{ $item->nama_barang }}</p>
-                                        <p class="text-xs text-slate-500">Jumlah standar: {{ $item->jumlah }} pcs</p>
+                                        <p class="font-semibold text-slate-800">
+                                            {{ $item->nama_barang }}
+                                        </p>
+                                        <p class="text-xs text-slate-500">
+                                            Jumlah standar: {{ $item->jumlah }} pcs
+                                        </p>
                                         <p data-status class="mt-1 text-xs text-slate-500" aria-live="polite"></p>
                                         <p data-tinjauan class="mt-1 hidden text-xs font-medium text-amber-700"></p>
                                     </div>
@@ -193,18 +242,27 @@
 
                                 <div class="flex items-center gap-2">
                                     @if ($adaMasalah)
-                                        <span class="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">Bermasalah</span>
+                                        <span class="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                                            Bermasalah
+                                        </span>
                                     @elseif ($sudahIsi)
-                                        <span class="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">Baik</span>
+                                        <span class="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                                            Baik
+                                        </span>
                                     @else
-                                        <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">Belum diperiksa</span>
+                                        <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">
+                                            Belum diperiksa
+                                        </span>
                                     @endif
 
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
                                         class="h-4 w-4 text-slate-400 transition-transform duration-200"
                                         :class="{ 'rotate-180': open }"
-                                        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        stroke-width="2"
                                     >
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                                     </svg>
@@ -212,11 +270,24 @@
                             </button>
 
                             {{-- FORM PEMERIKSAAN --}}
-                            <div x-show="open" x-collapse data-detail class="border-t border-slate-200 px-4 pb-4 pt-3">
+                            <div
+                                x-show="open"
+                                x-collapse
+                                data-detail
+                                class="border-t border-slate-200 px-4 pb-4 pt-3"
+                            >
                                 <div data-saved-evidence @if (!$hasil?->bukti_foto_path) hidden @endif class="mb-4">
-                                    <p class="mb-1 text-xs font-semibold text-slate-600">Bukti foto tersimpan</p>
-                                    <img data-saved-evidence-image src="{{ $hasil?->bukti_foto_path ? route('user.inventaris.foto-bukti', $item) : '' }}" alt="Bukti foto inventaris" class="max-h-48 rounded-lg border border-slate-200 object-contain">
+                                    <p class="mb-1 text-xs font-semibold text-slate-600">
+                                        Bukti foto tersimpan
+                                    </p>
+                                    <img
+                                        data-saved-evidence-image
+                                        src="{{ $hasil?->bukti_foto_path ? route('user.inventaris.foto-bukti', $item) : '' }}"
+                                        alt="Bukti foto inventaris"
+                                        class="max-h-48 rounded-lg border border-slate-200 object-contain"
+                                    >
                                 </div>
+
                                 <form
                                     method="POST"
                                     action="{{ route('user.inventaris.update', $item->id) }}"
@@ -224,10 +295,15 @@
                                 >
                                     @csrf
                                     @method('PATCH')
-                                    <input type="hidden" name="dinas_id" value="{{ $dinas->id }}">
+
+                                    <input
+                                        type="hidden"
+                                        name="dinas_id"
+                                        value="{{ $dinasAktif->id }}"
+                                    >
 
                                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                        {{-- Kondisi --}}
+                                        {{-- KONDISI --}}
                                         <div>
                                             <label class="mb-1 block text-xs font-semibold text-slate-600">
                                                 Kondisi <span class="text-red-500">*</span>
@@ -239,10 +315,10 @@
                                                 class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-[#55769a] focus:ring-2 focus:ring-[#55769a]/20"
                                             >
                                                 @foreach ([
-                                                    'baik'             => 'Baik',
-                                                    'perlu_perbaikan'  => 'Perlu Perbaikan',
-                                                    'rusak'            => 'Rusak',
-                                                    'hilang'           => 'Hilang',
+                                                    'baik' => 'Baik',
+                                                    'perlu_perbaikan' => 'Perlu Perbaikan',
+                                                    'rusak' => 'Rusak',
+                                                    'hilang' => 'Hilang',
                                                 ] as $val => $label)
                                                     <option
                                                         value="{{ $val }}"
@@ -254,11 +330,13 @@
                                             </select>
                                         </div>
 
-                                        {{-- Jumlah aktual --}}
+                                        {{-- JUMLAH AKTUAL --}}
                                         <div>
                                             <label class="mb-1 block text-xs font-semibold text-slate-600">
                                                 Jumlah Aktual
-                                                <span class="font-normal text-slate-400">(kosongkan = sesuai standar)</span>
+                                                <span class="font-normal text-slate-400">
+                                                    (kosongkan = sesuai standar)
+                                                </span>
                                             </label>
                                             <input
                                                 type="number"
@@ -272,7 +350,7 @@
                                         </div>
                                     </div>
 
-                                    {{-- Catatan --}}
+                                    {{-- CATATAN --}}
                                     <div>
                                         <label class="mb-1 block text-xs font-semibold text-slate-600">
                                             Catatan
@@ -302,36 +380,91 @@
                 </div>
             @endif
 
-            <dialog data-evidence-dialog aria-labelledby="evidence-title" class="w-[min(92vw,36rem)] rounded-2xl border border-slate-200 p-0 shadow-2xl backdrop:bg-slate-900/50">
+            {{-- DIALOG BUKTI FOTO --}}
+            <dialog
+                data-evidence-dialog
+                aria-labelledby="evidence-title"
+                class="w-[min(92vw,36rem)] rounded-2xl border border-slate-200 p-0 shadow-2xl backdrop:bg-slate-900/50"
+            >
                 <div class="border-b border-slate-200 px-5 py-4">
                     <h2 id="evidence-title" data-evidence-title class="text-lg font-semibold text-slate-900"></h2>
                     <p data-evidence-help class="mt-1 text-sm text-slate-600"></p>
                 </div>
+
                 <div class="space-y-4 px-5 py-4">
                     <div data-existing-evidence hidden>
-                        <p class="mb-1 text-xs font-semibold text-slate-600">Bukti sebelumnya</p>
-                        <img src="" alt="Bukti foto yang tersimpan" class="max-h-40 rounded-lg border border-slate-200 object-contain">
+                        <p class="mb-1 text-xs font-semibold text-slate-600">
+                            Bukti sebelumnya
+                        </p>
+                        <img
+                            src=""
+                            alt="Bukti foto yang tersimpan"
+                            class="max-h-40 rounded-lg border border-slate-200 object-contain"
+                        >
                     </div>
+
                     <div>
-                        <label for="evidence-photo" class="mb-1 block text-sm font-medium text-slate-700">Foto bukti</label>
-                        <input id="evidence-photo" data-evidence-photo type="file" accept="image/jpeg,image/png,image/webp" class="block w-full rounded-lg border border-slate-300 p-2 text-sm">
-                        <p data-photo-required class="mt-1 text-xs text-red-700" hidden>Wajib untuk kondisi Rusak.</p>
-                        <p data-photo-optional class="mt-1 text-xs text-slate-500">Untuk kondisi Hilang, foto bersifat opsional. JPEG, PNG, atau WebP, maksimal 5 MB.</p>
+                        <label for="evidence-photo" class="mb-1 block text-sm font-medium text-slate-700">
+                            Foto bukti
+                        </label>
+                        <input
+                            id="evidence-photo"
+                            data-evidence-photo
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            class="block w-full rounded-lg border border-slate-300 p-2 text-sm"
+                        >
+                        <p data-photo-required class="mt-1 text-xs text-red-700" hidden>
+                            Wajib untuk kondisi Rusak.
+                        </p>
+                        <p data-photo-optional class="mt-1 text-xs text-slate-500">
+                            Untuk kondisi Hilang, foto bersifat opsional. JPEG, PNG, atau WebP, maksimal 5 MB.
+                        </p>
                         <p data-error-photo role="alert" class="mt-1 text-xs text-red-700" hidden></p>
                     </div>
+
                     <div data-evidence-preview-wrap hidden>
-                        <p class="mb-1 text-xs font-semibold text-slate-600">Pratinjau foto baru</p>
-                        <img data-evidence-preview src="" alt="Pratinjau foto bukti" class="max-h-48 rounded-lg border border-slate-200 object-contain">
+                        <p class="mb-1 text-xs font-semibold text-slate-600">
+                            Pratinjau foto baru
+                        </p>
+                        <img
+                            data-evidence-preview
+                            src=""
+                            alt="Pratinjau foto bukti"
+                            class="max-h-48 rounded-lg border border-slate-200 object-contain"
+                        >
                     </div>
+
                     <div>
-                        <label for="evidence-description" class="mb-1 block text-sm font-medium text-slate-700">Keterangan <span class="text-red-600">*</span></label>
-                        <textarea id="evidence-description" data-evidence-description rows="3" maxlength="2000" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"></textarea>
+                        <label for="evidence-description" class="mb-1 block text-sm font-medium text-slate-700">
+                            Keterangan <span class="text-red-600">*</span>
+                        </label>
+                        <textarea
+                            id="evidence-description"
+                            data-evidence-description
+                            rows="3"
+                            maxlength="2000"
+                            class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        ></textarea>
                         <p data-error-description role="alert" class="mt-1 text-xs text-red-700" hidden></p>
                     </div>
                 </div>
+
                 <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
-                    <button type="button" data-evidence-cancel class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Batal</button>
-                    <button type="button" data-evidence-confirm class="rounded-lg bg-[#1d2d50] px-4 py-2 text-sm font-semibold text-white hover:bg-[#14213d]">Simpan</button>
+                    <button
+                        type="button"
+                        data-evidence-cancel
+                        class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="button"
+                        data-evidence-confirm
+                        class="rounded-lg bg-[#1d2d50] px-4 py-2 text-sm font-semibold text-white hover:bg-[#14213d]"
+                    >
+                        Simpan
+                    </button>
                 </div>
             </dialog>
 

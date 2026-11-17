@@ -18,7 +18,13 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class InventarisController extends Controller
 {
     /**
-     * Mendapatkan dinas aktif milik pengguna yang login.
+     * Mengambil dinas aktif dan identitas petugas.
+     *
+     * Relasi:
+     * - jpl.resort
+     * - shift
+     * - user
+     * - userDigantikan
      */
     private function dinasAktif(Request $request): ?Dinas
     {
@@ -29,15 +35,21 @@ class InventarisController extends Controller
         }
 
         return Dinas::query()
-            ->with(['jpl', 'shift'])
-            ->whereKey($dinasId)
+            ->with([
+                'jpl.resort',
+                'shift',
+                'user',
+                'userDigantikan',
+            ])
+            ->whereKey((int) $dinasId)
             ->where('user_id', auth()->id())
             ->where('status', 'berlangsung')
             ->first();
     }
 
     /**
-     * Menentukan Dinas utama sebagai sumber pemeriksaan bersama untuk petugas wakilan.
+     * Menentukan Dinas utama sebagai sumber pemeriksaan bersama
+     * untuk petugas wakilan.
      */
     private function dinasSumberInventaris(Dinas $dinas): Dinas
     {
@@ -140,60 +152,88 @@ class InventarisController extends Controller
         return $jumlahDisalin;
     }
 
+    /**
+     * Menampilkan halaman inventaris.
+     */
     public function index(Request $request)
     {
+        /*
+        |--------------------------------------------------------------------------
+        | AMBIL DINAS AKTIF DAN IDENTITAS PETUGAS
+        |--------------------------------------------------------------------------
+        */
+
         $dinas = $this->dinasAktif($request);
 
-        if (! $dinas) {
-            return view('user.inventaris.index', [
-                'dinas' => null,
-                'inventaris' => collect(),
-                'realisasi' => collect(),
-            ]);
+        $inventaris = collect();
+        $realisasi = collect();
+
+        if ($dinas && $dinas->jpl_id) {
+            $dinasSumber = $this->dinasSumberInventaris($dinas);
+
+            $inventaris = Inventaris::query()
+                ->where('is_active', true)
+                ->where('jpl_id', $dinas->jpl_id)
+                ->orderBy('nama_barang')
+                ->get();
+
+            $realisasi = RealisasiInventaris::query()
+                ->where('dinas_id', $dinasSumber->id)
+                ->whereIn('inventaris_id', $inventaris->pluck('id'))
+                ->get()
+                ->keyBy('inventaris_id');
         }
 
-        $dinasSumber = $this->dinasSumberInventaris($dinas);
+        /*
+        |--------------------------------------------------------------------------
+        | KIRIM DATA KE VIEW
+        |--------------------------------------------------------------------------
+        |
+        | dinasAktif:
+        | - jpl.resort
+        | - shift
+        | - user
+        | - userDigantikan
+        |
+        */
 
-        $inventaris = Inventaris::query()
-            ->where('is_active', true)
-            ->where('jpl_id', $dinas->jpl_id)
-            ->orderBy('nama_barang')
-            ->get();
-
-        $realisasi = RealisasiInventaris::query()
-            ->where('dinas_id', $dinasSumber->id)
-            ->whereIn('inventaris_id', $inventaris->pluck('id'))
-            ->get()
-            ->keyBy('inventaris_id');
-
-        return view('user.inventaris.index', compact(
-            'dinas',
-            'inventaris',
-            'realisasi'
-        ));
+        return view('user.inventaris.index', [
+            'dinasAktif' => $dinas,
+            'inventaris' => $inventaris,
+            'realisasi' => $realisasi,
+        ]);
     }
 
     /**
-     * Menampilkan bukti foto pemeriksaan hanya kepada PJL pada Dinas terkait.
+     * Menampilkan bukti foto pemeriksaan hanya kepada PJL
+     * pada Dinas terkait.
      */
     public function fotoBukti(
         Request $request,
         Inventaris $inventaris
     ): BinaryFileResponse {
         $dinas = $this->dinasAktif($request);
+
         abort_unless($dinas, 404);
-        abort_unless((int) $inventaris->jpl_id === (int) $dinas->jpl_id, 404);
+
+        abort_unless(
+            (int) $inventaris->jpl_id === (int) $dinas->jpl_id,
+            404
+        );
 
         $dinasSumber = $this->dinasSumberInventaris($dinas);
+
         $realisasi = RealisasiInventaris::query()
             ->where('dinas_id', $dinasSumber->id)
             ->where('inventaris_id', $inventaris->id)
             ->firstOrFail();
 
         $path = $realisasi->bukti_foto_path;
+
         abort_unless($this->buktiFotoTersedia($path), 404);
 
         $mimeType = Storage::disk('local')->mimeType($path);
+
         abort_unless(
             in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'], true),
             404
@@ -203,6 +243,7 @@ class InventarisController extends Controller
             Storage::disk('local')->path($path),
             ['X-Content-Type-Options' => 'nosniff']
         );
+
         $response->setPrivate();
         $response->headers->set('Cache-Control', 'private, no-store');
 
@@ -210,14 +251,26 @@ class InventarisController extends Controller
     }
 
     /**
-     * Menyalin pemeriksaan terakhir ke Dinas berjalan atas permintaan PJL.
+     * Menyalin pemeriksaan terakhir ke Dinas berjalan
+     * atas permintaan PJL.
      */
     public function prepare(
         Request $request,
         ActivityLogService $activityLogService
     ): RedirectResponse {
         $dinas = $this->dinasAktif($request);
-        abort_unless($dinas, 404, 'Dinas aktif tidak ditemukan untuk sesi ini.');
+
+        abort_unless(
+            $dinas,
+            404,
+            'Dinas aktif tidak ditemukan untuk sesi ini.'
+        );
+
+        abort_unless(
+            $dinas->jpl_id,
+            422,
+            'JPL belum ditentukan. Pemeriksaan inventaris belum dapat disiapkan.'
+        );
 
         $dinasSumber = $this->dinasSumberInventaris($dinas);
 
@@ -259,13 +312,6 @@ class InventarisController extends Controller
 
     /**
      * Menyimpan pemeriksaan satu inventaris.
-     *
-     * Aturan sama dengan SerahTerimaDinasController::storeInventaris():
-     * - Bermasalah jika kondisi bukan "baik" atau jumlah aktual
-     *   berbeda dari jumlah master.
-     * - jumlah_aktual opsional; jika kosong dianggap sama dengan
-     *   jumlah master (inventaris lengkap).
-     * - Inventaris bermasalah ditandai untuk ditinjau admin.
      *
      * Mendukung request biasa (redirect) maupun fetch/AJAX (JSON).
      */
@@ -322,6 +368,7 @@ class InventarisController extends Controller
 
         abort_unless(
             $inventaris->is_active
+                && $dinas->jpl_id
                 && (int) $inventaris->jpl_id === (int) $dinas->jpl_id,
             403,
             'Inventaris ini tidak termasuk dalam penempatan JPL dinas Anda.'
@@ -498,6 +545,9 @@ class InventarisController extends Controller
             ->with('success', $pesan);
     }
 
+    /**
+     * Memastikan path foto hanya berasal dari direktori bukti inventaris.
+     */
     private function buktiFotoTersedia(?string $path): bool
     {
         return is_string($path)

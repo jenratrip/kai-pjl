@@ -19,6 +19,26 @@
     <nav class="flex min-h-0 flex-1 flex-col gap-[7px] overflow-y-auto px-4 py-5" aria-label="Menu navigasi">
         <a
             @click="closeSidebar()"
+            href="{{ route('user.jadwal-dinas') }}"
+            @class([
+                'flex min-h-[46px] items-center gap-[13px] rounded-[9px] border border-transparent px-[13px] py-[11px] text-[13px] font-semibold transition-colors',
+                'border-[#dce6f5] bg-[#edf3fb] font-bold text-[#1e3156]' => request()->routeIs('user.jadwal-dinas'),
+                'text-[#59677d] hover:bg-[#f5f7fb] hover:text-[#1e3156]' => !request()->routeIs('user.jadwal-dinas'),
+            ])
+            @if(request()->routeIs('user.jadwal-dinas')) aria-current="page" @endif
+        >
+            <span class="inline-flex h-[25px] w-[25px] shrink-0 items-center justify-center text-xl">
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 2v4M16 2v4M3 10h18"/>
+    <rect x="3" y="4" width="18" height="18" rx="2"/>
+    <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>
+</svg>
+            </span>
+            <span>Jadwal Saya</span>
+        </a>
+
+        <a
+            @click="closeSidebar()"
             href="{{ url('/user/realisasi-ka') }}"
             @class([
                 'flex min-h-[46px] items-center gap-[13px] rounded-[9px] border border-transparent px-[13px] py-[11px] text-[13px] font-semibold transition-colors',
@@ -34,7 +54,7 @@
     <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>
 </svg>
             </span>
-            <span>Jadwal KA</span>
+            <span>Realisasi Jadwal KA</span>
         </a>
 
         <a

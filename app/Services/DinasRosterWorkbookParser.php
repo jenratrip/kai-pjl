@@ -24,18 +24,27 @@ class DinasRosterWorkbookParser
     private const VALID_CODES = ['P', 'S', 'M', 'L'];
 
     /**
-     * @return array{month: int, year: int, days_in_month: int, staff: list<array<string, mixed>>}
+     * @return array{
+     *     month: int,
+     *     year: int,
+     *     days_in_month: int,
+     *     staff: list<array<string, mixed>>
+     * }
      */
     public function parse(string $path, int $month, int $year): array
     {
         if ($month < 1 || $month > 12 || ! checkdate($month, 1, $year)) {
-            throw new \InvalidArgumentException('Periode bulan dan tahun tidak valid.');
+            throw new \InvalidArgumentException(
+                'Periode bulan dan tahun tidak valid.'
+            );
         }
 
         try {
             $spreadsheet = IOFactory::load($path);
         } catch (Throwable) {
-            throw new \InvalidArgumentException('Workbook Excel tidak dapat dibaca. Pastikan file tidak rusak.');
+            throw new \InvalidArgumentException(
+                'Workbook Excel tidak dapat dibaca. Pastikan file tidak rusak.'
+            );
         }
 
         $matchingSheets = array_values(array_filter(
@@ -47,40 +56,74 @@ class DinasRosterWorkbookParser
         ));
 
         if (count($matchingSheets) !== 1) {
-            throw new \InvalidArgumentException('Workbook harus memiliki tepat satu sheet dengan nama yang diawali “Jadwal ”.');
+            throw new \InvalidArgumentException(
+                'Workbook harus memiliki tepat satu sheet dengan nama yang diawali “Jadwal ”.'
+            );
         }
 
         $sheet = $matchingSheets[0];
+
         $this->validateHeaders($sheet);
 
-        $daysInMonth = CarbonImmutable::createSafe($year, $month, 1)->daysInMonth;
+        $daysInMonth = CarbonImmutable::createSafe(
+            $year,
+            $month,
+            1
+        )->daysInMonth;
+
         $this->validateDateColumns($sheet, $daysInMonth);
 
         $staff = [];
 
-        for ($row = self::FIRST_DATA_ROW; $row <= $sheet->getHighestRow(); $row++) {
-            $serial = $this->cellText($sheet->getCell("A{$row}")->getValue());
-            $name = $this->cellText($sheet->getCell("B{$row}")->getValue());
-            $jobTitle = $this->cellText($sheet->getCell("C{$row}")->getValue());
-            $nipkwt = $this->cellText($sheet->getCell("D{$row}")->getValue());
+        for (
+            $row = self::FIRST_DATA_ROW;
+            $row <= $sheet->getHighestRow();
+            $row++
+        ) {
+            $serial = $this->cellText(
+                $sheet->getCell("A{$row}")->getValue()
+            );
+
+            $name = $this->cellText(
+                $sheet->getCell("B{$row}")->getValue()
+            );
+
+            $jobTitle = $this->cellText(
+                $sheet->getCell("C{$row}")->getValue()
+            );
+
+            $nipkwt = $this->cellText(
+                $sheet->getCell("D{$row}")->getValue()
+            );
 
             if (! $this->isStaffRow($serial, $name, $nipkwt)) {
                 continue;
             }
 
             $errors = [];
+
             if ($name === '') {
                 $errors[] = "Baris {$row}: nama petugas wajib diisi.";
             }
+
             if ($nipkwt === '') {
                 $errors[] = "Baris {$row}: NIPKWT wajib diisi.";
             }
 
             $days = [];
 
+            // Hanya membaca tanggal yang termasuk dalam periode terpilih.
             for ($day = 1; $day <= $daysInMonth; $day++) {
-                $column = Coordinate::stringFromColumnIndex(self::FIRST_DATE_COLUMN + $day - 1);
-                $code = mb_strtoupper(trim($this->cellText($sheet->getCell("{$column}{$row}")->getValue())));
+                $column = Coordinate::stringFromColumnIndex(
+                    self::FIRST_DATE_COLUMN + $day - 1
+                );
+
+                $code = mb_strtoupper(trim(
+                    $this->cellText(
+                        $sheet->getCell("{$column}{$row}")->getValue()
+                    )
+                ));
+
                 $valid = in_array($code, self::VALID_CODES, true);
 
                 if ($code === '') {
@@ -91,21 +134,27 @@ class DinasRosterWorkbookParser
 
                 $days[] = [
                     'day' => $day,
-                    'date' => CarbonImmutable::createSafe($year, $month, $day)->toDateString(),
+                    'date' => CarbonImmutable::createSafe(
+                        $year,
+                        $month,
+                        $day
+                    )->toDateString(),
                     'code' => $code,
                     'valid' => $valid,
                     'holiday' => $valid && $code === 'L',
                 ];
             }
 
-            for ($day = $daysInMonth + 1; $day <= self::LAST_DATE_COLUMN - self::FIRST_DATE_COLUMN + 1; $day++) {
-                $column = Coordinate::stringFromColumnIndex(self::FIRST_DATE_COLUMN + $day - 1);
-                $extraCode = trim($this->cellText($sheet->getCell("{$column}{$row}")->getValue()));
-
-                if ($extraCode !== '') {
-                    $errors[] = "Baris {$row}, kolom tanggal {$day}: jadwal terisi untuk tanggal yang tidak ada pada periode terpilih.";
-                }
-            }
+            /*
+             * Kolom tanggal setelah akhir bulan sengaja diabaikan.
+             *
+             * Contoh:
+             * - Februari hanya memiliki 28/29 hari.
+             * - Jika kolom tanggal 29 sampai 31 masih terisi,
+             *   isinya tidak dimasukkan ke jadwal.
+             * - Isi tersebut tidak menghasilkan validation error.
+             * - Jadwal valid pada tanggal dalam periode tetap diproses.
+             */
 
             $staff[] = [
                 'workbook_row' => $row,
@@ -119,7 +168,9 @@ class DinasRosterWorkbookParser
         }
 
         if ($staff === []) {
-            throw new \InvalidArgumentException('Tidak ada baris petugas pada workbook.');
+            throw new \InvalidArgumentException(
+                'Tidak ada baris petugas pada workbook.'
+            );
         }
 
         return [
@@ -141,31 +192,59 @@ class DinasRosterWorkbookParser
         ];
 
         foreach ($expected as $column => $header) {
-            $actual = mb_strtoupper(trim($this->cellText(
-                $sheet->getCell("{$column}".self::HEADER_ROW)->getValue()
-            )));
+            $actual = mb_strtoupper(trim(
+                $this->cellText(
+                    $sheet->getCell(
+                        "{$column}" . self::HEADER_ROW
+                    )->getValue()
+                )
+            ));
 
             if ($actual !== $header) {
-                throw new \InvalidArgumentException("Header kolom {$column} pada baris 6 harus {$header}.");
+                throw new \InvalidArgumentException(
+                    "Header kolom {$column} pada baris 6 harus {$header}."
+                );
             }
         }
     }
 
-    private function validateDateColumns(Worksheet $sheet, int $daysInMonth): void
-    {
+    private function validateDateColumns(
+        Worksheet $sheet,
+        int $daysInMonth
+    ): void {
         for ($day = 1; $day <= $daysInMonth; $day++) {
-            $column = Coordinate::stringFromColumnIndex(self::FIRST_DATE_COLUMN + $day - 1);
-            $actual = trim($this->cellText($sheet->getCell("{$column}".self::DATE_ROW)->getValue()));
+            $column = Coordinate::stringFromColumnIndex(
+                self::FIRST_DATE_COLUMN + $day - 1
+            );
 
-            if (! is_numeric($actual) || (int) $actual !== $day || (float) $actual !== (float) $day) {
-                throw new \InvalidArgumentException("Header tanggal pada kolom {$column}, baris 7 tidak sesuai dengan tanggal {$day}.");
+            $actual = trim(
+                $this->cellText(
+                    $sheet->getCell(
+                        "{$column}" . self::DATE_ROW
+                    )->getValue()
+                )
+            );
+
+            if (
+                ! is_numeric($actual)
+                || (int) $actual !== $day
+                || (float) $actual !== (float) $day
+            ) {
+                throw new \InvalidArgumentException(
+                    "Header tanggal pada kolom {$column}, baris 7 tidak sesuai dengan tanggal {$day}."
+                );
             }
         }
     }
 
-    private function isStaffRow(string $serial, string $name, string $nipkwt): bool
-    {
-        $hasNumericSerial = $serial !== '' && is_numeric($serial) && (float) $serial === (float) (int) $serial;
+    private function isStaffRow(
+        string $serial,
+        string $name,
+        string $nipkwt
+    ): bool {
+        $hasNumericSerial = $serial !== ''
+            && is_numeric($serial)
+            && (float) $serial === (float) (int) $serial;
 
         return $hasNumericSerial || ($name !== '' && $nipkwt !== '');
     }
