@@ -11,6 +11,7 @@
     @include('user.catatan-dinas._section', [
         'catatan'      => $catatan,
         'daftarDinas'  => $daftarDinas,
+        'dinasAktif'   => $dinasAktif ?? null,
         'redirectTo'   => '',
     ])
 @endsection

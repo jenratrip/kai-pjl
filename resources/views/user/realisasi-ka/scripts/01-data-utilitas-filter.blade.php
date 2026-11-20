@@ -115,7 +115,8 @@ let dataKA = CONFIG.data.map((ka, index) => ({
     nomor: ka.nomor ?? '',
     nama: ka.nama ?? '',
     relasi: ka.relasi ?? '',
-    arah: String(ka.arah ?? '').trim().toUpperCase(),
+    hulu: ka.hulu ?? '',
+    hilir: ka.hilir ?? '',
     jadwal: ka.jadwal ?? '-',
     aktual: ka.aktual ?? '',
 

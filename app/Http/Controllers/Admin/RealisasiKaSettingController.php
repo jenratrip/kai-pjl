@@ -15,25 +15,48 @@ class RealisasiKaSettingController extends Controller
      */
     public function index()
     {
-        $setting = RealisasiKaSetting::firstOrCreate([], [
-            'toleransi_keterlambatan_menit' => 5,
-            'peringatan_keterlambatan_tinggi_menit' => 10,
+        $setting = RealisasiKaSetting::firstOrCreate(
+            [],
+            [
+                // ==========================================
+                // 1. KETERLAMBATAN KA
+                // ==========================================
 
-            'jarak_minimum_antar_ka_menit' => 0,
-            'warning_antar_ka_aktif' => false,
+                'toleransi_keterlambatan_menit' => 5,
+                'peringatan_keterlambatan_tinggi_menit' => 10,
 
-            'batas_penutupan_palang_menit' => 0,
-            'warning_penutupan_palang_aktif' => false,
+                'warning_keterlambatan_aktif' => false,
+                'warning_keterlambatan_tinggi_aktif' => false,
 
-            'batas_lebih_awal_menit' => 2,
-            'warning_lebih_awal_aktif' => true,
+                // ==========================================
+                // 2. JARAK ANTAR KA
+                // ==========================================
 
-            'batas_awas_2_arah_menit' => 5,
-            'warning_awas_2_arah_aktif' => false,
+                'jarak_minimum_antar_ka_menit' => 0,
+                'warning_antar_ka_aktif' => false,
 
-            'warning_keterlambatan_aktif' => false,
-            'warning_keterlambatan_tinggi_aktif' => false,
-        ]);
+                // ==========================================
+                // 3. DURASI PENUTUPAN PALANG
+                // ==========================================
+
+                'batas_penutupan_palang_menit' => 0,
+                'warning_penutupan_palang_aktif' => false,
+
+                // ==========================================
+                // 4. KA LEBIH AWAL DARI JADWAL
+                // ==========================================
+
+                'batas_lebih_awal_menit' => 2,
+                'warning_lebih_awal_aktif' => true,
+
+                // ==========================================
+                // 5. AWAS 2 ARAH
+                // ==========================================
+
+                'batas_awas_2_arah_menit' => 5,
+                'warning_awas_2_arah_aktif' => false,
+            ]
+        );
 
         return view(
             'admin.realisasi-ka-settings.index',
@@ -140,6 +163,7 @@ class RealisasiKaSettingController extends Controller
                 'required',
                 Rule::in(['0', '1', 0, 1]),
             ],
+
         ], [
             'peringatan_keterlambatan_tinggi_menit.gte' =>
                 'Ambang keterlambatan tinggi harus sama dengan atau lebih besar daripada toleransi keterlambatan.',
@@ -162,7 +186,17 @@ class RealisasiKaSettingController extends Controller
 
         DB::transaction(function () use ($validated) {
 
-            $setting = RealisasiKaSetting::firstOrCreate([]);
+            // Ambil pengaturan yang sudah tersedia.
+            // Jika belum ada, inisialisasi melalui index().
+            $setting = RealisasiKaSetting::query()
+                ->lockForUpdate()
+                ->first();
+
+            if (!$setting) {
+                throw new \RuntimeException(
+                    'Pengaturan Realisasi KA belum tersedia. Silakan buka panel pengaturan terlebih dahulu.'
+                );
+            }
 
             $setting->update([
 

@@ -4,7 +4,6 @@
         <table class="realisasi-table w-full min-w-0 table-fixed border-collapse text-center">
             <thead>
                 <tr>
-                    <th>NO</th>
                     <th>NOMOR KA</th>
                     <th>NAMA KA</th>
                     <th>RELASI</th>

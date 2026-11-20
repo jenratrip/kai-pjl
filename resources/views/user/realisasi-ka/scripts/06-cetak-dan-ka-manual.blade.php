@@ -65,7 +65,11 @@ function toggleFormTambahKA(forceOpen) {
         form.hidden;
 
     form.hidden = !open;
+
+    // Tombol memakai class inline-flex yang menimpa atribut hidden,
+    // jadi disembunyikan juga lewat class "hidden".
     btn.hidden = open;
+    btn.classList.toggle('hidden', open);
     btn.setAttribute('aria-expanded', String(open));
 
     if (open) {
@@ -97,7 +101,7 @@ function setManualCheck(button) {
     if (!field || !['yes', 'no'].includes(value)) return;
 
     const buttons = document.querySelectorAll(
-        `.mini-check [data-group="${group}"]`
+        `#formTambahKa [data-group="${group}"]`
     );
 
     buttons.forEach(item => {
@@ -135,7 +139,7 @@ function resetManualChecks() {
         semboyan35: ''
     };
 
-    document.querySelectorAll('.mini-check [data-group]').forEach(button => {
+    document.querySelectorAll('#formTambahKa [data-group]').forEach(button => {
         button.classList.remove(
             'border-green-300', 'bg-green-100', 'text-green-700',
             'border-red-300', 'bg-red-100', 'text-red-700'
@@ -197,7 +201,8 @@ function tambahKAManual() {
         nomor,
         nama,
         relasi,
-        arah: '',
+        hulu: '',
+        hilir: '',
         jadwal: '-',
         aktual,
         status: 'JALAN',

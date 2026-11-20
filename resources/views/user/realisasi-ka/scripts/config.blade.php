@@ -50,76 +50,91 @@
         |--------------------------------------------------------------------------
         | 5. PENGATURAN PERINGATAN DARI DATABASE
         |--------------------------------------------------------------------------
+        |
+        | Seluruh nilai ambang batas dan sakelar peringatan
+        | bersumber dari pengaturan yang disimpan oleh admin.
+        |
+        | Tidak ada nilai konfigurasi alternatif di frontend.
+        |
         */
 
         settings: {
-
-            // -------------------------------------------------
-            // KETERLAMBATAN KA
-            // -------------------------------------------------
+            /*
+            |--------------------------------------------------------------------------
+            | KETERLAMBATAN KA
+            |--------------------------------------------------------------------------
+            */
 
             toleransiKeterlambatanMenit: @json(
-                (int) data_get($realisasiKaSetting, 'toleransi_keterlambatan_menit', 5)
+                (int) $realisasiKaSetting->toleransi_keterlambatan_menit
             ),
 
             peringatanKeterlambatanTinggiMenit: @json(
-                (int) data_get($realisasiKaSetting, 'peringatan_keterlambatan_tinggi_menit', 10)
+                (int) $realisasiKaSetting->peringatan_keterlambatan_tinggi_menit
             ),
 
             warningKeterlambatanAktif: @json(
-                (bool) data_get($realisasiKaSetting, 'warning_keterlambatan_aktif', false)
+                (bool) $realisasiKaSetting->warning_keterlambatan_aktif
             ),
 
             warningKeterlambatanTinggiAktif: @json(
-                (bool) data_get($realisasiKaSetting, 'warning_keterlambatan_tinggi_aktif', false)
+                (bool) $realisasiKaSetting->warning_keterlambatan_tinggi_aktif
             ),
 
-            // -------------------------------------------------
-            // KA LEBIH CEPAT DARI JADWAL
-            // -------------------------------------------------
+            /*
+            |--------------------------------------------------------------------------
+            | KA LEBIH CEPAT DARI JADWAL
+            |--------------------------------------------------------------------------
+            */
 
             batasLebihCepatMenit: @json(
-                (int) data_get($realisasiKaSetting, 'batas_lebih_awal_menit', 2)
+                (int) $realisasiKaSetting->batas_lebih_awal_menit
             ),
 
             warningLebihAwalAktif: @json(
-                (bool) data_get($realisasiKaSetting, 'warning_lebih_awal_aktif', true)
+                (bool) $realisasiKaSetting->warning_lebih_awal_aktif
             ),
 
-            // -------------------------------------------------
-            // JARAK MINIMUM ANTAR KA
-            // -------------------------------------------------
+            /*
+            |--------------------------------------------------------------------------
+            | JARAK MINIMUM ANTAR KA
+            |--------------------------------------------------------------------------
+            */
 
             jarakMinimumAntarKaMenit: @json(
-                (int) data_get($realisasiKaSetting, 'jarak_minimum_antar_ka_menit', 0)
+                (int) $realisasiKaSetting->jarak_minimum_antar_ka_menit
             ),
 
             warningAntarKaAktif: @json(
-                (bool) data_get($realisasiKaSetting, 'warning_antar_ka_aktif', false)
+                (bool) $realisasiKaSetting->warning_antar_ka_aktif
             ),
 
-            // -------------------------------------------------
-            // AWAS 2 ARAH
-            // -------------------------------------------------
+            /*
+            |--------------------------------------------------------------------------
+            | AWAS 2 ARAH
+            |--------------------------------------------------------------------------
+            */
 
             batasAwas2ArahMenit: @json(
-                (int) data_get($realisasiKaSetting, 'batas_awas_2_arah_menit', 5)
+                (int) $realisasiKaSetting->batas_awas_2_arah_menit
             ),
 
             warningAwas2ArahAktif: @json(
-                (bool) data_get($realisasiKaSetting, 'warning_awas_2_arah_aktif', false)
+                (bool) $realisasiKaSetting->warning_awas_2_arah_aktif
             ),
 
-            // -------------------------------------------------
-            // DURASI PENUTUPAN PALANG
-            // -------------------------------------------------
+            /*
+            |--------------------------------------------------------------------------
+            | DURASI PENUTUPAN PALANG
+            |--------------------------------------------------------------------------
+            */
 
             batasPenutupanPalangMenit: @json(
-                (int) data_get($realisasiKaSetting, 'batas_penutupan_palang_menit', 0)
+                (int) $realisasiKaSetting->batas_penutupan_palang_menit
             ),
 
             warningPenutupanPalangAktif: @json(
-                (bool) data_get($realisasiKaSetting, 'warning_penutupan_palang_aktif', false)
+                (bool) $realisasiKaSetting->warning_penutupan_palang_aktif
             )
         }
     };

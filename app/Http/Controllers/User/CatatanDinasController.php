@@ -12,19 +12,34 @@ use Illuminate\Support\Facades\Log;
 class CatatanDinasController extends Controller
 {
     /**
-     * Mengambil dinas aktif pengguna untuk kebutuhan header.
+     * Mengambil data dinas aktif berdasarkan session.
+     *
+     * Dinas harus:
+     * - Sesuai dengan ID dinas pada session.
+     * - Dimiliki oleh user yang sedang login.
+     * - Berstatus berlangsung.
      */
     private function dinasAktif(): ?Dinas
     {
+        if (! auth()->check()) {
+            return null;
+        }
+
+        $dinasId = request()->session()->get('dinas_id');
+
+        if (! is_numeric($dinasId) || (int) $dinasId <= 0) {
+            return null;
+        }
+
         return Dinas::with([
             'user',
             'userDigantikan',
             'jpl.resort',
             'shift',
         ])
+            ->whereKey((int) $dinasId)
             ->where('user_id', auth()->id())
             ->where('status', 'berlangsung')
-            ->latest('id')
             ->first();
     }
 
@@ -35,27 +50,36 @@ class CatatanDinasController extends Controller
     {
         $user = auth()->user();
 
-        // Pastikan pengguna sudah login.
-        if (!$user) {
+        if (! $user) {
             return redirect()->route('login');
         }
 
-        // Mengambil dinas aktif untuk header.
+        // Dinas aktif dari session (juga dipakai untuk header).
         $dinasAktif = $this->dinasAktif();
 
-        // Mengambil catatan milik pengguna yang sedang login.
-        $catatan = CatatanDinas::with([
-            'user',
-            'dinas.user',
-            'dinas.userDigantikan',
-            'dinas.shift',
-            'dinas.jpl.resort',
-        ])
-            ->where('user_id', $user->id)
-            ->latest('waktu_catatan')
-            ->get();
+        // JPL tempat pengguna login saat ini (misal JPL 351).
+        $jplId = $dinasAktif?->jpl_id
+            ? (int) $dinasAktif->jpl_id
+            : null;
 
-        // Mengambil jadwal dinas beserta data shift dari database.
+        // Semua petugas pada JPL yang sama (shift 1, 2, 3)
+        // dapat membaca catatan satu sama lain.
+        $catatan = $jplId
+            ? CatatanDinas::with([
+                'user',
+                'dinas.user',
+                'dinas.userDigantikan',
+                'dinas.shift',
+                'dinas.jpl.resort',
+            ])
+                ->whereHas('dinas', function ($query) use ($jplId) {
+                    $query->where('jpl_id', $jplId);
+                })
+                ->latest('waktu_catatan')
+                ->get()
+            : collect();
+
+        // Jadwal milik pengguna sendiri (untuk pilihan tanggal/shift di form).
         $daftarDinas = Dinas::with([
             'user',
             'userDigantikan',
@@ -67,29 +91,15 @@ class CatatanDinasController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        // Log untuk membantu memeriksa data jadwal dan shift.
         Log::info('Pemeriksaan Catatan Dinas', [
             'user_id' => $user->id,
             'nama_user' => $user->name,
+            'session_dinas_id' => request()->session()->get('dinas_id'),
             'dinas_aktif_id' => $dinasAktif?->id,
             'dinas_aktif_status' => $dinasAktif?->status,
+            'jpl_id' => $jplId,
             'jumlah_catatan' => $catatan->count(),
             'jumlah_jadwal' => $daftarDinas->count(),
-            'jadwal' => $daftarDinas->map(function ($dinas) {
-                return [
-                    'dinas_id' => $dinas->id,
-                    'user_id' => $dinas->user_id,
-                    'tanggal_dinas' => $dinas->getRawOriginal(
-                        'tanggal_dinas'
-                    ),
-                    'shift_id' => $dinas->shift_id,
-                    'nama_shift' => $dinas->shift?->nama_shift,
-                    'is_pengganti' => $dinas->is_pengganti,
-                    'nama_jpl' => $dinas->jpl?->nama_jpl,
-                    'nama_petugas' => $dinas->user?->name,
-                    'nama_petugas_digantikan' => $dinas->userDigantikan?->name,
-                ];
-            })->values()->all(),
         ]);
 
         return view('user.catatan-dinas.index', [
@@ -108,41 +118,25 @@ class CatatanDinasController extends Controller
     {
         $user = auth()->user();
 
-        if (!$user) {
+        if (! $user) {
             return redirect()->route('login');
         }
 
-        // Validasi input dari formulir.
         $validated = $request->validate([
-            'tanggal' => [
-                'required',
-                'date_format:Y-m-d',
-            ],
-            'shift_id' => [
-                'required',
-                'integer',
-            ],
-            'catatan' => [
-                'required',
-                'string',
-                'max:5000',
-            ],
-            'redirect_to' => [
-                'nullable',
-                'string',
-                'in:realisasi-ka',
-            ],
+            'tanggal' => ['required', 'date_format:Y-m-d'],
+            'shift_id' => ['required', 'integer'],
+            'catatan' => ['required', 'string', 'max:5000'],
+            'redirect_to' => ['nullable', 'string', 'in:realisasi-ka'],
         ]);
 
-        // Jadwal harus dimiliki pengguna yang sedang login,
-        // serta sesuai dengan tanggal dan shift yang dipilih.
+        // Penulis tetap harus punya jadwal dinas pada tanggal dan shift tersebut.
         $dinas = Dinas::with('shift')
             ->where('user_id', $user->id)
             ->whereDate('tanggal_dinas', $validated['tanggal'])
             ->where('shift_id', $validated['shift_id'])
             ->first();
 
-        if (!$dinas) {
+        if (! $dinas) {
             Log::warning('Jadwal Catatan Dinas tidak ditemukan', [
                 'user_id' => $user->id,
                 'tanggal' => $validated['tanggal'],
@@ -158,7 +152,6 @@ class CatatanDinasController extends Controller
                 ]);
         }
 
-        // Simpan catatan menggunakan transaksi database.
         DB::transaction(function () use ($dinas, $user, $validated) {
             CatatanDinas::create([
                 'dinas_id' => $dinas->id,
@@ -170,7 +163,6 @@ class CatatanDinasController extends Controller
             ]);
         });
 
-        // Kembali ke halaman Realisasi KA jika form dikirim dari sana.
         if (($validated['redirect_to'] ?? null) === 'realisasi-ka') {
             return redirect()
                 ->to(route('user.realisasi-ka') . '#catatanDinasQuick')

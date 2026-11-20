@@ -1,5 +1,5 @@
 {{-- resources/views/user/catatan-dinas/_section.blade.php --}}
-{{-- Variabel: $catatan, $daftarDinas, $redirectTo (opsional) --}}
+{{-- Variabel: $catatan, $daftarDinas, $dinasAktif (opsional), $redirectTo (opsional) --}}
 
 <div class="mx-auto w-full max-w-7xl px-3 py-4 text-sm leading-5 text-[#26344d] sm:px-4 sm:py-6 lg:px-6 lg:py-7">
     <section id="catatanDinasSection">
@@ -43,7 +43,7 @@
                         $tanggalCatatan = $tanggalMentahCatatan
                             ? \Carbon\Carbon::parse($tanggalMentahCatatan)->locale('id')->translatedFormat('d M Y')
                             : '-';
-                        $namaPjl = $item->dinas?->user?->name ?? $item->user?->name ?? '-';
+                        $namaPjl = $item->user?->name ?? $item->dinas?->user?->name ?? '-';
                         $namaShift = $item->dinas?->shift?->nama_shift ?? '-';
                     @endphp
 
@@ -96,8 +96,14 @@
                 @empty
                     <div class="px-3 py-8 text-center text-xs text-[#647084]">
                         <span class="mb-2 block text-2xl text-slate-400" aria-hidden="true">▤</span>
-                        <p class="m-0 font-semibold text-[#26344d]">Belum ada catatan dinas.</p>
-                        <p class="mb-0 mt-1">Klik tombol Tambah Catatan untuk membuat catatan baru.</p>
+                        <p class="m-0 font-semibold text-[#26344d]">
+                            {{ ($dinasAktif ?? null) ? 'Belum ada catatan dinas.' : 'Dinas belum dimulai.' }}
+                        </p>
+                        <p class="mb-0 mt-1">
+                            {{ ($dinasAktif ?? null)
+                                ? 'Klik tombol Tambah Catatan untuk membuat catatan baru.'
+                                : 'Mulai dinas terlebih dahulu untuk melihat catatan pada JPL Anda.' }}
+                        </p>
                     </div>
                 @endforelse
             </div>
@@ -123,7 +129,7 @@
                                 $tanggalCatatan = $tanggalMentahCatatan
                                     ? \Carbon\Carbon::parse($tanggalMentahCatatan)->locale('id')->translatedFormat('d M Y')
                                     : '-';
-                                $namaPjl = $item->dinas?->user?->name ?? $item->user?->name ?? '-';
+                                $namaPjl = $item->user?->name ?? $item->dinas?->user?->name ?? '-';
                                 $namaShift = $item->dinas?->shift?->nama_shift ?? '-';
                             @endphp
 
@@ -165,8 +171,14 @@
                             <tr>
                                 <td colspan="6" class="px-5 py-10 text-center text-xs text-[#647084]">
                                     <span class="mb-2 block text-2xl text-slate-400" aria-hidden="true">▤</span>
-                                    <p class="m-0 font-semibold text-[#26344d]">Belum ada catatan dinas.</p>
-                                    <p class="mb-0 mt-1">Klik tombol Tambah Catatan untuk membuat catatan baru.</p>
+                                    <p class="m-0 font-semibold text-[#26344d]">
+                                        {{ ($dinasAktif ?? null) ? 'Belum ada catatan dinas.' : 'Dinas belum dimulai.' }}
+                                    </p>
+                                    <p class="mb-0 mt-1">
+                                        {{ ($dinasAktif ?? null)
+                                            ? 'Klik tombol Tambah Catatan untuk membuat catatan baru.'
+                                            : 'Mulai dinas terlebih dahulu untuk melihat catatan pada JPL Anda.' }}
+                                    </p>
                                 </td>
                             </tr>
                         @endforelse

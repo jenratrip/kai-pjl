@@ -116,21 +116,72 @@ function getStatusNote(ka, color) {
 
 /* =====================================================
    ARAH PERJALANAN KA
+   Arah diturunkan dari JURUSAN (dari -> ke), BUKAN dari
+   paritas nomor KA. Urutan stasiun (barat -> timur):
+   YK - LPN - MGW
 ===================================================== */
 
-function getParitas(ka) {
-    const match = String(ka.nomor ?? '').match(/\d+/);
+const URUTAN_STASIUN = {
+    YK: 0,
+    LPN: 1,
+    MGW: 2
+};
 
-    if (!match) {
-        return '';
+// Mengambil kode stasiun asal & tujuan dari berbagai kemungkinan field.
+function getRuteKA(ka) {
+    let dari = ka.dari ?? ka.asal ?? '';
+    let ke = ka.ke ?? ka.tujuan ?? '';
+
+    // Format teks gabungan pada field relasi, mis. "MGW - YK".
+    const teksRute = ka.relasi || ka.jurusan;
+
+    if ((!dari || !ke) && teksRute) {
+        const bagian = String(teksRute)
+            .split(/\s*(?:-|–|—|>|→|\/)\s*/)
+            .filter(Boolean);
+
+        if (bagian.length >= 2) {
+            dari = bagian[0];
+            ke = bagian[bagian.length - 1];
+        }
     }
 
-    return Number(match[0].slice(-1)) % 2 === 0
-        ? 'GENAP'
-        : 'GANJIL';
+    return {
+        dari: String(dari).trim().toUpperCase(),
+        ke: String(ke).trim().toUpperCase()
+    };
+}
+
+function getArahKA(ka) {
+    const { dari, ke } = getRuteKA(ka);
+
+    const posDari = URUTAN_STASIUN[dari];
+    const posKe = URUTAN_STASIUN[ke];
+
+    if (
+        posDari !== undefined &&
+        posKe !== undefined &&
+        posDari !== posKe
+    ) {
+        return posKe > posDari ? 'TIMUR' : 'BARAT';
+    }
+
+    // Cadangan: field arah manual (HULU/HILIR) jika rute tidak tersedia.
+    if (ka.arah === 'HULU' || ka.arah === 'HILIR') {
+        return ka.arah;
+    }
+
+    // Tidak diketahui -> JANGAN ditebak.
+    return '';
 }
 
 function getLabelArah(ka) {
+    const { dari } = getRuteKA(ka);
+
+    if (URUTAN_STASIUN[dari] !== undefined) {
+        return `dari ${dari}`;
+    }
+
     if (ka.arah === 'HULU' || ka.arah === 'HILIR') {
         return `dari ${ka.arah.toLowerCase()}`;
     }
@@ -139,16 +190,21 @@ function getLabelArah(ka) {
 }
 
 function isBerlawananArah(a, b) {
-    const arahValid = ['HULU', 'HILIR'];
+    const arahA = getArahKA(a);
+    const arahB = getArahKA(b);
 
-    if (
-        !arahValid.includes(a.arah) ||
-        !arahValid.includes(b.arah)
-    ) {
+    if (!arahA || !arahB) {
         return false;
     }
 
-    return a.arah !== b.arah;
+    // Hanya bandingkan jika memakai istilah arah yang sama.
+    const pasanganSah =
+        (arahA === 'TIMUR' && arahB === 'BARAT') ||
+        (arahA === 'BARAT' && arahB === 'TIMUR') ||
+        (arahA === 'HULU' && arahB === 'HILIR') ||
+        (arahA === 'HILIR' && arahB === 'HULU');
+
+    return pasanganSah;
 }
 
 
@@ -157,19 +213,14 @@ function isBerlawananArah(a, b) {
 ===================================================== */
 
 function getWaktuRujukan(ka) {
-    if (ka.status === 'JALAN') {
-        if (!ka.aktual) {
-            return null;
-        }
-
-        return timeToMinutes(ka.aktual);
+    if (ka.status === 'BATAL') {
+        return null;
     }
 
-    if (ka.status === 'BELUM') {
-        return timeToMinutes(ka.jadwal);
-    }
-
-    return null;
+    // Kedekatan KA dinilai dari JADWAL, bukan dari jam saat tombol ✓ ditekan.
+    // Jam aktual hanya dipakai jika KA tidak punya jadwal (KA manual).
+    // Dengan begitu penanda tidak hilang/muncul hanya karena jam klik berbeda.
+    return timeToMinutes(ka.jadwal) ?? timeToMinutes(ka.aktual);
 }
 
 
@@ -236,6 +287,17 @@ function getKandidatAwas() {
 
 
 /* =====================================================
+   KETERANGAN "BERSAMAAN" (DARI JADWAL)
+===================================================== */
+
+function isBersamaan(ka) {
+    return String(ka.keterangan ?? '')
+        .trim()
+        .toUpperCase() === 'BERSAMAAN';
+}
+
+
+/* =====================================================
    DETEKSI AWAS 2 ARAH
 ===================================================== */
 
@@ -266,7 +328,16 @@ function cariAwas2Arah() {
             const b = kandidat[j];
 
             // Harus berlawanan arah.
-            if (!isBerlawananArah(a.ka, b.ka)) {
+            // Jika arah kedua KA terbaca, pakai arah. Jika tidak,
+            // percaya keterangan BERSAMAAN dari jadwal.
+            const arahDiketahui =
+                getArahKA(a.ka) && getArahKA(b.ka);
+
+            const lawan = arahDiketahui
+                ? isBerlawananArah(a.ka, b.ka)
+                : (isBersamaan(a.ka) || isBersamaan(b.ka));
+
+            if (!lawan) {
                 continue;
             }
 
@@ -368,5 +439,5 @@ function updateAwasBanner(info) {
         </ul>
     `;
 
-    banner.hidden = false;
+    banner.hidden = true;
 }

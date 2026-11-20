@@ -9,6 +9,7 @@ use App\Models\KeretaApi;
 use App\Models\RealisasiKa;
 use App\Models\RealisasiKaSetting;
 use App\Services\ActivityLogService;
+use App\Services\CatatanSiklusService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -20,8 +21,10 @@ class RealisasiKaController extends Controller
      * Menampilkan jadwal KA, realisasi, dan konfigurasi Admin
      * untuk dinas aktif pengguna.
      */
-    public function index(Request $request)
-    {
+    public function index(
+        Request $request,
+        CatatanSiklusService $catatanSiklusService
+    ) {
         /*
         |--------------------------------------------------------------------------
         | AMBIL DINAS AKTIF DAN IDENTITAS PETUGAS
@@ -313,6 +316,18 @@ class RealisasiKaController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | CATATAN DINAS SATU SIKLUS (SHIFT 1 SAMPAI 3)
+        |--------------------------------------------------------------------------
+        |
+        | Dibagikan ke semua petugas pada JPL yang sama. Siklus berganti
+        | otomatis ketika shift pagi (shift 1) berikutnya aktif.
+        |
+        */
+
+        $catatanSiklus = $catatanSiklusService->untuk($dinas);
+
+        /*
+        |--------------------------------------------------------------------------
         | KIRIM DATA KE VIEW
         |--------------------------------------------------------------------------
         |
@@ -330,6 +345,7 @@ class RealisasiKaController extends Controller
             'dataKA' => $dataKA,
             'dinasAktif' => $dinas,
             'realisasiKaSetting' => $realisasiKaSetting,
+            'catatanSiklus' => $catatanSiklus,
         ]);
     }
 

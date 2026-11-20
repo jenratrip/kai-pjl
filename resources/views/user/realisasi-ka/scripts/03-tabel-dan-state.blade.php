@@ -28,14 +28,10 @@ function stateBaris(index) {
         return 'saved';
     }
 
-    // Jika belum ada realisasi_ka_id, berarti belum pernah disimpan
     if (!dataKA[index] || !dataKA[index].realisasi_ka_id) {
-        // Check apakah ada perubahan dari baseline
         return isRowChanged(index) ? 'dirty' : 'clean';
     }
 
-    // Sudah pernah disimpan (punya realisasi_ka_id)
-    // Check apakah ada perubahan dari baseline
     return isRowChanged(index) ? 'dirty' : 'clean';
 }
 
@@ -44,13 +40,12 @@ function refreshRowButtons() {
         const index = Number(button.dataset.saveRow);
         const state = stateBaris(index);
 
-        // Sembunyikan tombol jika baris bersih (tidak ada perubahan)
         if (state === 'clean') {
             button.style.display = 'none';
             return;
         }
 
-        button.style.display = '';  // Tampilkan kembali jika ada perubahan
+        button.style.display = '';
 
         const labels = {
             dirty: 'Simpan',
@@ -74,7 +69,6 @@ function refreshRowButtons() {
             font-weight:600;
             white-space:nowrap;
             cursor:pointer;
-            display:;
         `;
 
         button.textContent = labels[state] || 'Simpan';
@@ -102,13 +96,14 @@ function simpanBaris(index) {
 
 /*
  * Satu tombol dengan siklus:
- * kosong -> yes -> no -> yes -> no ...
+ * kosong -> YA -> TIDAK -> YA -> TIDAK ...
  */
 function createCheckGroup(value, index, field) {
     const isYes = value === 'yes';
     const isNo = value === 'no';
 
     let label = '—';
+
     let style = `
         background:#fff;
         color:#64748b;
@@ -120,6 +115,7 @@ function createCheckGroup(value, index, field) {
     if (isYes) {
         label = '✓';
         title = 'YA';
+
         style = `
             background:#dcfce7;
             color:#15803d;
@@ -128,6 +124,7 @@ function createCheckGroup(value, index, field) {
     } else if (isNo) {
         label = '×';
         title = 'TIDAK';
+
         style = `
             background:#fee2e2;
             color:#b91c1c;
@@ -169,26 +166,22 @@ function setCheck(button, index, field) {
 
     const currentValue = dataKA[index][field];
 
-    // Kosong -> YA -> TIDAK -> YA
+    // Kosong -> YA -> TIDAK
     const nextValue = currentValue === 'yes'
         ? 'no'
         : 'yes';
 
-    // Simpan perubahan pada data lokal.
     dataKA[index][field] = nextValue;
 
     incrementRowVersion(index);
 
-    // ✓ PERBAIKAN: Deteksi apakah berubah dari baseline
     if (isRowChanged(index)) {
         dirtyRows.add(index);
         savedRows.delete(index);
     } else {
-        // Nilai kembali ke baseline
         dirtyRows.delete(index);
     }
 
-    // Perbarui tombol tanpa merender seluruh tabel.
     const group = button.closest('.check-group');
 
     if (group) {
@@ -199,7 +192,6 @@ function setCheck(button, index, field) {
         );
     }
 
-    // Tandai perubahan untuk disimpan nanti.
     tandaiBerubah(index);
 }
 
@@ -209,7 +201,7 @@ function setCheck(button, index, field) {
 ===================================================== */
 
 function createActualTimeDisplay(ka, index) {
-    // Jika belum ada jam aktual, tampilkan hanya ikon jam
+    // Jika belum ada jam aktual, tampilkan ikon jam.
     if (!ka.aktual) {
         return `
             <div class="actual-time-wrapper flex items-center justify-center gap-2">
@@ -218,7 +210,13 @@ function createActualTimeDisplay(ka, index) {
                     class="time-icon-btn inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
                     onclick="openActualTimeInput(${index})"
                     title="Klik untuk mengisi jam aktual">
-                    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
+
+                    <svg
+                        aria-hidden="true"
+                        focusable="false"
+                        viewBox="0 0 24 24"
+                        class="h-4 w-4 fill-none stroke-current stroke-2">
+
                         <circle cx="12" cy="12" r="10" />
                         <path d="M12 6v6l4 2" />
                     </svg>
@@ -227,7 +225,7 @@ function createActualTimeDisplay(ka, index) {
         `;
     }
 
-    // Jika ada jam aktual, tampilkan waktu dengan ikon jam yang bisa diklik
+    // Jika ada jam aktual, tampilkan waktu yang bisa diklik.
     return `
         <div class="actual-time-wrapper flex items-center justify-center gap-2">
             <button
@@ -235,10 +233,17 @@ function createActualTimeDisplay(ka, index) {
                 class="time-value-btn inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 transition-colors"
                 onclick="openActualTimeInput(${index})"
                 title="Klik untuk mengubah jam">
-                <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" class="h-3 w-3 mr-1 fill-none stroke-current stroke-2">
+
+                <svg
+                    aria-hidden="true"
+                    focusable="false"
+                    viewBox="0 0 24 24"
+                    class="h-3 w-3 mr-1 fill-none stroke-current stroke-2">
+
                     <circle cx="12" cy="12" r="10" />
                     <path d="M12 6v6l4 2" />
                 </svg>
+
                 <span>${escapeHtml(ka.aktual)}</span>
             </button>
         </div>
@@ -247,37 +252,37 @@ function createActualTimeDisplay(ka, index) {
 
 function openActualTimeInput(index) {
     const ka = dataKA[index];
-    
+
     if (!ka) {
         return;
     }
 
-    // Cari wrapper jam aktual
-    const row = document.querySelector(`tr[data-index="${index}"]`);
-    
+    const row = document.querySelector(
+        `tr[data-index="${index}"]`
+    );
+
     if (!row) {
         return;
     }
 
     const wrapper = row.querySelector('.actual-time-wrapper');
-    
+
     if (!wrapper) {
         return;
     }
 
-    // Tampilkan input time
     wrapper.innerHTML = `
         <input
             type="time"
             class="actual-time-input w-full min-w-0 rounded-md border border-blue-500 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value="${escapeHtml(ka.aktual)}"
+            value="${escapeHtml(ka.aktual || '')}"
             onchange="updateActualTimeFromInput(${index}, this.value)"
             onblur="closeActualTimeInput(${index})"
             autofocus>
     `;
 
-    // Focus input
     const input = wrapper.querySelector('input[type="time"]');
+
     if (input) {
         input.focus();
         input.select?.();
@@ -293,7 +298,7 @@ function updateActualTimeFromInput(index, value) {
 
     const jamAktual = String(value ?? '').trim();
 
-    // Validasi format jam HH:mm
+    // Validasi format jam HH:mm.
     if (
         jamAktual !== '' &&
         !/^([01]\d|2[0-3]):[0-5]\d$/.test(jamAktual)
@@ -305,42 +310,39 @@ function updateActualTimeFromInput(index, value) {
 
     incrementRowVersion(index);
 
-    // ✓ PERBAIKAN: Deteksi apakah berubah dari baseline
     if (isRowChanged(index)) {
         dirtyRows.add(index);
         savedRows.delete(index);
     } else {
-        // Nilai kembali ke baseline
         dirtyRows.delete(index);
     }
 
-    // Tandai perubahan
     tandaiBerubah(index);
 
-    // Render ulang untuk memperbarui tampilan
     renderTable();
 }
 
 function closeActualTimeInput(index) {
     const ka = dataKA[index];
-    
+
     if (!ka) {
         return;
     }
 
-    const row = document.querySelector(`tr[data-index="${index}"]`);
-    
+    const row = document.querySelector(
+        `tr[data-index="${index}"]`
+    );
+
     if (!row) {
         return;
     }
 
     const wrapper = row.querySelector('.actual-time-wrapper');
-    
+
     if (!wrapper) {
         return;
     }
 
-    // Tampilkan kembali display jam aktual
     wrapper.innerHTML = createActualTimeDisplay(ka, index);
 }
 
@@ -433,7 +435,6 @@ function createStatus(ka, index) {
 function createRowAction(index) {
     const state = stateBaris(index);
 
-    // Jika baris bersih, jangan render tombol
     if (state === 'clean') {
         return '';
     }
@@ -472,7 +473,9 @@ function createRowAction(index) {
 function renderTable(forPrint = false) {
     const tbody = document.getElementById('kaTableBody');
 
-    if (!tbody) return;
+    if (!tbody) {
+        return;
+    }
 
     const awasInfo = cariAwas2Arah();
     updateAwasBanner(awasInfo);
@@ -504,10 +507,7 @@ function renderTable(forPrint = false) {
         return;
     }
 
-    visibleKA.forEach(({
-        ka,
-        index
-    }, visibleIndex) => {
+    visibleKA.forEach(({ ka, index }) => {
         const row = document.createElement('tr');
 
         row.dataset.index = index;
@@ -518,10 +518,7 @@ function renderTable(forPrint = false) {
         }
 
         row.innerHTML = `
-            <td class="break-words px-1 py-2 text-center text-xs text-gray-600">
-                ${visibleIndex + 1}
-            </td>
-
+            <!-- KOLOM 1: NOMOR KA -->
             <td class="break-words px-1 py-2 text-xs font-semibold text-gray-800">
                 ${escapeHtml(ka.nomor)}
                 ${ka.is_manual
@@ -529,6 +526,7 @@ function renderTable(forPrint = false) {
                     : ''}
             </td>
 
+            <!-- KOLOM 2: NAMA KA -->
             <td class="break-words px-1 py-2 text-xs text-gray-800">
                 ${escapeHtml(ka.nama)}
                 ${awasInfo.indexSet.has(index)
@@ -536,38 +534,47 @@ function renderTable(forPrint = false) {
                     : ''}
             </td>
 
+            <!-- KOLOM 3: RELASI -->
             <td class="break-words px-1 py-2 text-xs text-gray-600">
                 ${escapeHtml(ka.relasi || '-')}
             </td>
 
+            <!-- KOLOM 4: JAM JADWAL -->
             <td class="whitespace-nowrap px-1 py-2 text-center text-xs font-medium text-gray-700">
                 ${escapeHtml(ka.jadwal)}
             </td>
 
+            <!-- KOLOM 5: JAM AKTUAL -->
             <td class="px-1 py-2 text-center">
                 ${createActualTimeDisplay(ka, index)}
             </td>
 
+            <!-- KOLOM 6: STATUS -->
             <td class="px-1 py-2 text-center">
                 ${createStatus(ka, index)}
             </td>
 
+            <!-- KOLOM 7: S21 -->
             <td class="px-1 py-2 text-center">
                 ${createCheckGroup(ka.semboyan21, index, 'semboyan21')}
             </td>
 
+            <!-- KOLOM 8: GENTA -->
             <td class="px-1 py-2 text-center">
                 ${createCheckGroup(ka.genta, index, 'genta')}
             </td>
 
+            <!-- KOLOM 9: PINTU PERLINTASAN -->
             <td class="px-1 py-2 text-center">
                 ${createCheckGroup(ka.pintu, index, 'pintu')}
             </td>
 
+            <!-- KOLOM 10: S35 -->
             <td class="px-1 py-2 text-center">
                 ${createCheckGroup(ka.semboyan35, index, 'semboyan35')}
             </td>
 
+            <!-- KOLOM 11: KETERANGAN -->
             <td class="px-1 py-2">
                 <input
                     type="text"
@@ -577,6 +584,7 @@ function renderTable(forPrint = false) {
                     oninput="updateKeterangan(${index}, this.value)">
             </td>
 
+            <!-- KOLOM 12: AKSI -->
             <td class="whitespace-nowrap px-3 py-3 text-center">
                 ${createRowAction(index)}
             </td>
